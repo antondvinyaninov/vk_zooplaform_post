@@ -237,6 +237,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (vkOAuthBtn) {
         vkOAuthBtn.addEventListener('click', startVKOAuth);
     }
+    
+    // Добавляем обработчик для сервисного ключа
+    const serviceKeyBtn = document.getElementById('serviceKeyBtn');
+    if (serviceKeyBtn) {
+        serviceKeyBtn.addEventListener('click', useServiceKey);
+    }
 });
 
 // VK OAuth авторизация (старый метод для доступа к VK API)
@@ -314,5 +320,63 @@ async function getUserInfoVKAPI(accessToken, userId) {
         }
     } catch (error) {
         console.error('VK API error:', error);
+    }
+}
+
+// Использование сервисного ключа
+async function useServiceKey() {
+    const serviceKeyInput = document.getElementById('serviceKeyInput');
+    const serviceKeyResult = document.getElementById('serviceKeyResult');
+    const serviceKey = serviceKeyInput.value.trim();
+    
+    if (!serviceKey) {
+        serviceKeyResult.className = 'result show error';
+        serviceKeyResult.innerHTML = '<strong>✗ Ошибка!</strong><p>Введите сервисный ключ</p>';
+        return;
+    }
+    
+    serviceKeyResult.className = 'result show';
+    serviceKeyResult.style.background = '#fff3cd';
+    serviceKeyResult.style.color = '#856404';
+    serviceKeyResult.innerHTML = '<strong>⏳ Проверка ключа...</strong>';
+    
+    try {
+        // Проверяем ключ, получая информацию о текущем пользователе
+        const response = await fetch(`https://api.vk.com/method/users.get?fields=photo_200&access_token=${serviceKey}&v=5.131`);
+        const data = await response.json();
+        
+        if (data.error) {
+            serviceKeyResult.className = 'result show error';
+            serviceKeyResult.innerHTML = `<strong>✗ Ошибка!</strong><p>${data.error.error_msg}</p>`;
+            return;
+        }
+        
+        if (data.response && data.response[0]) {
+            const user = data.response[0];
+            
+            // Сохраняем токен (сервисный ключ живет вечно)
+            localStorage.setItem('vk_access_token', serviceKey);
+            localStorage.setItem('vk_user_id', user.id);
+            localStorage.setItem('vk_token_expires', Date.now() + (365 * 24 * 60 * 60 * 1000)); // 1 год
+            localStorage.setItem('vk_user_name', `${user.first_name} ${user.last_name}`);
+            localStorage.setItem('vk_user_photo', user.photo_200);
+            
+            serviceKeyResult.className = 'result show success';
+            serviceKeyResult.innerHTML = `
+                <div style="text-align: center;">
+                    <img src="${user.photo_200}" alt="${user.first_name}" style="width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px;">
+                    <h3 style="margin: 10px 0;">${user.first_name} ${user.last_name}</h3>
+                    <strong>✓ Сервисный ключ принят!</strong>
+                    <p>User ID: ${user.id}</p>
+                    <br>
+                    <a href="index.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
+                        Перейти к панели управления
+                    </a>
+                </div>
+            `;
+        }
+    } catch (error) {
+        serviceKeyResult.className = 'result show error';
+        serviceKeyResult.innerHTML = `<strong>✗ Ошибка!</strong><p>${error.message}</p>`;
     }
 }
