@@ -65,6 +65,10 @@ func main() {
 	http.HandleFunc("/api/vk/user-info", corsMiddleware(vkUserInfoHandler))
 	http.HandleFunc("/api/vk/service-key", corsMiddleware(vkServiceKeyHandler))
 
+	// Новый OAuth endpoint (не затирает старый)
+	http.HandleFunc("/api/vk/oauth/callback", corsMiddleware(vkOAuthCallbackHandler))
+	http.HandleFunc("/api/vk/oauth/token", corsMiddleware(vkOAuthTokenHandler))
+
 	// Редиректы для обратной совместимости
 	http.HandleFunc("/auth.html", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/pages/auth.html", http.StatusMovedPermanently)
@@ -130,7 +134,7 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	// Отправляем запрос в VK Service
 	vkServiceURL := os.Getenv("VK_SERVICE_URL")
 	if vkServiceURL == "" {
-		vkServiceURL = "http://localhost:5000"
+		vkServiceURL = "http://localhost:5001"
 	}
 
 	// Создаем новый multipart writer для пересылки в VK Service
@@ -438,7 +442,7 @@ func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		AccessToken string `json:"access_token"`
-		UserID      int    `json:"user_id"`
+		UserIDs     string `json:"user_ids"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -448,15 +452,22 @@ func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.AccessToken == "" || req.UserIDs == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "access_token and user_ids are required"})
+		return
+	}
+
 	// Отправляем запрос в VK Service
 	vkServiceURL := os.Getenv("VK_SERVICE_URL")
 	if vkServiceURL == "" {
-		vkServiceURL = "http://localhost:5000"
+		vkServiceURL = "http://localhost:5001"
 	}
 
 	payload := map[string]interface{}{
 		"access_token": req.AccessToken,
-		"user_ids":     fmt.Sprintf("%d", req.UserID),
+		"user_ids":     req.UserIDs,
 	}
 
 	jsonData, err := json.Marshal(payload)
@@ -649,7 +660,7 @@ func vkGetPostsHandler(w http.ResponseWriter, r *http.Request) {
 	// Отправляем запрос в VK Service
 	vkServiceURL := os.Getenv("VK_SERVICE_URL")
 	if vkServiceURL == "" {
-		vkServiceURL = "http://localhost:5000"
+		vkServiceURL = "http://localhost:5001"
 	}
 
 	payload := map[string]interface{}{
@@ -722,7 +733,7 @@ func vkRepostHandler(w http.ResponseWriter, r *http.Request) {
 	// Отправляем запрос в VK Service
 	vkServiceURL := os.Getenv("VK_SERVICE_URL")
 	if vkServiceURL == "" {
-		vkServiceURL = "http://localhost:5000"
+		vkServiceURL = "http://localhost:5001"
 	}
 
 	payload := map[string]interface{}{
@@ -792,7 +803,7 @@ func vkCopyPostHandler(w http.ResponseWriter, r *http.Request) {
 	// Отправляем запрос в VK Service
 	vkServiceURL := os.Getenv("VK_SERVICE_URL")
 	if vkServiceURL == "" {
-		vkServiceURL = "http://localhost:5000"
+		vkServiceURL = "http://localhost:5001"
 	}
 
 	payload := map[string]interface{}{
@@ -831,4 +842,103 @@ func vkCopyPostHandler(w http.ResponseWriter, r *http.Request) {
 	// Отправляем ответ как есть
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(body)
+}
+
+// Новый OAuth callback handler (Authorization Code Flow)
+func vkOAuthCallbackHandler(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		http.Redirect(w, r, "http://localhost:3000/?error=no_code", http.StatusFound)
+		return
+	}
+
+	// Редиректим на фронт с кодом
+	http.Redirect(w, r, fmt.Sprintf("http://localhost:3000/?code=%s", code), http.StatusFound)
+}
+
+// Обмен кода на токен (новый метод)
+func vkOAuthTokenHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Code string `json:"code"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if req.Code == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "code is required"})
+		return
+	}
+
+	// Используем твой App ID
+	clientID := "54555042"
+	clientSecret := os.Getenv("VK_CLIENT_SECRET")
+	if clientSecret == "" {
+		clientSecret = "488uLwXVh0NbUFcrJIvA"
+	}
+	redirectURI := "http://localhost/api/vk/oauth/callback"
+
+	// Обмениваем код на токен
+	vkURL := "https://oauth.vk.com/access_token"
+	params := url.Values{}
+	params.Set("client_id", clientID)
+	params.Set("client_secret", clientSecret)
+	params.Set("redirect_uri", redirectURI)
+	params.Set("code", req.Code)
+
+	resp, err := http.Get(vkURL + "?" + params.Encode())
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("VK API error: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read VK response"})
+		return
+	}
+
+	var vkResp struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
+		UserID      int    `json:"user_id"`
+		Error       string `json:"error"`
+		ErrorDesc   string `json:"error_description"`
+	}
+
+	if err := json.Unmarshal(body, &vkResp); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to parse VK response"})
+		return
+	}
+
+	if vkResp.Error != "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("VK Error: %s - %s", vkResp.Error, vkResp.ErrorDesc),
+		})
+		return
+	}
+
+	// Успешный ответ
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(vkResp)
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Запуск приложения..."
+echo "🚀 Запуск VK SMM Панель (React + VKUI)..."
 
 # Функция для освобождения порта
 kill_port() {
@@ -15,11 +15,28 @@ kill_port() {
 
 # Проверка и очистка портов
 echo "🔍 Проверка портов..."
-kill_port 8000
+kill_port 80
 kill_port 3000
+kill_port 5001
+kill_port 5173
 
-# Запуск бэкенда с Air или go run
-echo "📦 Запуск бэкенда..."
+# Убиваем AirPlay на порту 5000 (macOS)
+echo "🔧 Освобождение порта 5000 от AirPlay..."
+lsof -ti:5000 | xargs kill -9 2>/dev/null || true
+sleep 1
+
+# Запуск Python VK Service
+echo "🐍 Запуск VK Service (Python)..."
+cd backend/vk_service
+python3 main.py &
+VK_SERVICE_PID=$!
+cd ../..
+
+# Ожидание запуска VK Service
+sleep 2
+
+# Запуск Go бэкенда
+echo "📦 Запуск Go Backend (порт 80)..."
 cd backend
 if command -v air &> /dev/null; then
     echo "   Используется Air (hot reload)"
@@ -35,22 +52,23 @@ cd ..
 # Ожидание запуска бэкенда
 sleep 2
 
-# Запуск фронтенда
-echo "🌐 Запуск фронтенда на http://localhost:3000"
-cd frontend
-python3 -m http.server 3000 &
+# Запуск React фронтенда
+echo "⚛️  Запуск React Frontend (Vite)..."
+cd front-react
+npm run dev &
 FRONTEND_PID=$!
 cd ..
 
 echo ""
 echo "✅ Приложение запущено!"
-echo "   Фронтенд: http://localhost:3000"
-echo "   Бэкенд:   http://localhost:8000"
+echo "   React Frontend: http://localhost:3000"
+echo "   Go Backend:     http://localhost:80"
+echo "   VK Service:     http://localhost:5001 (внутренний)"
 echo ""
 echo "Для остановки нажмите Ctrl+C"
 
 # Обработка сигнала завершения
-trap "echo ''; echo '🛑 Остановка...'; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit" INT TERM
+trap "echo ''; echo '🛑 Остановка...'; kill $FRONTEND_PID $BACKEND_PID $VK_SERVICE_PID 2>/dev/null; exit" INT TERM
 
 # Ожидание
 wait

@@ -57,7 +57,7 @@ def users_get():
     return jsonify(result), status_code
 
 if __name__ == '__main__':
-    port = int(os.environ.get('VK_SERVICE_PORT', 5000))
+    port = int(os.environ.get('VK_SERVICE_PORT', 5001))
     print(f"=== Starting VK Service on port {port} ===")
     print(f"vk_api available: True")
     app.run(host='0.0.0.0', port=port, debug=False)
