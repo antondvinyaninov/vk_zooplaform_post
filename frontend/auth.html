@@ -5,37 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VK Авторизация</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@vkid/sdk@2.6.5/dist-sdk/umd/index.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>Авторизация VK</h1>
         
         <div class="card">
-            <h2>Получение токена доступа</h2>
-            <p>Есть два способа получить токен:</p>
+            <h2>Войти через VK ID</h2>
+            <p>Нажмите кнопку ниже для авторизации</p>
             
-            <div style="margin: 20px 0; padding: 15px; background: #f0f3ff; border-radius: 8px;">
-                <h3 style="margin-bottom: 10px;">Способ 1: Через VK (рекомендуется)</h3>
-                <ol style="text-align: left; margin: 10px 0; padding-left: 20px;">
-                    <li>Перейдите по ссылке ниже</li>
-                    <li>Разрешите доступ приложению</li>
-                    <li>Скопируйте токен из адресной строки</li>
-                    <li>Вставьте токен в поле ниже</li>
-                </ol>
-                <a href="https://oauth.vk.com/authorize?client_id=54481712&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=wall,photos,video,groups,offline&response_type=token&v=5.131" 
-                   target="_blank" 
-                   class="btn" 
-                   style="display: inline-block; text-decoration: none; margin: 10px 0;">
-                    Получить токен через VK
-                </a>
-            </div>
-            
-            <div class="form-group">
-                <label for="manualToken">Вставьте токен или URL</label>
-                <textarea id="manualToken" rows="3" placeholder="access_token=... или полный URL"></textarea>
-            </div>
-            
-            <button id="saveTokenBtn" class="btn">Сохранить токен</button>
+            <!-- Контейнер для кнопки VK ID -->
+            <div id="vk-auth-button"></div>
             
             <div id="tokenResult" class="result"></div>
         </div>
@@ -47,6 +28,6 @@
         </div>
     </div>
 
-    <script src="auth.js"></script>
+    <script src="auth-vkid.js"></script>
 </body>
 </html>
