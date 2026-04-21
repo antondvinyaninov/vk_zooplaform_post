@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 )
 
 type Response struct {
@@ -50,12 +51,22 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/health", corsMiddleware(healthHandler))
-	http.HandleFunc("/vk/post", corsMiddleware(vkPostHandler))
-	http.HandleFunc("/vk/groups", corsMiddleware(vkGetGroupsHandler))
+	// Раздача статических файлов фронтенда
+	fs := http.FileServer(http.Dir("./frontend"))
+	http.Handle("/", fs)
 
-	log.Println("Server starting on :8000")
-	if err := http.ListenAndServe(":8000", nil); err != nil {
+	// API endpoints
+	http.HandleFunc("/api/health", corsMiddleware(healthHandler))
+	http.HandleFunc("/api/vk/post", corsMiddleware(vkPostHandler))
+	http.HandleFunc("/api/vk/groups", corsMiddleware(vkGetGroupsHandler))
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8000"
+	}
+
+	log.Printf("Server starting on :%s", port)
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
 	}
 }

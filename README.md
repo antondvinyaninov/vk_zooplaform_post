@@ -27,8 +27,7 @@
 ```
 
 Приложение будет доступно:
-- Фронтенд: http://localhost:3000
-- Бэкенд: http://localhost:8000
+- Приложение: http://localhost:8000
 
 ## Docker
 
@@ -39,7 +38,7 @@ docker build -t vk-smm-panel .
 
 ### Запуск
 ```bash
-docker run -p 8000:8000 -p 3000:3000 \
+docker run -p 8000:8000 \
   -e VK_APP_ID=54481712 \
   -e VK_SERVICE_KEY=your_key \
   vk-smm-panel
@@ -58,7 +57,7 @@ docker-compose up -d
 4. Добавьте переменные окружения:
    - `VK_APP_ID`
    - `VK_SERVICE_KEY`
-5. Настройте порты: 8000, 3000
+5. Настройте порт: 8000
 6. Деплой!
 
 ## Настройка VK приложения

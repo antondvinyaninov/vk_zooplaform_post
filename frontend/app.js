@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:8000';
+const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:8000/api' 
+    : `${window.location.origin}/api`;
 
 const connectAccountBtn = document.getElementById('connectAccountBtn');
 const accountStatus = document.getElementById('accountStatus');

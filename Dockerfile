@@ -24,16 +24,7 @@ COPY frontend/ ./frontend/
 # Переменные окружения
 ENV PORT=8000
 
-# Открываем порты
-EXPOSE 8000 3000
+# Открываем порт
+EXPOSE 8000
 
-# Создаем скрипт запуска
-RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'cd /app/frontend && python3 -m http.server 3000 &' >> /app/start.sh && \
-    echo 'cd /app && ./main' >> /app/start.sh && \
-    chmod +x /app/start.sh
-
-# Устанавливаем Python для фронтенда
-RUN apk add --no-cache python3
-
-CMD ["/app/start.sh"]
+CMD ["./main"]
