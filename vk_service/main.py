@@ -233,6 +233,7 @@ def wall_get():
         owner_id = data.get('owner_id')
         count = data.get('count', 10)  # По умолчанию 10 постов
         offset = data.get('offset', 0)
+        filter_type = data.get('filter', 'all')  # all, owner, others, postponed, suggests
         
         if not token or not owner_id:
             print(f"[VK Service] Missing parameters")
@@ -241,14 +242,19 @@ def wall_get():
         # Получаем VK API
         vk_session = get_vk_session(token)
         api = vk_session['api']
-        print(f"[VK Service] Calling wall.get for owner_id: {owner_id}, count: {count}, offset: {offset}")
+        print(f"[VK Service] Calling wall.get for owner_id: {owner_id}, count: {count}, offset: {offset}, filter: {filter_type}")
         
         # Получаем посты
-        result = api.wall.get(
-            owner_id=owner_id,
-            count=count,
-            offset=offset
-        )
+        params = {
+            'owner_id': owner_id,
+            'count': count,
+            'offset': offset
+        }
+        
+        if filter_type and filter_type != 'all':
+            params['filter'] = filter_type
+        
+        result = api.wall.get(**params)
         
         print(f"[VK Service] wall.get result: {result['count']} posts")
         

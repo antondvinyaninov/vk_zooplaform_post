@@ -25,6 +25,16 @@
                     <option value="">Загрузка...</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label for="filterSelect">Тип постов:</label>
+                <select id="filterSelect" class="input">
+                    <option value="all">Все посты</option>
+                    <option value="owner">Только от группы</option>
+                    <option value="others">Только от пользователей</option>
+                    <option value="postponed">Отложенные посты</option>
+                    <option value="suggests">Предложенные посты</option>
+                </select>
+            </div>
             <button id="loadPostsBtn" class="btn">Загрузить посты</button>
             <div id="loadResult"></div>
         </div>

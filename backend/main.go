@@ -612,6 +612,7 @@ func vkGetPostsHandler(w http.ResponseWriter, r *http.Request) {
 		OwnerID     string `json:"owner_id"`
 		Count       int    `json:"count"`
 		Offset      int    `json:"offset"`
+		Filter      string `json:"filter"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -643,6 +644,10 @@ func vkGetPostsHandler(w http.ResponseWriter, r *http.Request) {
 		"owner_id":     req.OwnerID,
 		"count":        req.Count,
 		"offset":       req.Offset,
+	}
+
+	if req.Filter != "" && req.Filter != "all" {
+		payload["filter"] = req.Filter
 	}
 
 	jsonData, err := json.Marshal(payload)

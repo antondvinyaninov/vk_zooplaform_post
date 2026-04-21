@@ -3,6 +3,7 @@ const API_URL = window.location.hostname === 'localhost'
     : `${window.location.origin}/api`;
 
 const groupSelect = document.getElementById('groupSelect');
+const filterSelect = document.getElementById('filterSelect');
 const loadPostsBtn = document.getElementById('loadPostsBtn');
 const loadResult = document.getElementById('loadResult');
 const postsContainer = document.getElementById('postsContainer');
@@ -12,6 +13,7 @@ const loadMoreContainer = document.getElementById('loadMoreContainer');
 
 let currentOffset = 0;
 let currentGroupId = null;
+let currentFilter = 'all';
 let hasMorePosts = true;
 
 // Загружаем список групп
@@ -129,6 +131,7 @@ function renderPosts(posts, append = false) {
 async function loadPosts(append = false) {
     const accessToken = localStorage.getItem('vk_access_token');
     const ownerId = groupSelect.value;
+    const filter = filterSelect.value;
     
     if (!accessToken) {
         loadResult.className = 'result show error';
@@ -157,6 +160,7 @@ async function loadPosts(append = false) {
             loadPostsBtn.textContent = 'Загрузка...';
             currentOffset = 0;
             currentGroupId = ownerId;
+            currentFilter = filter;
             hasMorePosts = true;
         } else {
             loadMoreBtn.disabled = true;
@@ -175,7 +179,8 @@ async function loadPosts(append = false) {
                 access_token: accessToken,
                 owner_id: ownerId,
                 count: 10,
-                offset: currentOffset
+                offset: currentOffset,
+                filter: filter
             })
         });
         
@@ -193,10 +198,17 @@ async function loadPosts(append = false) {
         const posts = data.items || [];
         
         if (posts.length === 0 && !append) {
+            const filterNames = {
+                'all': 'постов',
+                'owner': 'постов от группы',
+                'others': 'постов от пользователей',
+                'postponed': 'отложенных постов',
+                'suggests': 'предложенных постов'
+            };
             loadResult.className = 'result show error';
             loadResult.innerHTML = `
                 <strong>⚠ Внимание!</strong>
-                <p>В этой группе нет постов</p>
+                <p>В этой группе нет ${filterNames[filter]}</p>
             `;
             postsContainer.style.display = 'none';
             return;
@@ -207,7 +219,7 @@ async function loadPosts(append = false) {
             loadResult.className = 'result show success';
             loadResult.innerHTML = `
                 <strong>✓ Загружено постов: ${posts.length}</strong>
-                <p>Всего постов в группе: ${data.count}</p>
+                <p>Всего постов: ${data.count}</p>
             `;
             postsContainer.style.display = 'block';
         }
@@ -246,8 +258,14 @@ window.addEventListener('DOMContentLoaded', () => {
 loadPostsBtn.addEventListener('click', () => loadPosts(false));
 loadMoreBtn.addEventListener('click', () => loadPosts(true));
 
-// Сброс при смене группы
+// Сброс при смене группы или фильтра
 groupSelect.addEventListener('change', () => {
+    postsContainer.style.display = 'none';
+    loadResult.className = '';
+    loadResult.innerHTML = '';
+});
+
+filterSelect.addEventListener('change', () => {
     postsContainer.style.display = 'none';
     loadResult.className = '';
     loadResult.innerHTML = '';
