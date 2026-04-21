@@ -1,6 +1,4 @@
-const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost/api' 
-    : `${window.location.origin}/api`;
+// API_URL определен в utils.js
 
 console.log('[App] Initializing VK SMM Panel');
 console.log('[App] API URL:', API_URL);
@@ -301,9 +299,7 @@ async function refreshTokenIfNeeded() {
     // Если токен истекает через 1 час или уже истёк
     if (Date.now() >= parseInt(tokenExpires) - 3600000) {
         try {
-            const API_URL = window.location.hostname === 'localhost' 
-                ? 'http://localhost/api' 
-                : `${window.location.origin}/api`;
+            // API_URL уже определен глобально
             
             const response = await fetch(`${API_URL}/vk/refresh-token`, {
                 method: 'POST',

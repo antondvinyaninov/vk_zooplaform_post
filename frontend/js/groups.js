@@ -1,6 +1,4 @@
-const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost/api' 
-    : `${window.location.origin}/api`;
+// API_URL определен в utils.js
 
 const loadGroupsBtn = document.getElementById('loadGroupsBtn');
 const saveBtn = document.getElementById('saveBtn');
