@@ -43,7 +43,7 @@ EXPOSE 8000 5000
 # Создаем скрипт запуска обоих сервисов
 RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'cd /app/vk-service && python main.py &' >> /app/start.sh && \
-    echo 'cd /app/backend && ./main' >> /app/start.sh && \
+    echo 'cd /app && ./backend/main' >> /app/start.sh && \
     chmod +x /app/start.sh
 
 CMD ["/app/start.sh"]
