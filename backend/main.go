@@ -52,17 +52,17 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Раздача статических файлов фронтенда
-	fs := http.FileServer(http.Dir("./frontend"))
-	http.Handle("/", fs)
-
-	// API endpoints
+	// API endpoints (регистрируем ПЕРВЫМИ)
 	http.HandleFunc("/api/health", corsMiddleware(healthHandler))
 	http.HandleFunc("/api/vk/post", corsMiddleware(vkPostHandler))
 	http.HandleFunc("/api/vk/groups", corsMiddleware(vkGetGroupsHandler))
 	http.HandleFunc("/api/vk/exchange-code", corsMiddleware(vkExchangeCodeHandler))
 	http.HandleFunc("/api/vk/refresh-token", corsMiddleware(vkRefreshTokenHandler))
 	http.HandleFunc("/api/vk/user-info", corsMiddleware(vkUserInfoHandler))
+
+	// Раздача статических файлов фронтенда (регистрируем ПОСЛЕДНИМ)
+	fs := http.FileServer(http.Dir("./frontend"))
+	http.Handle("/", fs)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -73,6 +73,7 @@ func main() {
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
 	}
+}
 }
 
 func vkPostHandler(w http.ResponseWriter, r *http.Request) {
