@@ -6,48 +6,29 @@
     <title>VK Авторизация</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/@vkid/sdk@2.6.5/dist-sdk/umd/index.js"></script>
 </head>
 <body>
     <div class="container">
         <h1>Авторизация VK</h1>
         
         <div class="card">
-            <h2>Войти через VK ID</h2>
-            <p>Нажмите кнопку ниже для авторизации</p>
-            
-            <!-- Контейнер для кнопки VK ID -->
-            <div id="vk-auth-button"></div>
-            
-            <div id="tokenResult" class="result"></div>
-        </div>
-
-        <div class="card">
-            <h2>Или используйте VK OAuth</h2>
-            <p>Для работы с группами и постами нужен токен VK API</p>
-            <button id="vkOAuthBtn" class="btn">Авторизация через VK OAuth</button>
-            <div id="oauthResult" class="result"></div>
-        </div>
-
-        <div class="card">
-            <h2>Или используйте сервисный ключ</h2>
-            <p>Для быстрого доступа можно использовать сервисный ключ приложения</p>
-            <button id="autoServiceKeyBtn" class="btn">Использовать сервисный ключ автоматически</button>
-            <p style="margin-top: 10px; font-size: 14px; color: #666;">Или введите ключ вручную:</p>
-            <div class="form-group">
-                <input type="text" id="serviceKeyInput" placeholder="Вставьте сервисный ключ" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
-            </div>
-            <button id="serviceKeyBtn" class="btn">Использовать введенный ключ</button>
+            <h2>Быстрая авторизация</h2>
+            <p>Используйте сервисный ключ приложения для доступа к VK API</p>
+            <button id="autoServiceKeyBtn" class="btn">Авторизоваться автоматически</button>
             <div id="serviceKeyResult" class="result"></div>
         </div>
 
         <div class="card">
-            <h2>Или введите готовый токен</h2>
-            <p>Если у вас уже есть токен доступа:</p>
-            <a href="index.html" class="btn" style="display: inline-block; text-decoration: none;">Перейти к панели управления</a>
+            <h2>Или введите токен вручную</h2>
+            <p>Если у вас есть токен доступа VK API:</p>
+            <div class="form-group">
+                <input type="text" id="manualTokenInput" placeholder="Вставьте токен доступа" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+            </div>
+            <button id="manualTokenBtn" class="btn">Использовать токен</button>
+            <div id="manualTokenResult" class="result"></div>
         </div>
     </div>
 
-    <script src="auth-vkid.js"></script>
+    <script src="auth.js"></script>
 </body>
 </html>
