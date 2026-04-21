@@ -3,6 +3,7 @@ const API_URL = window.location.hostname === 'localhost'
     : `${window.location.origin}/api`;
 
 const groupSelect = document.getElementById('groupSelect');
+const customGroupIdInput = document.getElementById('customGroupId');
 const filterSelect = document.getElementById('filterSelect');
 const loadPostsBtn = document.getElementById('loadPostsBtn');
 const loadResult = document.getElementById('loadResult');
@@ -127,11 +128,44 @@ function renderPosts(posts, append = false) {
     });
 }
 
+// Парсинг ID группы из разных форматов
+function parseGroupId(input) {
+    if (!input) return null;
+    
+    input = input.trim();
+    
+    // Если это ссылка VK
+    if (input.includes('vk.com/')) {
+        // Извлекаем короткое имя или ID из ссылки
+        const match = input.match(/vk\.com\/([^/?#]+)/);
+        if (match) {
+            input = match[1];
+        }
+    }
+    
+    // Убираем префиксы club, public, event
+    input = input.replace(/^(club|public|event)/, '');
+    
+    // Если это число - добавляем минус
+    if (/^\d+$/.test(input)) {
+        return `-${input}`;
+    }
+    
+    // Если это короткое имя - возвращаем как есть
+    return input;
+}
+
 // Загрузка постов
 async function loadPosts(append = false) {
     const accessToken = localStorage.getItem('vk_access_token');
-    const ownerId = groupSelect.value;
+    let ownerId = groupSelect.value;
+    const customId = customGroupIdInput.value.trim();
     const filter = filterSelect.value;
+    
+    // Если введен custom ID - используем его
+    if (customId) {
+        ownerId = parseGroupId(customId);
+    }
     
     if (!accessToken) {
         loadResult.className = 'result show error';
@@ -149,7 +183,7 @@ async function loadPosts(append = false) {
         loadResult.className = 'result show error';
         loadResult.innerHTML = `
             <strong>✗ Ошибка!</strong>
-            <p>Выберите группу</p>
+            <p>Выберите группу или введите ссылку</p>
         `;
         return;
     }
@@ -215,7 +249,9 @@ async function loadPosts(append = false) {
         }
         
         if (!append) {
-            const groupName = groupSelect.options[groupSelect.selectedIndex].dataset.groupName;
+            const groupName = customGroupIdInput.value.trim() 
+                ? `Группа: ${ownerId}` 
+                : groupSelect.options[groupSelect.selectedIndex].dataset.groupName;
             loadResult.className = 'result show success';
             loadResult.innerHTML = `
                 <strong>✓ Загружено постов: ${posts.length}</strong>
@@ -260,6 +296,18 @@ loadMoreBtn.addEventListener('click', () => loadPosts(true));
 
 // Сброс при смене группы или фильтра
 groupSelect.addEventListener('change', () => {
+    if (groupSelect.value) {
+        customGroupIdInput.value = '';
+    }
+    postsContainer.style.display = 'none';
+    loadResult.className = '';
+    loadResult.innerHTML = '';
+});
+
+customGroupIdInput.addEventListener('input', () => {
+    if (customGroupIdInput.value.trim()) {
+        groupSelect.value = '';
+    }
     postsContainer.style.display = 'none';
     loadResult.className = '';
     loadResult.innerHTML = '';

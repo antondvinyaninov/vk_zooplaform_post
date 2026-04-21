@@ -20,11 +20,25 @@
         <div class="card">
             <h2>Выберите группу</h2>
             <div class="form-group">
-                <label for="groupSelect">Группа:</label>
+                <label for="groupSelect">Ваши группы:</label>
                 <select id="groupSelect" class="input">
                     <option value="">Загрузка...</option>
                 </select>
             </div>
+            
+            <div style="text-align: center; margin: 15px 0; color: #666;">или</div>
+            
+            <div class="form-group">
+                <label for="customGroupId">Ссылка или ID любой группы:</label>
+                <input type="text" 
+                       id="customGroupId" 
+                       placeholder="Например: https://vk.com/apiclub или apiclub или 123456"
+                       style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                <small style="color: #666; font-size: 12px;">
+                    Можно парсить любую публичную группу. Вставьте ссылку или короткое имя
+                </small>
+            </div>
+            
             <div class="form-group">
                 <label for="filterSelect">Тип постов:</label>
                 <select id="filterSelect" class="input">
