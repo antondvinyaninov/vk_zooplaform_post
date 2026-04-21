@@ -98,14 +98,16 @@
 </head>
 <body>
     <div class="container">
-        <h1>Управление группами</h1>
+        <div class="header">
+            <h1>Управление группами</h1>
+            <nav class="nav">
+                <a href="index.html">Главная</a>
+                <a href="groups.html" class="active">Управление группами</a>
+                <a href="posts.html">Просмотр постов</a>
+            </nav>
+        </div>
         
         <div class="card">
-            <div class="nav-links">
-                <a href="index.html">← Назад к панели</a>
-                <a href="auth.html">Авторизация</a>
-            </div>
-            
             <h2>Подключенные группы</h2>
             <p>Выберите группы, в которые хотите постить контент</p>
             
@@ -121,6 +123,10 @@
             
             <button id="saveBtn" class="btn" style="display: none; margin-top: 20px;">
                 Сохранить выбранные группы
+            </button>
+            
+            <button id="getGroupTokensBtn" class="btn" style="display: none; margin-top: 10px; background: #764ba2;">
+                Получить токены для выбранных групп
             </button>
         </div>
     </div>

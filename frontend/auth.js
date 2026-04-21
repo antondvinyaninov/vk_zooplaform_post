@@ -1,7 +1,35 @@
 // Проверяем токен в URL при загрузке
 window.addEventListener('DOMContentLoaded', () => {
     checkTokenInURL();
+    
+    // Обработчик кнопки авторизации
+    const authBtn = document.getElementById('authBtn');
+    if (authBtn) {
+        authBtn.addEventListener('click', startAuth);
+    }
 });
+
+// Начало авторизации - получаем user token для доступа к списку групп
+function startAuth() {
+    const currentUrl = window.location.origin + window.location.pathname;
+    
+    // Используем VK Admin app для получения user token с правами groups
+    const authUrl = `https://oauth.vk.com/authorize?` +
+        `client_id=2685278&` +
+        `scope=1073737727&` +
+        `redirect_uri=${encodeURIComponent(currentUrl)}&` +
+        `display=page&` +
+        `response_type=token&` +
+        `revoke=1`;
+    
+    window.location.href = authUrl;
+}
+
+function showResult(message, success) {
+    const resultDiv = document.getElementById('authResult');
+    resultDiv.className = 'result show ' + (success ? 'success' : 'error');
+    resultDiv.innerHTML = success ? `<strong>✓ ${message}</strong>` : `<strong>✗ ${message}</strong>`;
+}
 
 // Проверка токена в URL (после редиректа)
 function checkTokenInURL() {
@@ -14,7 +42,7 @@ function checkTokenInURL() {
     const expiresIn = params.get('expires_in');
     
     if (accessToken) {
-        // Сохраняем токен
+        // Сохраняем user token для получения списка групп
         localStorage.setItem('vk_access_token', accessToken);
         localStorage.setItem('vk_user_id', userId || '');
         
@@ -28,16 +56,11 @@ function checkTokenInURL() {
         window.history.replaceState({}, document.title, window.location.pathname);
         
         // Показываем успех
-        const resultDiv = document.getElementById('authResult');
-        resultDiv.className = 'result show success';
-        resultDiv.innerHTML = `
-            <strong>✓ Авторизация успешна!</strong>
-            <p>User ID: ${userId}</p>
-            <p>Токен: ${expiresIn === '0' ? 'Бессрочный' : 'Действителен'}</p>
-            <br>
-            <a href="index.html" class="btn" style="display: inline-block; text-decoration: none;">
-                Перейти к панели управления
-            </a>
-        `;
+        showResult('Авторизация успешна!', true);
+        
+        // Переход на страницу выбора групп
+        setTimeout(() => {
+            window.location.href = 'groups.html';
+        }, 1000);
     }
 }

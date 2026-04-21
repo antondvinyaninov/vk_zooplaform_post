@@ -144,6 +144,49 @@ def users_get():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/vk/wall/get', methods=['POST'])
+def wall_get():
+    """Получение постов со стены группы"""
+    try:
+        data = request.json
+        print(f"[VK Service] Received wall.get request: {data}")
+        
+        token = data.get('access_token')
+        owner_id = data.get('owner_id')
+        count = data.get('count', 10)  # По умолчанию 10 постов
+        offset = data.get('offset', 0)
+        
+        if not token or not owner_id:
+            print(f"[VK Service] Missing parameters")
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        # Получаем VK API
+        api = get_vk_api(token)
+        print(f"[VK Service] Calling wall.get for owner_id: {owner_id}, count: {count}, offset: {offset}")
+        
+        # Получаем посты
+        result = api.wall.get(
+            owner_id=owner_id,
+            count=count,
+            offset=offset
+        )
+        
+        print(f"[VK Service] wall.get result: {result['count']} posts")
+        
+        return jsonify({
+            'count': result['count'],
+            'items': result['items']
+        })
+        
+    except vk_api.exceptions.ApiError as e:
+        print(f"[VK Service] VK API Error: {e}")
+        return jsonify({'error': f'VK API Error: {str(e)}'}), 400
+    except Exception as e:
+        print(f"[VK Service] Error in wall.get: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('VK_SERVICE_PORT', 5000))
     print(f"=== Starting VK Service on port {port} ===")

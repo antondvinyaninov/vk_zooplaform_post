@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Просмотр постов - VK SMM Panel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Просмотр постов групп</h1>
+            <nav class="nav">
+                <a href="index.html">Главная</a>
+                <a href="groups.html">Управление группами</a>
+                <a href="posts.html" class="active">Просмотр постов</a>
+            </nav>
+        </div>
+
+        <div class="card">
+            <h2>Выберите группу</h2>
+            <div class="form-group">
+                <label for="groupSelect">Группа:</label>
+                <select id="groupSelect" class="input">
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+            <button id="loadPostsBtn" class="btn">Загрузить посты</button>
+            <div id="loadResult"></div>
+        </div>
+
+        <div id="postsContainer" class="card" style="display: none;">
+            <h2>Посты группы</h2>
+            <div id="postsList"></div>
+            <div id="loadMoreContainer" style="text-align: center; margin-top: 20px; display: none;">
+                <button id="loadMoreBtn" class="btn">Загрузить ещё</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="posts.js"></script>
+</body>
+</html>

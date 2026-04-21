@@ -34,13 +34,13 @@ COPY --from=vk-service /usr/local/lib/python3.11/site-packages /usr/local/lib/py
 COPY frontend/ ./frontend/
 
 # Переменные окружения
-ENV PORT=8000
+ENV PORT=80
 ENV VK_SERVICE_PORT=5000
 ENV VK_SERVICE_URL=http://localhost:5000
 ENV VK_SERVICE_KEY=a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d8826cb301184
 
 # Открываем порты
-EXPOSE 8000 5000
+EXPOSE 80 5000
 
 # Создаем скрипт запуска обоих сервисов
 RUN echo '#!/bin/sh' > /app/start.sh && \

@@ -4,9 +4,12 @@ services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      - "80:80"
     environment:
-      - VK_APP_ID=${VK_APP_ID:-54481712}
-      - VK_SERVICE_KEY=${VK_SERVICE_KEY}
-      - PORT=8000
+      - VK_APP_ID=${VK_APP_ID:-54556179}
+      - VK_CLIENT_SECRET=${VK_CLIENT_SECRET:-488uLwXVh0NbUFcrJIvA}
+      - VK_SERVICE_KEY=${VK_SERVICE_KEY:-a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d8826cb301184}
+      - PORT=80
+      - VK_SERVICE_PORT=5000
+      - VK_SERVICE_URL=http://localhost:5000
     restart: unless-stopped

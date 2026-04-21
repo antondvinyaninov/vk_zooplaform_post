@@ -4,6 +4,7 @@ const API_URL = window.location.hostname === 'localhost'
 
 const loadGroupsBtn = document.getElementById('loadGroupsBtn');
 const saveBtn = document.getElementById('saveBtn');
+const getGroupTokensBtn = document.getElementById('getGroupTokensBtn');
 const groupsContainer = document.getElementById('groupsContainer');
 const loadResult = document.getElementById('loadResult');
 const selectedCountDiv = document.getElementById('selectedCount');
@@ -25,6 +26,7 @@ function updateSelectedCount() {
     selectedCountDiv.querySelector('strong').textContent = count;
     selectedCountDiv.style.display = count > 0 ? 'block' : 'none';
     saveBtn.style.display = count > 0 ? 'block' : 'none';
+    getGroupTokensBtn.style.display = count > 0 ? 'block' : 'none';
 }
 
 // Отрисовка групп
@@ -159,11 +161,80 @@ function saveSelectedGroups() {
     setTimeout(() => notification.remove(), 3000);
 }
 
+// Получение токенов для выбранных групп через Implicit Flow
+function getGroupTokens() {
+    if (selectedGroups.size === 0) {
+        alert('Выберите хотя бы одну группу');
+        return;
+    }
+    
+    // Формируем список ID групп
+    const groupIds = Array.from(selectedGroups).join(',');
+    
+    const currentUrl = window.location.origin + window.location.pathname;
+    const clientId = '54556179';
+    
+    // Implicit Flow для получения токенов сообществ
+    const authUrl = `https://oauth.vk.com/authorize?` +
+        `client_id=${clientId}&` +
+        `group_ids=${groupIds}&` +
+        `display=page&` +
+        `redirect_uri=${encodeURIComponent(currentUrl)}&` +
+        `scope=manage,messages,photos,docs&` +
+        `response_type=token&` +
+        `v=5.199`;
+    
+    window.location.href = authUrl;
+}
+
+// Проверка токенов групп в URL (после редиректа от VK)
+function checkGroupTokensInURL() {
+    const hash = window.location.hash.substring(1);
+    if (!hash) return;
+    
+    const params = new URLSearchParams(hash);
+    
+    // Получаем все токены групп (access_token_GROUPID)
+    const groupTokens = {};
+    let hasTokens = false;
+    
+    for (const [key, value] of params.entries()) {
+        if (key.startsWith('access_token_')) {
+            const groupId = key.replace('access_token_', '');
+            groupTokens[groupId] = value;
+            hasTokens = true;
+        }
+    }
+    
+    if (hasTokens) {
+        // Сохраняем токены групп
+        const existingTokens = JSON.parse(localStorage.getItem('vk_group_tokens') || '{}');
+        Object.assign(existingTokens, groupTokens);
+        localStorage.setItem('vk_group_tokens', JSON.stringify(existingTokens));
+        
+        // Очищаем URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        const groupCount = Object.keys(groupTokens).length;
+        
+        loadResult.className = 'result show success';
+        loadResult.innerHTML = `
+            <strong>✓ Получены токены для ${groupCount} групп!</strong>
+            <p>Теперь вы можете публиковать посты в выбранные группы</p>
+            <a href="index.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
+                Перейти к публикации
+            </a>
+        `;
+    }
+}
+
 // Инициализация
 window.addEventListener('DOMContentLoaded', () => {
     loadSavedGroups();
     updateSelectedCount();
+    checkGroupTokensInURL(); // Проверяем токены групп после редиректа
 });
 
 loadGroupsBtn.addEventListener('click', loadGroups);
 saveBtn.addEventListener('click', saveSelectedGroups);
+getGroupTokensBtn.addEventListener('click', getGroupTokens);
