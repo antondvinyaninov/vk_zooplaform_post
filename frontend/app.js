@@ -15,13 +15,29 @@ function checkAuth() {
     const accessToken = localStorage.getItem('vk_access_token');
     const tokenExpires = localStorage.getItem('vk_token_expires');
     const userId = localStorage.getItem('vk_user_id');
+    const userName = localStorage.getItem('vk_user_name');
+    const userPhoto = localStorage.getItem('vk_user_photo');
     
     if (accessToken && tokenExpires && Date.now() < parseInt(tokenExpires)) {
         // Аккаунт подключен
+        let userInfoHTML = '';
+        
+        if (userPhoto && userName) {
+            userInfoHTML = `
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                    <img src="${userPhoto}" alt="${userName}" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid #667eea;">
+                    <div>
+                        <h3 style="margin: 0 0 5px 0; color: #333;">${userName}</h3>
+                        <p style="margin: 0; color: #666;">User ID: ${userId}</p>
+                    </div>
+                </div>
+            `;
+        }
+        
         accountStatus.innerHTML = `
             <div class="result show success">
+                ${userInfoHTML}
                 <strong>✓ Аккаунт подключен</strong>
-                <p>User ID: ${userId}</p>
                 <p>Токен действителен до: ${new Date(parseInt(tokenExpires)).toLocaleString('ru-RU')}</p>
             </div>
         `;
@@ -70,9 +86,25 @@ function loadConnectedGroups() {
         return;
     }
     
+    // Показываем список групп с аватарками
+    let groupsHTML = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 10px;">';
+    groups.forEach(group => {
+        groupsHTML += `
+            <div style="display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 8px;">
+                <img src="${group.photo_200}" alt="${group.name}" style="width: 40px; height: 40px; border-radius: 50%;">
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${group.name}</div>
+                    <div style="font-size: 12px; color: #666;">${group.members_count.toLocaleString()} подписчиков</div>
+                </div>
+            </div>
+        `;
+    });
+    groupsHTML += '</div>';
+    
     connectedGroupsDiv.innerHTML = `
         <div class="result show success">
             <strong>✓ Подключено групп: ${groups.length}</strong>
+            ${groupsHTML}
         </div>
     `;
     
