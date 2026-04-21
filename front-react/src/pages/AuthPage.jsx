@@ -81,8 +81,66 @@ function AuthPage({ onAuth }) {
     // Открываем в новом окне
     const authWindow = window.open(authUrl, 'vk_oauth', 'width=800,height=600');
     
-    // Показываем поле для ввода URL
-    setShowInput(true);
+    // Проверяем URL окна каждые 500мс
+    const checkInterval = setInterval(() => {
+      try {
+        if (!authWindow || authWindow.closed) {
+          clearInterval(checkInterval);
+          return;
+        }
+        
+        const currentUrl = authWindow.location.href;
+        
+        // Проверяем что мы на blank.html с токеном
+        if (currentUrl.includes('blank.html#access_token')) {
+          clearInterval(checkInterval);
+          
+          // Парсим токен из URL
+          const hash = authWindow.location.hash.substring(1);
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get('access_token');
+          const userId = params.get('user_id');
+          
+          if (accessToken && userId) {
+            // Закрываем окно
+            authWindow.close();
+            
+            // Сохраняем токен
+            handleOAuthSuccess(accessToken, userId);
+          }
+        }
+      } catch (e) {
+        // Игнорируем ошибки CORS (пока окно на другом домене)
+      }
+    }, 500);
+    
+    // Останавливаем проверку через 5 минут
+    setTimeout(() => {
+      clearInterval(checkInterval);
+      if (authWindow && !authWindow.closed) {
+        setShowInput(true); // Показываем поле для ручного ввода если не получилось автоматически
+      }
+    }, 300000);
+  };
+
+  const handleOAuthSuccess = async (accessToken, userId) => {
+    try {
+      saveToken(accessToken, userId);
+      
+      // Получаем информацию о пользователе
+      const userInfo = await getUserInfo(userId, accessToken);
+      
+      if (userInfo.response && userInfo.response[0]) {
+        const user = userInfo.response[0];
+        localStorage.setItem('vk_user_name', `${user.first_name} ${user.last_name}`);
+        localStorage.setItem('vk_user_photo', user.photo_200);
+      }
+      
+      onAuth();
+    } catch (error) {
+      console.error('Error saving token:', error);
+      alert('Ошибка сохранения токена');
+    }
   };
 
   const handleOAuthCode = async (code) => {
