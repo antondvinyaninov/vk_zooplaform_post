@@ -7,22 +7,67 @@ window.addEventListener('DOMContentLoaded', () => {
     if (authBtn) {
         authBtn.addEventListener('click', startAuth);
     }
+    
+    // Обработчик кнопки сохранения токена
+    const saveTokenBtn = document.getElementById('saveTokenBtn');
+    if (saveTokenBtn) {
+        saveTokenBtn.addEventListener('click', saveManualToken);
+    }
 });
 
 // Начало авторизации - получаем user token для доступа к списку групп
 function startAuth() {
-    const currentUrl = window.location.origin + window.location.pathname;
-    
-    // Используем VK Admin app для получения user token с правами groups
+    // Используем VK Admin app с redirect на blank.html
     const authUrl = `https://oauth.vk.com/authorize?` +
         `client_id=2685278&` +
         `scope=1073737727&` +
-        `redirect_uri=${encodeURIComponent(currentUrl)}&` +
+        `redirect_uri=https://oauth.vk.com/blank.html&` +
         `display=page&` +
         `response_type=token&` +
         `revoke=1`;
     
-    window.location.href = authUrl;
+    // Открываем в новом окне
+    const authWindow = window.open(authUrl, 'vk_auth', 'width=800,height=600');
+    
+    // Показываем инструкцию
+    showResult('Скопируйте URL из адресной строки после авторизации и вставьте ниже', false);
+    document.getElementById('manualTokenInput').style.display = 'block';
+}
+
+// Сохранение токена вручную
+function saveManualToken() {
+    const input = document.getElementById('tokenUrlInput');
+    const url = input.value.trim();
+    
+    if (!url) {
+        showResult('Вставьте URL', false);
+        return;
+    }
+    
+    // Извлекаем токен из URL
+    const match = url.match(/access_token=([^&]+)/);
+    if (!match) {
+        showResult('Неверный формат URL', false);
+        return;
+    }
+    
+    const accessToken = match[1];
+    
+    // Извлекаем user_id
+    const userIdMatch = url.match(/user_id=([^&]+)/);
+    const userId = userIdMatch ? userIdMatch[1] : '';
+    
+    // Сохраняем
+    localStorage.setItem('vk_access_token', accessToken);
+    localStorage.setItem('vk_user_id', userId);
+    localStorage.setItem('vk_token_expires', Date.now() + (365 * 24 * 60 * 60 * 1000));
+    
+    showResult('Токен сохранен!', true);
+    
+    // Переход на страницу выбора групп
+    setTimeout(() => {
+        window.location.href = 'groups.html';
+    }, 1000);
 }
 
 function showResult(message, success) {
