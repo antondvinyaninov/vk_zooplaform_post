@@ -21,6 +21,11 @@
 ### Статические файлы
 - `GET /` - раздача файлов из `./frontend/`
 
+### Редиректы (обратная совместимость)
+- `GET /auth.html` → `/pages/auth.html` (301)
+- `GET /groups.html` → `/pages/groups.html` (301)
+- `GET /posts.html` → `/pages/posts.html` (301)
+
 ## 🐍 VK Service API (Python Flask - порт 5000)
 
 ### Health Check

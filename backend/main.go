@@ -65,6 +65,17 @@ func main() {
 	http.HandleFunc("/api/vk/user-info", corsMiddleware(vkUserInfoHandler))
 	http.HandleFunc("/api/vk/service-key", corsMiddleware(vkServiceKeyHandler))
 
+	// Редиректы для обратной совместимости
+	http.HandleFunc("/auth.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/pages/auth.html", http.StatusMovedPermanently)
+	})
+	http.HandleFunc("/groups.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/pages/groups.html", http.StatusMovedPermanently)
+	})
+	http.HandleFunc("/posts.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/pages/posts.html", http.StatusMovedPermanently)
+	})
+
 	// Раздача статических файлов фронтенда (регистрируем ПОСЛЕДНИМ)
 	fs := http.FileServer(http.Dir("./frontend"))
 	http.Handle("/", fs)
