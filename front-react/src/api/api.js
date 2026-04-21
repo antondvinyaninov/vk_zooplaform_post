@@ -84,30 +84,54 @@ export const getUserInfo = async (userId) => {
     console.log('getUserInfo called with:', userId);
     console.log('Access token:', getAccessToken()?.substring(0, 20) + '...');
     
-    const response = await fetch(`${API_URL}/vk/user-info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            access_token: getAccessToken(),
-            user_ids: String(userId)
-        })
-    });
-    
-    console.log('Response status:', response.status);
-    console.log('Response headers:', response.headers);
-    
-    const text = await response.text();
-    console.log('Response text:', text);
-    
-    if (!text) {
-        throw new Error('Empty response from server');
-    }
-    
+    // Пробуем получить через service key если user token не работает
     try {
-        return JSON.parse(text);
+        const response = await fetch(`${API_URL}/vk/user-info`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                access_token: getAccessToken(),
+                user_ids: String(userId)
+            })
+        });
+        
+        console.log('Response status:', response.status);
+        
+        const text = await response.text();
+        console.log('Response text:', text);
+        
+        if (!text) {
+            throw new Error('Empty response from server');
+        }
+        
+        const data = JSON.parse(text);
+        
+        // Если ошибка IP - пробуем через service key
+        if (data.error && data.error.includes('ip address')) {
+            console.log('Trying with service key...');
+            
+            const serviceKeyResponse = await fetch(`${API_URL}/vk/service-key`);
+            const serviceKeyData = await serviceKeyResponse.json();
+            
+            if (serviceKeyData.service_key) {
+                const retryResponse = await fetch(`${API_URL}/vk/user-info`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        access_token: serviceKeyData.service_key,
+                        user_ids: String(userId)
+                    })
+                });
+                
+                const retryText = await retryResponse.text();
+                return JSON.parse(retryText);
+            }
+        }
+        
+        return data;
     } catch (e) {
-        console.error('Failed to parse JSON:', e);
-        throw new Error(`Invalid JSON response: ${text}`);
+        console.error('Failed to get user info:', e);
+        throw e;
     }
 };
 
