@@ -277,3 +277,46 @@ if __name__ == '__main__':
     print(f"=== Starting VK Service on port {port} ===")
     print(f"vk_api available: True")
     app.run(host='0.0.0.0', port=port, debug=False)
+
+@app.route('/vk/wall/repost', methods=['POST'])
+def wall_repost():
+    """Репост записи в группу"""
+    try:
+        data = request.json
+        print(f"[VK Service] Received wall.repost request: {data}")
+        
+        token = data.get('access_token')
+        object_id = data.get('object')  # Формат: wall-123456_789
+        group_id = data.get('group_id')
+        
+        if not token or not object_id or not group_id:
+            print(f"[VK Service] Missing parameters")
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        # Получаем VK API
+        vk_session = get_vk_session(token)
+        api = vk_session['api']
+        print(f"[VK Service] Calling wall.repost for object: {object_id}, group_id: {group_id}")
+        
+        # Делаем репост
+        result = api.wall.repost(
+            object=object_id,
+            group_id=group_id
+        )
+        
+        print(f"[VK Service] wall.repost result: {result}")
+        
+        return jsonify({
+            'post_id': result['post_id'],
+            'reposts_count': result.get('reposts_count', 0),
+            'likes_count': result.get('likes_count', 0)
+        })
+        
+    except vk_api.exceptions.ApiError as e:
+        print(f"[VK Service] VK API Error: {e}")
+        return jsonify({'error': f'VK API Error: {str(e)}'}), 400
+    except Exception as e:
+        print(f"[VK Service] Error in wall.repost: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

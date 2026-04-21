@@ -84,6 +84,8 @@ function renderPosts(posts, append = false) {
     posts.forEach(post => {
         const postCard = document.createElement('div');
         postCard.className = 'post-card';
+        postCard.dataset.postId = post.id;
+        postCard.dataset.ownerId = post.owner_id;
         
         // Формируем информацию о вложениях
         let attachmentsHTML = '';
@@ -114,6 +116,16 @@ function renderPosts(posts, append = false) {
             </div>
         `;
         
+        // Кнопка репоста
+        const repostBtn = `
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+                <button class="repost-btn" data-post-id="${post.id}" data-owner-id="${post.owner_id}" style="background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; width: 100%;">
+                    📤 Репостнуть в свою группу
+                </button>
+                <div class="repost-result" style="margin-top: 10px;"></div>
+            </div>
+        `;
+        
         postCard.innerHTML = `
             <div class="post-header">
                 <div class="post-date">${formatDate(post.date)}</div>
@@ -122,9 +134,15 @@ function renderPosts(posts, append = false) {
             <div class="post-text">${formatPostText(post.text)}</div>
             ${attachmentsHTML}
             ${stats}
+            ${repostBtn}
         `;
         
         postsList.appendChild(postCard);
+    });
+    
+    // Добавляем обработчики для кнопок репоста
+    document.querySelectorAll('.repost-btn').forEach(btn => {
+        btn.addEventListener('click', handleRepost);
     });
 }
 
@@ -318,3 +336,100 @@ filterSelect.addEventListener('change', () => {
     loadResult.className = '';
     loadResult.innerHTML = '';
 });
+
+// Обработчик репоста
+async function handleRepost(e) {
+    const btn = e.target;
+    const postId = btn.dataset.postId;
+    const ownerId = btn.dataset.ownerId;
+    const resultDiv = btn.nextElementSibling;
+    
+    // Получаем список своих групп
+    const groupsData = localStorage.getItem('vk_selected_groups_data');
+    if (!groupsData) {
+        resultDiv.className = 'result show error';
+        resultDiv.innerHTML = '<small>Сначала подключите свои группы</small>';
+        return;
+    }
+    
+    const groups = JSON.parse(groupsData);
+    if (groups.length === 0) {
+        resultDiv.className = 'result show error';
+        resultDiv.innerHTML = '<small>Сначала подключите свои группы</small>';
+        return;
+    }
+    
+    // Показываем модальное окно выбора группы
+    const groupOptions = groups.map(g => 
+        `<option value="-${g.id}">${g.name}</option>`
+    ).join('');
+    
+    resultDiv.innerHTML = `
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-top: 10px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Выберите группу:</label>
+            <select id="repostGroupSelect-${postId}" style="width: 100%; padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px; margin-bottom: 10px;">
+                ${groupOptions}
+            </select>
+            <div style="display: flex; gap: 10px;">
+                <button class="confirm-repost-btn" data-post-id="${postId}" data-owner-id="${ownerId}" style="flex: 1; background: #667eea; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer;">
+                    Репостнуть
+                </button>
+                <button class="cancel-repost-btn" style="flex: 1; background: #ccc; color: #333; border: none; padding: 8px; border-radius: 6px; cursor: pointer;">
+                    Отмена
+                </button>
+            </div>
+            <div class="repost-status" style="margin-top: 10px;"></div>
+        </div>
+    `;
+    
+    // Обработчик подтверждения
+    resultDiv.querySelector('.confirm-repost-btn').addEventListener('click', async (e) => {
+        const confirmBtn = e.target;
+        const targetGroupId = document.getElementById(`repostGroupSelect-${postId}`).value;
+        const statusDiv = resultDiv.querySelector('.repost-status');
+        
+        try {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Репостим...';
+            
+            const accessToken = localStorage.getItem('vk_access_token');
+            const response = await fetch(`${API_URL}/vk/repost`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    access_token: accessToken,
+                    object: `wall${ownerId}_${postId}`,
+                    group_id: targetGroupId.replace('-', '')
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                statusDiv.className = 'result show error';
+                statusDiv.innerHTML = `<small>Ошибка: ${data.error}</small>`;
+            } else {
+                statusDiv.className = 'result show success';
+                statusDiv.innerHTML = `<small>✓ Репост успешно создан! ID: ${data.post_id}</small>`;
+                
+                // Скрываем форму через 2 секунды
+                setTimeout(() => {
+                    resultDiv.innerHTML = '';
+                }, 2000);
+            }
+        } catch (error) {
+            statusDiv.className = 'result show error';
+            statusDiv.innerHTML = `<small>Ошибка: ${error.message}</small>`;
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Репостнуть';
+        }
+    });
+    
+    // Обработчик отмены
+    resultDiv.querySelector('.cancel-repost-btn').addEventListener('click', () => {
+        resultDiv.innerHTML = '';
+    });
+}

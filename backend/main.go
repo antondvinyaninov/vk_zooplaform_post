@@ -57,6 +57,7 @@ func main() {
 	http.HandleFunc("/api/health", corsMiddleware(healthHandler))
 	http.HandleFunc("/api/vk/post", corsMiddleware(vkPostHandler))
 	http.HandleFunc("/api/vk/posts", corsMiddleware(vkGetPostsHandler))
+	http.HandleFunc("/api/vk/repost", corsMiddleware(vkRepostHandler))
 	http.HandleFunc("/api/vk/groups", corsMiddleware(vkGetGroupsHandler))
 	http.HandleFunc("/api/vk/exchange-code", corsMiddleware(vkExchangeCodeHandler))
 	http.HandleFunc("/api/vk/refresh-token", corsMiddleware(vkRefreshTokenHandler))
@@ -659,6 +660,74 @@ func vkGetPostsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := http.Post(vkServiceURL+"/vk/wall/get", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("VK Service error: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read response"})
+		return
+	}
+
+	// Отправляем ответ как есть
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(body)
+}
+
+func vkRepostHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AccessToken string `json:"access_token"`
+		Object      string `json:"object"`
+		GroupID     string `json:"group_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if req.AccessToken == "" || req.Object == "" || req.GroupID == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "access_token, object and group_id are required"})
+		return
+	}
+
+	// Отправляем запрос в VK Service
+	vkServiceURL := os.Getenv("VK_SERVICE_URL")
+	if vkServiceURL == "" {
+		vkServiceURL = "http://localhost:5000"
+	}
+
+	payload := map[string]interface{}{
+		"access_token": req.AccessToken,
+		"object":       req.Object,
+		"group_id":     req.GroupID,
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to prepare request"})
+		return
+	}
+
+	resp, err := http.Post(vkServiceURL+"/vk/wall/repost", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
