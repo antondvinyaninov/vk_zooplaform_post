@@ -254,6 +254,7 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Code        string `json:"code"`
 		RedirectURI string `json:"redirect_uri"`
+		DeviceID    string `json:"device_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -293,6 +294,11 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 		"redirect_uri":  req.RedirectURI,
 		"client_id":     appID,
 		"client_secret": clientSecret,
+	}
+
+	// Добавляем device_id только если он передан
+	if req.DeviceID != "" {
+		reqBody["device_id"] = req.DeviceID
 	}
 
 	jsonData, err := json.Marshal(reqBody)
