@@ -270,10 +270,23 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем токен из VK
+	appID := os.Getenv("VK_APP_ID")
+	serviceKey := os.Getenv("VK_SERVICE_KEY")
+
+	// Если переменные не установлены, используем значения по умолчанию
+	if appID == "" {
+		appID = "54481712"
+	}
+	if serviceKey == "" {
+		serviceKey = "b0278517b0278517b0278517a2b318d627bb027b0278517d99457deeba5ab53cea4c7ea"
+	}
+
+	log.Printf("Using App ID: %s", appID)
+
 	vkURL := "https://oauth.vk.com/access_token"
 	params := url.Values{}
-	params.Set("client_id", os.Getenv("VK_APP_ID"))
-	params.Set("client_secret", os.Getenv("VK_SERVICE_KEY"))
+	params.Set("client_id", appID)
+	params.Set("client_secret", serviceKey)
 	params.Set("redirect_uri", req.RedirectURI)
 	params.Set("code", req.Code)
 
