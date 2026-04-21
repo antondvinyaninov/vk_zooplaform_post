@@ -55,7 +55,7 @@ function AuthPage({ onAuth }) {
   const handleAuth = () => {
     const authUrl = `https://oauth.vk.com/authorize?` +
       `client_id=2685278&` +
-      `scope=1073737727&` +
+      `scope=wall,photos,video,groups&` +
       `redirect_uri=https://oauth.vk.com/blank.html&` +
       `display=page&` +
       `response_type=token&` +
@@ -67,9 +67,8 @@ function AuthPage({ onAuth }) {
 
   const handleOAuthDirect = () => {
     const clientId = '54555042'; // Твой App ID
-    // Используем blank.html для всех окружений пока не настроим redirect_uri в VK
     const redirectUri = 'https://oauth.vk.com/blank.html';
-    const scope = 'wall,photos,video,groups,offline';
+    const scope = 'wall,photos,video,groups'; // Убрали offline
     
     const authUrl = `https://oauth.vk.com/authorize?` +
       `client_id=${clientId}&` +
@@ -128,14 +127,14 @@ function AuthPage({ onAuth }) {
   const handleVKBridgeAuth = async () => {
     try {
       if (!bridge || typeof bridge.send !== 'function') {
-        alert('VK Bridge недоступен. Этот метод работает только внутри VK приложений.');
+        alert('VK Bridge недоступен. Этот метод работает только внутри VK Mini Apps.');
         return;
       }
       
       // Запрашиваем токен через VK Bridge
       const data = await bridge.send('VKWebAppGetAuthToken', {
         app_id: 54555042,
-        scope: 'wall,photos,video,groups,offline'
+        scope: 'wall,photos,video,groups'
       });
       
       if (data.access_token) {
@@ -150,7 +149,7 @@ function AuthPage({ onAuth }) {
       }
     } catch (error) {
       console.error('VK Bridge auth error:', error);
-      alert('Ошибка авторизации через VK Bridge. Возможно, приложение не запущено в VK.');
+      alert('Ошибка авторизации через VK Bridge. Этот метод работает только в VK Mini Apps.');
     }
   };
 
