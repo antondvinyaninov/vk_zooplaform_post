@@ -6,7 +6,6 @@
     <title>VK Авторизация</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
     <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js"></script>
 </head>
 <body>
     <div class="container">
@@ -14,8 +13,8 @@
         
         <div class="card">
             <h2>Войти через ВКонтакте</h2>
-            <p>Для работы с группами войдите через ваш аккаунт ВКонтакте</p>
-            <div id="vk-button-container"></div>
+            <p>Нажмите кнопку для авторизации</p>
+            <button id="vkAuthBtn" class="btn">Войти через ВКонтакте</button>
             <div id="authResult" class="result"></div>
         </div>
     </div>
