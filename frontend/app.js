@@ -12,6 +12,41 @@ const postBtn = document.getElementById('postBtn');
 const postResult = document.getElementById('postResult');
 const targetGroupSelect = document.getElementById('targetGroup');
 const connectedGroupsDiv = document.getElementById('connectedGroups');
+const postPhotosInput = document.getElementById('postPhotos');
+const postVideoInput = document.getElementById('postVideo');
+const photoPreview = document.getElementById('photoPreview');
+const videoPreview = document.getElementById('videoPreview');
+
+// Превью фотографий
+postPhotosInput.addEventListener('change', (e) => {
+    photoPreview.innerHTML = '';
+    const files = Array.from(e.target.files);
+    
+    files.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.style.cssText = 'width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 2px solid #e0e0e0;';
+            photoPreview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+    });
+});
+
+// Превью видео
+postVideoInput.addEventListener('change', (e) => {
+    videoPreview.innerHTML = '';
+    const file = e.target.files[0];
+    
+    if (file) {
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(file);
+        video.controls = true;
+        video.style.cssText = 'max-width: 300px; border-radius: 8px; border: 2px solid #e0e0e0;';
+        videoPreview.appendChild(video);
+    }
+});
 
 // Проверка авторизации
 function checkAuth() {
@@ -146,6 +181,8 @@ async function publishPost() {
     const accessToken = localStorage.getItem('vk_access_token');
     const ownerId = targetGroupSelect.value;
     const message = document.getElementById('postMessage').value.trim();
+    const photos = postPhotosInput.files;
+    const video = postVideoInput.files[0];
 
     // Валидация
     if (!ownerId) {
@@ -154,9 +191,9 @@ async function publishPost() {
         return;
     }
     
-    if (!message) {
+    if (!message && photos.length === 0 && !video) {
         postResult.className = 'result show error';
-        postResult.innerHTML = '<strong>✗ Ошибка!</strong><p>Введите текст поста</p>';
+        postResult.innerHTML = '<strong>✗ Ошибка!</strong><p>Добавьте текст, фото или видео</p>';
         return;
     }
 
@@ -164,17 +201,28 @@ async function publishPost() {
         postBtn.disabled = true;
         postBtn.textContent = 'Публикация...';
         
+        // Формируем данные для отправки
+        const formData = new FormData();
+        formData.append('owner_id', ownerId);
+        formData.append('message', message);
+        formData.append('access_token', accessToken);
+        formData.append('from_group', '1');
+        
+        // Добавляем фотографии
+        if (photos.length > 0) {
+            for (let i = 0; i < photos.length; i++) {
+                formData.append('photos', photos[i]);
+            }
+        }
+        
+        // Добавляем видео
+        if (video) {
+            formData.append('video', video);
+        }
+
         const response = await fetch(`${API_URL}/vk/post`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                owner_id: ownerId,
-                message: message,
-                access_token: accessToken,
-                from_group: 1
-            })
+            body: formData
         });
 
         const data = await response.json();
@@ -193,8 +241,12 @@ async function publishPost() {
                 <p>Группа: ${groupName}</p>
                 <p>ID поста: ${data.post_id}</p>
             `;
-            // Очищаем поле с текстом поста
+            // Очищаем форму
             document.getElementById('postMessage').value = '';
+            postPhotosInput.value = '';
+            postVideoInput.value = '';
+            photoPreview.innerHTML = '';
+            videoPreview.innerHTML = '';
         }
     } catch (error) {
         postResult.className = 'result show error';

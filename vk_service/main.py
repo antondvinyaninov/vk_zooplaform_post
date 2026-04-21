@@ -29,17 +29,15 @@ def health():
 
 @app.route('/vk/wall/post', methods=['POST'])
 def wall_post():
-    """Публикация поста на стене"""
+    """Публикация поста на стене с поддержкой фото и видео"""
     try:
-        data = request.json
-        print(f"[VK Service] Received wall.post request: {data}")
+        # Получаем данные из формы
+        token = request.form.get('access_token')
+        owner_id = request.form.get('owner_id')
+        message = request.form.get('message', '')
+        from_group = request.form.get('from_group', '1')
         
-        token = data.get('access_token')
-        owner_id = data.get('owner_id')
-        message = data.get('message')
-        from_group = data.get('from_group', 1)
-        
-        if not token or not owner_id or not message:
+        if not token or not owner_id:
             print(f"[VK Service] Missing parameters")
             return jsonify({'error': 'Missing required parameters'}), 400
         
@@ -47,12 +45,74 @@ def wall_post():
         api = get_vk_api(token)
         print(f"[VK Service] Calling wall.post for owner_id: {owner_id}")
         
+        # Подготавливаем параметры поста
+        post_params = {
+            'owner_id': owner_id,
+            'message': message,
+            'from_group': int(from_group)
+        }
+        
+        attachments = []
+        
+        # Обрабатываем фотографии
+        if 'photos' in request.files:
+            photos = request.files.getlist('photos')
+            print(f"[VK Service] Uploading {len(photos)} photos")
+            
+            for photo_file in photos:
+                try:
+                    # Получаем upload URL
+                    upload_server = api.photos.getWallUploadServer(group_id=owner_id.replace('-', ''))
+                    upload_url = upload_server['upload_url']
+                    
+                    # Загружаем фото
+                    import requests
+                    files = {'photo': photo_file.read()}
+                    upload_response = requests.post(upload_url, files=files).json()
+                    
+                    # Сохраняем фото
+                    saved_photo = api.photos.saveWallPhoto(
+                        group_id=owner_id.replace('-', ''),
+                        photo=upload_response['photo'],
+                        server=upload_response['server'],
+                        hash=upload_response['hash']
+                    )[0]
+                    
+                    attachments.append(f"photo{saved_photo['owner_id']}_{saved_photo['id']}")
+                    print(f"[VK Service] Photo uploaded: photo{saved_photo['owner_id']}_{saved_photo['id']}")
+                except Exception as e:
+                    print(f"[VK Service] Error uploading photo: {e}")
+        
+        # Обрабатываем видео
+        if 'video' in request.files:
+            video_file = request.files['video']
+            print(f"[VK Service] Uploading video: {video_file.filename}")
+            
+            try:
+                # Получаем upload URL для видео
+                video_server = api.video.save(
+                    name=video_file.filename,
+                    group_id=owner_id.replace('-', '')
+                )
+                upload_url = video_server['upload_url']
+                
+                # Загружаем видео
+                import requests
+                files = {'video_file': video_file.read()}
+                upload_response = requests.post(upload_url, files=files).json()
+                
+                if 'video_id' in upload_response:
+                    attachments.append(f"video{upload_response['owner_id']}_{upload_response['video_id']}")
+                    print(f"[VK Service] Video uploaded: video{upload_response['owner_id']}_{upload_response['video_id']}")
+            except Exception as e:
+                print(f"[VK Service] Error uploading video: {e}")
+        
+        # Добавляем attachments если есть
+        if attachments:
+            post_params['attachments'] = ','.join(attachments)
+        
         # Публикуем пост
-        result = api.wall.post(
-            owner_id=owner_id,
-            message=message,
-            from_group=from_group
-        )
+        result = api.wall.post(**post_params)
         
         print(f"[VK Service] wall.post result: {result}")
         

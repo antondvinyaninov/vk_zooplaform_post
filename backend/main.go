@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -83,19 +84,32 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req VKPostRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Парсим multipart form для поддержки файлов
+	err := r.ParseMultipartForm(32 << 20) // 32 MB max
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(VKPostResponse{Error: "Invalid request body"})
+		json.NewEncoder(w).Encode(VKPostResponse{Error: "Failed to parse form data"})
 		return
 	}
 
+	ownerId := r.FormValue("owner_id")
+	message := r.FormValue("message")
+	accessToken := r.FormValue("access_token")
+	fromGroup := r.FormValue("from_group")
+
 	// Валидация
-	if req.OwnerID == "" || req.Message == "" || req.AccessToken == "" {
+	if ownerId == "" || accessToken == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(VKPostResponse{Error: "owner_id, message and access_token are required"})
+		json.NewEncoder(w).Encode(VKPostResponse{Error: "owner_id and access_token are required"})
+		return
+	}
+
+	if message == "" && r.MultipartForm.File["photos"] == nil && r.MultipartForm.File["video"] == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(VKPostResponse{Error: "message, photos or video is required"})
 		return
 	}
 
@@ -105,22 +119,51 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 		vkServiceURL = "http://localhost:5000"
 	}
 
-	payload := map[string]interface{}{
-		"access_token": req.AccessToken,
-		"owner_id":     req.OwnerID,
-		"message":      req.Message,
-		"from_group":   req.FromGroup,
+	// Создаем новый multipart writer для пересылки в VK Service
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	// Добавляем текстовые поля
+	writer.WriteField("access_token", accessToken)
+	writer.WriteField("owner_id", ownerId)
+	writer.WriteField("message", message)
+	if fromGroup != "" {
+		writer.WriteField("from_group", fromGroup)
 	}
 
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(VKPostResponse{Error: "Failed to prepare request"})
-		return
+	// Добавляем фотографии
+	if photos := r.MultipartForm.File["photos"]; photos != nil {
+		for _, fileHeader := range photos {
+			file, err := fileHeader.Open()
+			if err != nil {
+				continue
+			}
+			defer file.Close()
+
+			part, err := writer.CreateFormFile("photos", fileHeader.Filename)
+			if err != nil {
+				continue
+			}
+			io.Copy(part, file)
+		}
 	}
 
-	resp, err := http.Post(vkServiceURL+"/vk/wall/post", "application/json", bytes.NewBuffer(jsonData))
+	// Добавляем видео
+	if video := r.MultipartForm.File["video"]; video != nil && len(video) > 0 {
+		fileHeader := video[0]
+		file, err := fileHeader.Open()
+		if err == nil {
+			defer file.Close()
+			part, err := writer.CreateFormFile("video", fileHeader.Filename)
+			if err == nil {
+				io.Copy(part, file)
+			}
+		}
+	}
+
+	writer.Close()
+
+	resp, err := http.Post(vkServiceURL+"/vk/wall/post", writer.FormDataContentType(), body)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -129,7 +172,7 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -142,7 +185,7 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 		Error  string `json:"error"`
 	}
 
-	if err := json.Unmarshal(body, &result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(VKPostResponse{Error: "Failed to parse response"})
