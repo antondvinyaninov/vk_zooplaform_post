@@ -61,6 +61,7 @@ func main() {
 	http.HandleFunc("/api/vk/post", corsMiddleware(vkPostHandler))
 	http.HandleFunc("/api/vk/groups", corsMiddleware(vkGetGroupsHandler))
 	http.HandleFunc("/api/vk/exchange-code", corsMiddleware(vkExchangeCodeHandler))
+	http.HandleFunc("/api/vk/refresh-token", corsMiddleware(vkRefreshTokenHandler))
 	http.HandleFunc("/api/vk/user-info", corsMiddleware(vkUserInfoHandler))
 
 	port := os.Getenv("PORT")
@@ -337,11 +338,12 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Парсим ответ VK
 	var vkResp struct {
-		AccessToken string `json:"access_token"`
-		ExpiresIn   int    `json:"expires_in"`
-		UserID      int    `json:"user_id"`
-		Error       string `json:"error"`
-		ErrorDesc   string `json:"error_description"`
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		UserID       int    `json:"user_id"`
+		Error        string `json:"error"`
+		ErrorDesc    string `json:"error_description"`
 	}
 
 	if err := json.Unmarshal(body, &vkResp); err != nil {
@@ -423,4 +425,103 @@ func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 	// Отправляем ответ как есть
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(body)
+}
+
+// Обновление токена через refresh_token
+func vkRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if req.RefreshToken == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "refresh_token is required"})
+		return
+	}
+
+	// Получаем новый токен
+	appID := os.Getenv("VK_APP_ID")
+	clientSecret := os.Getenv("VK_CLIENT_SECRET")
+
+	if appID == "" {
+		appID = "54481712"
+	}
+	if clientSecret == "" {
+		clientSecret = "488uLwXVh0NbUFcrJIvA"
+	}
+
+	vkURL := "https://id.vk.com/oauth2/auth"
+
+	reqBody := map[string]string{
+		"grant_type":    "refresh_token",
+		"refresh_token": req.RefreshToken,
+		"client_id":     appID,
+		"client_secret": clientSecret,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to prepare request"})
+		return
+	}
+
+	resp, err := http.Post(vkURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("VK API error: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read VK response"})
+		return
+	}
+
+	var vkResp struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		UserID       int    `json:"user_id"`
+		Error        string `json:"error"`
+		ErrorDesc    string `json:"error_description"`
+	}
+
+	if err := json.Unmarshal(body, &vkResp); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to parse VK response"})
+		return
+	}
+
+	if vkResp.Error != "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("VK Error: %s - %s", vkResp.Error, vkResp.ErrorDesc),
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(vkResp)
 }

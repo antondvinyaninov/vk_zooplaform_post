@@ -163,3 +163,59 @@ window.addEventListener('DOMContentLoaded', checkAuth);
 
 connectAccountBtn.addEventListener('click', connectAccount);
 postBtn.addEventListener('click', publishPost);
+
+
+// Автоматическое обновление токена
+async function refreshTokenIfNeeded() {
+    const tokenExpires = localStorage.getItem('vk_token_expires');
+    const refreshToken = localStorage.getItem('vk_refresh_token');
+    
+    if (!tokenExpires || !refreshToken) {
+        return false;
+    }
+    
+    // Если токен истекает через 1 час или уже истёк
+    if (Date.now() >= parseInt(tokenExpires) - 3600000) {
+        try {
+            const API_URL = window.location.hostname === 'localhost' 
+                ? 'http://localhost:8000/api' 
+                : `${window.location.origin}/api`;
+            
+            const response = await fetch(`${API_URL}/vk/refresh-token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    refresh_token: refreshToken
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                console.error('Token refresh failed:', data.error);
+                return false;
+            }
+            
+            // Обновляем токены
+            localStorage.setItem('vk_access_token', data.access_token);
+            localStorage.setItem('vk_refresh_token', data.refresh_token);
+            localStorage.setItem('vk_token_expires', Date.now() + (data.expires_in * 1000));
+            
+            console.log('Token refreshed successfully');
+            return true;
+        } catch (error) {
+            console.error('Token refresh error:', error);
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Проверяем токен при загрузке и каждые 30 минут
+window.addEventListener('DOMContentLoaded', () => {
+    refreshTokenIfNeeded();
+    setInterval(refreshTokenIfNeeded, 30 * 60 * 1000); // Каждые 30 минут
+});

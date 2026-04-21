@@ -55,6 +55,7 @@ async function exchangeCodeForToken(code, deviceId) {
         
         // Сохраняем токен
         localStorage.setItem('vk_access_token', data.access_token);
+        localStorage.setItem('vk_refresh_token', data.refresh_token);
         localStorage.setItem('vk_user_id', data.user_id);
         localStorage.setItem('vk_token_expires', Date.now() + (data.expires_in * 1000));
         
