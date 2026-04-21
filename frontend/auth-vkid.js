@@ -243,6 +243,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (serviceKeyBtn) {
         serviceKeyBtn.addEventListener('click', useServiceKey);
     }
+    
+    // Добавляем обработчик для автоматического сервисного ключа
+    const autoServiceKeyBtn = document.getElementById('autoServiceKeyBtn');
+    if (autoServiceKeyBtn) {
+        autoServiceKeyBtn.addEventListener('click', useAutoServiceKey);
+    }
 });
 
 // VK OAuth авторизация (старый метод для доступа к VK API)
@@ -335,10 +341,45 @@ async function useServiceKey() {
         return;
     }
     
+    await activateServiceKey(serviceKey, serviceKeyResult);
+}
+
+// Автоматическое использование сервисного ключа
+async function useAutoServiceKey() {
+    const serviceKeyResult = document.getElementById('serviceKeyResult');
+    
     serviceKeyResult.className = 'result show';
     serviceKeyResult.style.background = '#fff3cd';
     serviceKeyResult.style.color = '#856404';
-    serviceKeyResult.innerHTML = '<strong>⏳ Проверка ключа...</strong>';
+    serviceKeyResult.innerHTML = '<strong>⏳ Получение сервисного ключа...</strong>';
+    
+    try {
+        const API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:8000/api' 
+            : `${window.location.origin}/api`;
+        
+        const response = await fetch(`${API_URL}/vk/service-key`);
+        const data = await response.json();
+        
+        if (data.error) {
+            serviceKeyResult.className = 'result show error';
+            serviceKeyResult.innerHTML = `<strong>✗ Ошибка!</strong><p>${data.error}</p>`;
+            return;
+        }
+        
+        await activateServiceKey(data.service_key, serviceKeyResult);
+    } catch (error) {
+        serviceKeyResult.className = 'result show error';
+        serviceKeyResult.innerHTML = `<strong>✗ Ошибка!</strong><p>${error.message}</p>`;
+    }
+}
+
+// Активация сервисного ключа
+async function activateServiceKey(serviceKey, resultElement) {
+    resultElement.className = 'result show';
+    resultElement.style.background = '#fff3cd';
+    resultElement.style.color = '#856404';
+    resultElement.innerHTML = '<strong>⏳ Проверка ключа...</strong>';
     
     try {
         // Проверяем ключ, получая информацию о текущем пользователе
@@ -346,8 +387,8 @@ async function useServiceKey() {
         const data = await response.json();
         
         if (data.error) {
-            serviceKeyResult.className = 'result show error';
-            serviceKeyResult.innerHTML = `<strong>✗ Ошибка!</strong><p>${data.error.error_msg}</p>`;
+            resultElement.className = 'result show error';
+            resultElement.innerHTML = `<strong>✗ Ошибка!</strong><p>${data.error.error_msg}</p>`;
             return;
         }
         
@@ -361,8 +402,8 @@ async function useServiceKey() {
             localStorage.setItem('vk_user_name', `${user.first_name} ${user.last_name}`);
             localStorage.setItem('vk_user_photo', user.photo_200);
             
-            serviceKeyResult.className = 'result show success';
-            serviceKeyResult.innerHTML = `
+            resultElement.className = 'result show success';
+            resultElement.innerHTML = `
                 <div style="text-align: center;">
                     <img src="${user.photo_200}" alt="${user.first_name}" style="width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px;">
                     <h3 style="margin: 10px 0;">${user.first_name} ${user.last_name}</h3>
@@ -376,7 +417,7 @@ async function useServiceKey() {
             `;
         }
     } catch (error) {
-        serviceKeyResult.className = 'result show error';
-        serviceKeyResult.innerHTML = `<strong>✗ Ошибка!</strong><p>${error.message}</p>`;
+        resultElement.className = 'result show error';
+        resultElement.innerHTML = `<strong>✗ Ошибка!</strong><p>${error.message}</p>`;
     }
 }

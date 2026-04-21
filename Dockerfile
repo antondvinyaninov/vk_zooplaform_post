@@ -37,6 +37,7 @@ COPY frontend/ ./frontend/
 ENV PORT=8000
 ENV VK_SERVICE_PORT=5000
 ENV VK_SERVICE_URL=http://localhost:5000
+ENV VK_SERVICE_KEY=a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d8826cb301184
 
 # Открываем порты
 EXPOSE 8000 5000

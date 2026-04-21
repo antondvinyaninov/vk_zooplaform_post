@@ -59,6 +59,7 @@ func main() {
 	http.HandleFunc("/api/vk/exchange-code", corsMiddleware(vkExchangeCodeHandler))
 	http.HandleFunc("/api/vk/refresh-token", corsMiddleware(vkRefreshTokenHandler))
 	http.HandleFunc("/api/vk/user-info", corsMiddleware(vkUserInfoHandler))
+	http.HandleFunc("/api/vk/service-key", corsMiddleware(vkServiceKeyHandler))
 
 	// Раздача статических файлов фронтенда (регистрируем ПОСЛЕДНИМ)
 	fs := http.FileServer(http.Dir("./frontend"))
@@ -532,4 +533,22 @@ func vkRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(vkResp)
+}
+
+func vkServiceKeyHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	serviceKey := os.Getenv("VK_SERVICE_KEY")
+	if serviceKey == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Service key not configured"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"service_key": serviceKey})
 }
