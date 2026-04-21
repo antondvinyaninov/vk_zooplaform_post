@@ -178,7 +178,7 @@ async function initVKID() {
             app: 54481712, // App ID
             redirectUrl: window.location.origin + '/auth.html',
             state: 'random_state_string',
-            scope: 'email phone',
+            scope: 'wall,groups,photos,video', // Добавляем необходимые права
             codeChallenge: codeChallenge,
             codeChallengeMethod: 'S256'
         });
