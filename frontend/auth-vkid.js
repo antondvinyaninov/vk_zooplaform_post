@@ -46,9 +46,28 @@ async function initVKID() {
     }
 }
 
-// Обработка авторизации через VK ID
-async function handleVKIDAuth(response) {
-    console.log('VK ID Auth response:', response);
+// Проверяем, есть ли код в URL (после редиректа от VK ID)
+function checkCodeInURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const deviceId = urlParams.get('device_id');
+    
+    if (code) {
+        // Обмениваем код на токен
+        exchangeCodeForToken(code, deviceId);
+        
+        // Очищаем URL от параметров
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+}
+
+// Обмен кода на токен через бэкенд
+async function exchangeCodeForToken(code, deviceId) {
+    const API_URL = window.location.hostname === 'localhost' 
+        ? 'http://localhost:8000/api' 
+        : `${window.location.origin}/api`;
+    
+    const redirectUri = window.location.origin + '/auth.html';
     
     tokenResult.className = 'result show';
     tokenResult.style.background = '#fff3cd';
@@ -56,22 +75,7 @@ async function handleVKIDAuth(response) {
     tokenResult.innerHTML = '<strong>⏳ Получение токена...</strong>';
     
     try {
-        // Получаем код авторизации
-        const code = response.code || response.payload?.code;
-        const deviceId = response.device_id || response.payload?.device_id;
-        
-        if (!code) {
-            throw new Error('Код авторизации не получен');
-        }
-
-        // Обмениваем код на токен через наш бэкенд
-        const API_URL = window.location.hostname === 'localhost' 
-            ? 'http://localhost:8000/api' 
-            : `${window.location.origin}/api`;
-        
-        const redirectUri = window.location.origin + '/auth.html';
-        
-        const apiResponse = await fetch(`${API_URL}/vk/exchange-code`, {
+        const response = await fetch(`${API_URL}/vk/exchange-code`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -83,7 +87,7 @@ async function handleVKIDAuth(response) {
             })
         });
         
-        const data = await apiResponse.json();
+        const data = await response.json();
         
         if (data.error) {
             tokenResult.className = 'result show error';
@@ -99,17 +103,9 @@ async function handleVKIDAuth(response) {
         localStorage.setItem('vk_user_id', data.user_id);
         localStorage.setItem('vk_token_expires', Date.now() + (data.expires_in * 1000));
         
-        tokenResult.className = 'result show success';
-        tokenResult.innerHTML = `
-            <strong>✓ Авторизация успешна!</strong>
-            <p>Токен сохранён</p>
-            <p>User ID: ${data.user_id}</p>
-            <p>Действителен: ${Math.floor(data.expires_in / 3600)} часов</p>
-            <br>
-            <a href="index.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
-                Перейти к панели управления
-            </a>
-        `;
+        // Получаем информацию о пользователе
+        await getUserInfo(data.access_token, data.user_id);
+        
     } catch (error) {
         console.error('Token exchange error:', error);
         tokenResult.className = 'result show error';
@@ -120,5 +116,71 @@ async function handleVKIDAuth(response) {
     }
 }
 
+// Получение информации о пользователе
+async function getUserInfo(accessToken, userId) {
+    try {
+        const API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:8000/api' 
+            : `${window.location.origin}/api`;
+        
+        const response = await fetch(`${API_URL}/vk/user-info`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                access_token: accessToken,
+                user_id: userId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        const user = data.response?.[0];
+        
+        if (user) {
+            // Сохраняем информацию о пользователе
+            localStorage.setItem('vk_user_name', `${user.first_name} ${user.last_name}`);
+            localStorage.setItem('vk_user_photo', user.photo_200);
+            
+            tokenResult.className = 'result show success';
+            tokenResult.innerHTML = `
+                <div style="text-align: center;">
+                    <img src="${user.photo_200}" alt="${user.first_name}" style="width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px;">
+                    <h3 style="margin: 10px 0;">${user.first_name} ${user.last_name}</h3>
+                    <strong>✓ Авторизация успешна!</strong>
+                    <p>User ID: ${userId}</p>
+                    <br>
+                    <a href="index.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
+                        Перейти к панели управления
+                    </a>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('User info error:', error);
+        // Показываем успех даже если не удалось получить инфо
+        tokenResult.className = 'result show success';
+        tokenResult.innerHTML = `
+            <strong>✓ Авторизация успешна!</strong>
+            <p>User ID: ${userId}</p>
+            <br>
+            <a href="index.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
+                Перейти к панели управления
+            </a>
+        `;
+    }
+}
+
 // Инициализация при загрузке страницы
-window.addEventListener('DOMContentLoaded', initVKID);
+window.addEventListener('DOMContentLoaded', () => {
+    // Сначала проверяем код в URL
+    checkCodeInURL();
+    
+    // Затем инициализируем VK ID SDK
+    initVKID();
+});

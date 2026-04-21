@@ -60,6 +60,7 @@ func main() {
 	http.HandleFunc("/api/vk/post", corsMiddleware(vkPostHandler))
 	http.HandleFunc("/api/vk/groups", corsMiddleware(vkGetGroupsHandler))
 	http.HandleFunc("/api/vk/exchange-code", corsMiddleware(vkExchangeCodeHandler))
+	http.HandleFunc("/api/vk/user-info", corsMiddleware(vkUserInfoHandler))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -322,4 +323,53 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 	// Успешный ответ
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(vkResp)
+}
+
+// Получение информации о пользователе VK
+func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		AccessToken string `json:"access_token"`
+		UserID      int    `json:"user_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	// Получаем информацию о пользователе
+	vkURL := "https://api.vk.com/method/users.get"
+	params := url.Values{}
+	params.Set("user_ids", fmt.Sprintf("%d", req.UserID))
+	params.Set("fields", "photo_200")
+	params.Set("access_token", req.AccessToken)
+	params.Set("v", "5.131")
+
+	resp, err := http.PostForm(vkURL, params)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("VK API error: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read VK response"})
+		return
+	}
+
+	// Отправляем ответ как есть
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(body)
 }
