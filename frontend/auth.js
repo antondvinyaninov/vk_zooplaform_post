@@ -48,11 +48,8 @@ function authorizeVK() {
     localStorage.setItem('vk_app_id', appId);
     
     // Параметры авторизации
-    // Используем blank.html - официальный redirect URI для локальной разработки
-    const isLocal = window.location.hostname === 'localhost';
-    const redirectUri = isLocal 
-        ? encodeURIComponent('https://oauth.vk.com/blank.html')
-        : encodeURIComponent('https://my-projects-vk-zooplaform-post.crv1ic.easypanel.host/auth.html');
+    // Используем blank.html - официальный redirect URI, работает всегда
+    const redirectUri = encodeURIComponent('https://oauth.vk.com/blank.html');
     const scope = 'wall,photos,video,groups'; // Права доступа
     const display = 'page';
     const responseType = 'token';
