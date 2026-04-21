@@ -14,7 +14,7 @@ WORKDIR /app
 COPY front-react/package*.json ./
 RUN npm install
 COPY front-react/ ./
-RUN npm run build
+RUN npm run build && ls -la dist/
 
 # Python VK Service
 FROM python:3.11-slim AS vk-service
@@ -39,8 +39,11 @@ COPY --from=backend-builder /app/main ./backend/main
 COPY --from=vk-service /app/vk-service ./vk-service
 COPY --from=vk-service /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 
-# Копируем собранный React фронтенд
+# Копируем собранный React фронтенд (из dist в frontend)
 COPY --from=frontend-builder /app/dist ./frontend/
+
+# Проверяем что файлы скопировались
+RUN ls -la ./frontend/ && echo "Frontend files copied successfully"
 
 # Переменные окружения
 ENV PORT=80
