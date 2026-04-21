@@ -66,7 +66,7 @@ function saveManualToken() {
     
     // Переход на страницу выбора групп
     setTimeout(() => {
-        window.location.href = 'groups.html';
+        window.location.href = '../index.html';
     }, 1000);
 }
 
@@ -105,7 +105,7 @@ function checkTokenInURL() {
         
         // Переход на страницу выбора групп
         setTimeout(() => {
-            window.location.href = 'groups.html';
+            window.location.href = '../index.html';
         }, 1000);
     }
 }

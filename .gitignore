@@ -3,14 +3,21 @@ backend/tmp/
 backend/build-errors.log
 backend/.env
 backend/backend
+backend/vk_service/__pycache__/
+backend/vk_service/*.pyc
+
+# Frontend
+frontend/node_modules/
+frontend/.cache/
 
 # General
 .DS_Store
 *.log
+*.pyc
+__pycache__/
 
 # Environment
 .env
 
 # VK MCP
 vk_mcp/
-vk_service/__pycache__/

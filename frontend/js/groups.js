@@ -1,5 +1,5 @@
 const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:8000/api' 
+    ? 'http://localhost/api' 
     : `${window.location.origin}/api`;
 
 const loadGroupsBtn = document.getElementById('loadGroupsBtn');

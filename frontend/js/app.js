@@ -1,5 +1,5 @@
 const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:8000/api' 
+    ? 'http://localhost/api' 
     : `${window.location.origin}/api`;
 
 console.log('[App] Initializing VK SMM Panel');
@@ -173,7 +173,7 @@ function loadConnectedGroups() {
 
 // Подключение аккаунта
 function connectAccount() {
-    window.location.href = 'auth.html';
+    window.location.href = 'pages/auth.html';
 }
 
 // Публикация поста
@@ -302,7 +302,7 @@ async function refreshTokenIfNeeded() {
     if (Date.now() >= parseInt(tokenExpires) - 3600000) {
         try {
             const API_URL = window.location.hostname === 'localhost' 
-                ? 'http://localhost:8000/api' 
+                ? 'http://localhost/api' 
                 : `${window.location.origin}/api`;
             
             const response = await fetch(`${API_URL}/vk/refresh-token`, {

@@ -11,9 +11,9 @@ RUN go build -o main .
 FROM python:3.11-slim AS vk-service
 
 WORKDIR /app/vk-service
-COPY vk_service/requirements.txt .
+COPY backend/vk_service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY vk_service/ .
+COPY backend/vk_service/ .
 
 # Финальный образ
 FROM python:3.11-slim

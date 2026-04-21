@@ -1,10 +1,35 @@
+# Git
+.git
+.gitignore
+
+# Backend
 backend/tmp
 backend/build-errors.log
 backend/.env
-.git
+backend/.air.toml
+backend/vk_service/__pycache__/
+backend/vk_service/*.pyc
+
+# Frontend
+frontend/node_modules/
+frontend/.cache/
+
+# General
 .DS_Store
 *.log
-node_modules
+__pycache__/
+*.pyc
+
+# VK MCP (справочный проект, не используется)
 vk_mcp/
-vk_service/__pycache__/
-vk_service/*.pyc
+
+# Documentation
+README.md
+VK_POST_PARAMS.md
+backend/README.md
+frontend/README.md
+
+# Development
+.vscode/
+run
+

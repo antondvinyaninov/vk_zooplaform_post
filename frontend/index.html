@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VK SMM Панель</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>VK SMM Панель</h1>
+            <h1>📱 VK SMM Панель</h1>
             <nav class="nav">
                 <a href="index.html" class="active">Главная</a>
-                <a href="groups.html">Управление группами</a>
-                <a href="posts.html">Просмотр постов</a>
+                <a href="pages/groups.html">Управление группами</a>
+                <a href="pages/posts.html">Просмотр постов</a>
             </nav>
         </div>
         
@@ -28,7 +28,7 @@
             <div class="card">
                 <h2>Управление группами</h2>
                 <p>Подключите группы для публикации постов</p>
-                <a href="groups.html" class="btn" style="display: inline-block; text-decoration: none;">
+                <a href="pages/groups.html" class="btn" style="display: inline-block; text-decoration: none;">
                     Управление группами
                 </a>
                 <div id="connectedGroups" style="margin-top: 15px;"></div>
@@ -75,6 +75,7 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>
