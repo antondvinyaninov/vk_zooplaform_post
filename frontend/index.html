@@ -50,6 +50,14 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="publishDate">Отложенная публикация (необязательно)</label>
+                    <input type="datetime-local" 
+                           id="publishDate" 
+                           style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                    <small style="color: #666; font-size: 12px;">Оставьте пустым для немедленной публикации</small>
+                </div>
+
+                <div class="form-group">
                     <label for="postPhotos">Фотографии (можно выбрать несколько)</label>
                     <input type="file" id="postPhotos" accept="image/*" multiple style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
                     <div id="photoPreview" style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;"></div>

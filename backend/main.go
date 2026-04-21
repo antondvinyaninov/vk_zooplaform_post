@@ -97,6 +97,7 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	message := r.FormValue("message")
 	accessToken := r.FormValue("access_token")
 	fromGroup := r.FormValue("from_group")
+	publishDate := r.FormValue("publish_date")
 
 	// Валидация
 	if ownerId == "" || accessToken == "" {
@@ -129,6 +130,9 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	writer.WriteField("message", message)
 	if fromGroup != "" {
 		writer.WriteField("from_group", fromGroup)
+	}
+	if publishDate != "" {
+		writer.WriteField("publish_date", publishDate)
 	}
 
 	// Добавляем фотографии

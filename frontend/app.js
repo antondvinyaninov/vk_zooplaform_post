@@ -183,6 +183,7 @@ async function publishPost() {
     const message = document.getElementById('postMessage').value.trim();
     const photos = postPhotosInput.files;
     const video = postVideoInput.files[0];
+    const publishDateInput = document.getElementById('publishDate').value;
 
     // Валидация
     if (!ownerId) {
@@ -207,6 +208,23 @@ async function publishPost() {
         formData.append('message', message);
         formData.append('access_token', accessToken);
         formData.append('from_group', '1');
+        
+        // Добавляем дату отложенной публикации
+        if (publishDateInput) {
+            const publishDate = new Date(publishDateInput);
+            const now = new Date();
+            
+            if (publishDate <= now) {
+                postResult.className = 'result show error';
+                postResult.innerHTML = '<strong>✗ Ошибка!</strong><p>Дата публикации должна быть в будущем</p>';
+                postBtn.disabled = false;
+                postBtn.textContent = 'Опубликовать';
+                return;
+            }
+            
+            const unixTimestamp = Math.floor(publishDate.getTime() / 1000);
+            formData.append('publish_date', unixTimestamp);
+        }
         
         // Добавляем фотографии
         if (photos.length > 0) {
@@ -236,13 +254,17 @@ async function publishPost() {
         } else {
             postResult.className = 'result show success';
             const groupName = targetGroupSelect.options[targetGroupSelect.selectedIndex].text;
+            const isScheduled = publishDateInput ? true : false;
+            
             postResult.innerHTML = `
-                <strong>✓ Пост опубликован!</strong>
+                <strong>✓ ${isScheduled ? 'Пост запланирован!' : 'Пост опубликован!'}</strong>
                 <p>Группа: ${groupName}</p>
                 <p>ID поста: ${data.post_id}</p>
+                ${isScheduled ? `<p>Дата публикации: ${new Date(publishDateInput).toLocaleString('ru-RU')}</p>` : ''}
             `;
             // Очищаем форму
             document.getElementById('postMessage').value = '';
+            document.getElementById('publishDate').value = '';
             postPhotosInput.value = '';
             postVideoInput.value = '';
             photoPreview.innerHTML = '';

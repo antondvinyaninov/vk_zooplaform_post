@@ -40,6 +40,7 @@ def wall_post():
         owner_id = request.form.get('owner_id')
         message = request.form.get('message', '')
         from_group = request.form.get('from_group', '1')
+        publish_date = request.form.get('publish_date')
         
         if not token or not owner_id:
             print(f"[VK Service] Missing parameters")
@@ -51,6 +52,8 @@ def wall_post():
         upload = vk_session['upload']
         
         print(f"[VK Service] Calling wall.post for owner_id: {owner_id}")
+        if publish_date:
+            print(f"[VK Service] Scheduled for: {publish_date}")
         
         # Подготавливаем параметры поста
         post_params = {
@@ -58,6 +61,10 @@ def wall_post():
             'message': message,
             'from_group': int(from_group)
         }
+        
+        # Добавляем дату отложенной публикации
+        if publish_date:
+            post_params['publish_date'] = int(publish_date)
         
         attachments = []
         
