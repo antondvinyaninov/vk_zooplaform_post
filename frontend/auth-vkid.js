@@ -1,51 +1,5 @@
 const tokenResult = document.getElementById('tokenResult');
 
-// Инициализация VK ID SDK
-async function initVKID() {
-    try {
-        // Конфигурация VK ID
-        await window.VKIDSDK.Config.init({
-            app: 54481712, // App ID
-            redirectUrl: window.location.origin + '/auth.html',
-            state: 'random_state_string',
-            scope: 'email phone'
-        });
-
-        // Создаем кнопку авторизации
-        const oneTap = new window.VKIDSDK.OneTap();
-        
-        const container = document.getElementById('vk-auth-button');
-        
-        // Рендерим кнопку
-        oneTap.render({
-            container: container,
-            scheme: window.VKIDSDK.Scheme.LIGHT,
-            lang: window.VKIDSDK.Languages.RUS,
-            styles: {
-                width: 100,
-                height: 48
-            }
-        });
-
-        // Обработка успешной авторизации
-        oneTap.on(window.VKIDSDK.OneTapInternalEvents.LOGIN_SUCCESS, handleVKIDAuth);
-        
-        // Обработка ошибок
-        oneTap.on(window.VKIDSDK.OneTapInternalEvents.SHOW_LOGIN_OPTIONS, () => {
-            console.log('Show login options');
-        });
-
-    } catch (error) {
-        console.error('VK ID initialization error:', error);
-        tokenResult.className = 'result show error';
-        tokenResult.innerHTML = `
-            <strong>✗ Ошибка инициализации!</strong>
-            <p>${error.message}</p>
-            <p>Попробуйте обновить страницу</p>
-        `;
-    }
-}
-
 // Проверяем, есть ли код в URL (после редиректа от VK ID)
 function checkCodeInURL() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -83,7 +37,8 @@ async function exchangeCodeForToken(code, deviceId) {
             body: JSON.stringify({
                 code: code,
                 redirect_uri: redirectUri,
-                device_id: deviceId
+                device_id: deviceId,
+                code_verifier: sessionStorage.getItem('vk_code_verifier')
             })
         });
         
@@ -176,11 +131,88 @@ async function getUserInfo(accessToken, userId) {
     }
 }
 
+// Генерация code_verifier и code_challenge для PKCE
+function generateCodeVerifier() {
+    const array = new Uint8Array(32);
+    crypto.getRandomValues(array);
+    return base64URLEncode(array);
+}
+
+function base64URLEncode(buffer) {
+    const base64 = btoa(String.fromCharCode.apply(null, buffer));
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function generateCodeChallenge(verifier) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return base64URLEncode(new Uint8Array(hash));
+}
+
+// Инициализация VK ID SDK
+async function initVKID() {
+    try {
+        // Генерируем PKCE параметры
+        const codeVerifier = generateCodeVerifier();
+        const codeChallenge = await generateCodeChallenge(codeVerifier);
+        
+        // Сохраняем verifier для последующего использования
+        sessionStorage.setItem('vk_code_verifier', codeVerifier);
+        
+        // Конфигурация VK ID
+        await window.VKIDSDK.Config.init({
+            app: 54481712, // App ID
+            redirectUrl: window.location.origin + '/auth.html',
+            state: 'random_state_string',
+            scope: 'email phone',
+            codeChallenge: codeChallenge,
+            codeChallengeMethod: 'S256'
+        });
+
+        // Создаем кнопку авторизации
+        const oneTap = new window.VKIDSDK.OneTap();
+        
+        const container = document.getElementById('vk-auth-button');
+        
+        if (!container) {
+            console.error('Container not found');
+            return;
+        }
+        
+        // Рендерим кнопку
+        oneTap.render({
+            container: container,
+            scheme: window.VKIDSDK.Scheme.LIGHT,
+            lang: window.VKIDSDK.Languages.RUS,
+            styles: {
+                width: 100,
+                height: 48
+            }
+        });
+
+        console.log('VK ID SDK initialized successfully');
+
+    } catch (error) {
+        console.error('VK ID initialization error:', error);
+        tokenResult.className = 'result show error';
+        tokenResult.innerHTML = `
+            <strong>✗ Ошибка инициализации!</strong>
+            <p>${error.message}</p>
+            <p>Попробуйте обновить страницу</p>
+        `;
+    }
+}
+
 // Инициализация при загрузке страницы
 window.addEventListener('DOMContentLoaded', () => {
     // Сначала проверяем код в URL
     checkCodeInURL();
     
     // Затем инициализируем VK ID SDK
-    initVKID();
+    if (window.VKIDSDK) {
+        initVKID();
+    } else {
+        console.error('VK ID SDK not loaded');
+    }
 });
