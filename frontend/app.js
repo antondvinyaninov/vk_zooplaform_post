@@ -2,6 +2,9 @@ const API_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8000/api' 
     : `${window.location.origin}/api`;
 
+console.log('[App] Initializing VK SMM Panel');
+console.log('[App] API URL:', API_URL);
+
 const connectAccountBtn = document.getElementById('connectAccountBtn');
 const accountStatus = document.getElementById('accountStatus');
 const mainContent = document.getElementById('mainContent');
@@ -12,13 +15,24 @@ const connectedGroupsDiv = document.getElementById('connectedGroups');
 
 // Проверка авторизации
 function checkAuth() {
+    console.log('[App] Checking auth status...');
+    
     const accessToken = localStorage.getItem('vk_access_token');
     const tokenExpires = localStorage.getItem('vk_token_expires');
     const userId = localStorage.getItem('vk_user_id');
     const userName = localStorage.getItem('vk_user_name');
     const userPhoto = localStorage.getItem('vk_user_photo');
     
+    console.log('[App] Auth data:', {
+        hasToken: !!accessToken,
+        userId,
+        userName,
+        hasPhoto: !!userPhoto,
+        tokenExpires: tokenExpires ? new Date(parseInt(tokenExpires)).toLocaleString() : 'none'
+    });
+    
     if (accessToken && tokenExpires && Date.now() < parseInt(tokenExpires)) {
+        console.log('[App] User is authenticated');
         // Аккаунт подключен
         let userInfoHTML = '';
         
@@ -46,6 +60,7 @@ function checkAuth() {
         
         loadConnectedGroups();
     } else {
+        console.log('[App] User is not authenticated');
         // Аккаунт не подключен
         accountStatus.innerHTML = `
             <div class="result show error">
@@ -60,9 +75,12 @@ function checkAuth() {
 
 // Загрузка подключенных групп
 function loadConnectedGroups() {
+    console.log('[App] Loading connected groups...');
+    
     const groupsData = localStorage.getItem('vk_selected_groups_data');
     
     if (!groupsData) {
+        console.log('[App] No groups data found');
         connectedGroupsDiv.innerHTML = `
             <div class="result show error">
                 <strong>⚠ Группы не подключены</strong>

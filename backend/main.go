@@ -405,22 +405,30 @@ func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Calling VK Service at: %s/vk/users/get", vkServiceURL)
+
 	resp, err := http.Post(vkServiceURL+"/vk/users/get", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
+		log.Printf("VK Service connection error: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("VK Service error: %v", err)})
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("VK Service недоступен: %v", err)})
 		return
 	}
 	defer resp.Body.Close()
 
+	log.Printf("VK Service response status: %d", resp.StatusCode)
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("Failed to read VK Service response: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read response"})
 		return
 	}
+
+	log.Printf("VK Service response body: %s", string(body))
 
 	// Отправляем ответ как есть
 	w.Header().Set("Content-Type", "application/json")

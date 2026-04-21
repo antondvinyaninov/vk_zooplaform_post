@@ -42,8 +42,22 @@ EXPOSE 8000 5000
 
 # Создаем скрипт запуска обоих сервисов
 RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'cd /app/vk-service && python main.py &' >> /app/start.sh && \
-    echo 'cd /app && ./backend/main' >> /app/start.sh && \
+    echo 'set -e' >> /app/start.sh && \
+    echo 'echo "=== Starting VK Service ==="' >> /app/start.sh && \
+    echo 'cd /app/vk-service' >> /app/start.sh && \
+    echo 'python main.py > /tmp/vk-service.log 2>&1 &' >> /app/start.sh && \
+    echo 'VK_PID=$!' >> /app/start.sh && \
+    echo 'echo "VK Service started with PID: $VK_PID"' >> /app/start.sh && \
+    echo 'sleep 3' >> /app/start.sh && \
+    echo 'if ! kill -0 $VK_PID 2>/dev/null; then' >> /app/start.sh && \
+    echo '  echo "ERROR: VK Service failed to start!"' >> /app/start.sh && \
+    echo '  cat /tmp/vk-service.log' >> /app/start.sh && \
+    echo '  exit 1' >> /app/start.sh && \
+    echo 'fi' >> /app/start.sh && \
+    echo 'echo "VK Service is running"' >> /app/start.sh && \
+    echo 'echo "=== Starting Go Backend ==="' >> /app/start.sh && \
+    echo 'cd /app' >> /app/start.sh && \
+    echo 'exec ./backend/main' >> /app/start.sh && \
     chmod +x /app/start.sh
 
 CMD ["/app/start.sh"]

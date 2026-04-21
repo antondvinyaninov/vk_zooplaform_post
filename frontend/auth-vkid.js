@@ -79,6 +79,8 @@ async function getUserInfo(accessToken, userId) {
             ? 'http://localhost:8000/api' 
             : `${window.location.origin}/api`;
         
+        console.log('Fetching user info for user:', userId);
+        
         const response = await fetch(`${API_URL}/vk/user-info`, {
             method: 'POST',
             headers: {
@@ -90,9 +92,13 @@ async function getUserInfo(accessToken, userId) {
             })
         });
         
+        console.log('User info response status:', response.status);
+        
         const data = await response.json();
+        console.log('User info data:', data);
         
         if (data.error) {
+            console.error('User info API error:', data.error);
             throw new Error(data.error);
         }
         
@@ -102,6 +108,8 @@ async function getUserInfo(accessToken, userId) {
             // Сохраняем информацию о пользователе
             localStorage.setItem('vk_user_name', `${user.first_name} ${user.last_name}`);
             localStorage.setItem('vk_user_photo', user.photo_200);
+            
+            console.log('User info saved:', user.first_name, user.last_name);
             
             tokenResult.className = 'result show success';
             tokenResult.innerHTML = `
@@ -116,6 +124,9 @@ async function getUserInfo(accessToken, userId) {
                     </a>
                 </div>
             `;
+        } else {
+            console.warn('No user data in response');
+            throw new Error('Не удалось получить данные пользователя');
         }
     } catch (error) {
         console.error('User info error:', error);
@@ -124,6 +135,7 @@ async function getUserInfo(accessToken, userId) {
         tokenResult.innerHTML = `
             <strong>✓ Авторизация успешна!</strong>
             <p>User ID: ${userId}</p>
+            <p style="color: #856404; font-size: 12px;">⚠ Не удалось загрузить данные профиля</p>
             <br>
             <a href="index.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
                 Перейти к панели управления
