@@ -382,13 +382,25 @@ async function activateServiceKey(serviceKey, resultElement) {
     resultElement.innerHTML = '<strong>⏳ Проверка ключа...</strong>';
     
     try {
-        // Проверяем ключ, получая информацию о текущем пользователе
-        const response = await fetch(`https://api.vk.com/method/users.get?fields=photo_200&access_token=${serviceKey}&v=5.131`);
+        const API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:8000/api' 
+            : `${window.location.origin}/api`;
+        
+        // Проверяем ключ через наш backend (чтобы избежать CORS)
+        const response = await fetch(`${API_URL}/vk/user-info`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                access_token: serviceKey,
+                user_id: 0 // Получим ID из ответа
+            })
+        });
+        
         const data = await response.json();
         
         if (data.error) {
             resultElement.className = 'result show error';
-            resultElement.innerHTML = `<strong>✗ Ошибка!</strong><p>${data.error.error_msg}</p>`;
+            resultElement.innerHTML = `<strong>✗ Ошибка!</strong><p>${data.error}</p>`;
             return;
         }
         
