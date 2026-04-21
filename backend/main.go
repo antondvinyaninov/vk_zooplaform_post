@@ -71,8 +71,6 @@ func main() {
 		log.Fatal(err)
 	}
 }
-	}
-}
 
 func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
