@@ -81,11 +81,18 @@ function renderPosts(posts, append = false) {
         return;
     }
     
+    // Сохраняем посты в глобальную переменную для доступа при копировании
+    window.currentPosts = window.currentPosts || {};
+    
     posts.forEach(post => {
         const postCard = document.createElement('div');
         postCard.className = 'post-card';
         postCard.dataset.postId = post.id;
         postCard.dataset.ownerId = post.owner_id;
+        
+        // Сохраняем полные данные поста
+        const postKey = `${post.owner_id}_${post.id}`;
+        window.currentPosts[postKey] = post;
         
         // Формируем информацию о вложениях
         let attachmentsHTML = '';
@@ -118,11 +125,14 @@ function renderPosts(posts, append = false) {
         
         // Кнопка репоста
         const repostBtn = `
-            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
-                <button class="repost-btn" data-post-id="${post.id}" data-owner-id="${post.owner_id}" style="background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; width: 100%;">
-                    📤 Репостнуть в свою группу
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0; display: flex; gap: 10px;">
+                <button class="repost-btn" data-post-id="${post.id}" data-owner-id="${post.owner_id}" style="flex: 1; background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                    🔄 Репостнуть
                 </button>
-                <div class="repost-result" style="margin-top: 10px;"></div>
+                <button class="copy-post-btn" data-post-id="${post.id}" data-owner-id="${post.owner_id}" style="flex: 1; background: #764ba2; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px;">
+                    📋 Скопировать пост
+                </button>
+                <div class="repost-result" style="margin-top: 10px; width: 100%;"></div>
             </div>
         `;
         
@@ -143,6 +153,11 @@ function renderPosts(posts, append = false) {
     // Добавляем обработчики для кнопок репоста
     document.querySelectorAll('.repost-btn').forEach(btn => {
         btn.addEventListener('click', handleRepost);
+    });
+    
+    // Добавляем обработчики для кнопок копирования
+    document.querySelectorAll('.copy-post-btn').forEach(btn => {
+        btn.addEventListener('click', handleCopyPost);
     });
 }
 
@@ -462,6 +477,162 @@ async function handleRepost(e) {
     
     // Обработчик отмены
     resultDiv.querySelector('.cancel-repost-btn').addEventListener('click', () => {
+        resultDiv.innerHTML = '';
+    });
+}
+
+// Обработчик копирования поста
+async function handleCopyPost(e) {
+    const btn = e.target;
+    const postId = btn.dataset.postId;
+    const ownerId = btn.dataset.ownerId;
+    const resultDiv = btn.parentElement.querySelector('.repost-result');
+    
+    // Получаем данные поста
+    const postKey = `${ownerId}_${postId}`;
+    const post = window.currentPosts[postKey];
+    
+    if (!post) {
+        resultDiv.className = 'result show error';
+        resultDiv.innerHTML = '<small>Данные поста не найдены</small>';
+        return;
+    }
+    
+    // Получаем список своих групп
+    const groupsData = localStorage.getItem('vk_selected_groups_data');
+    if (!groupsData) {
+        resultDiv.className = 'result show error';
+        resultDiv.innerHTML = '<small>Сначала подключите свои группы</small>';
+        return;
+    }
+    
+    const groups = JSON.parse(groupsData);
+    if (groups.length === 0) {
+        resultDiv.className = 'result show error';
+        resultDiv.innerHTML = '<small>Сначала подключите свои группы</small>';
+        return;
+    }
+    
+    // Показываем форму выбора группы
+    const groupOptions = groups.map(g => 
+        `<option value="-${g.id}">${g.name}</option>`
+    ).join('');
+    
+    resultDiv.innerHTML = `
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin-top: 10px;">
+            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Выберите группу:</label>
+            <select id="copyGroupSelect-${postId}" style="width: 100%; padding: 8px; border: 2px solid #e0e0e0; border-radius: 6px; margin-bottom: 10px;">
+                ${groupOptions}
+            </select>
+            <div style="display: flex; gap: 10px;">
+                <button class="confirm-copy-btn" data-post-id="${postId}" data-owner-id="${ownerId}" style="flex: 1; background: #764ba2; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer;">
+                    Скопировать
+                </button>
+                <button class="cancel-copy-btn" style="flex: 1; background: #ccc; color: #333; border: none; padding: 8px; border-radius: 6px; cursor: pointer;">
+                    Отмена
+                </button>
+            </div>
+            <div class="copy-status" style="margin-top: 10px;"></div>
+        </div>
+    `;
+    
+    // Обработчик подтверждения
+    resultDiv.querySelector('.confirm-copy-btn').addEventListener('click', async (e) => {
+        const confirmBtn = e.target;
+        const targetGroupId = document.getElementById(`copyGroupSelect-${postId}`).value;
+        const statusDiv = resultDiv.querySelector('.copy-status');
+        
+        if (!statusDiv) {
+            console.error('Status div not found');
+            return;
+        }
+        
+        try {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Копируем...';
+            
+            const accessToken = localStorage.getItem('vk_access_token');
+            
+            // Формируем attachments из поста
+            let attachments = [];
+            if (post.attachments) {
+                post.attachments.forEach(att => {
+                    if (att.type === 'photo') {
+                        attachments.push(`photo${att.photo.owner_id}_${att.photo.id}`);
+                    } else if (att.type === 'video') {
+                        attachments.push(`video${att.video.owner_id}_${att.video.id}`);
+                    } else if (att.type === 'audio') {
+                        attachments.push(`audio${att.audio.owner_id}_${att.audio.id}`);
+                    } else if (att.type === 'doc') {
+                        attachments.push(`doc${att.doc.owner_id}_${att.doc.id}`);
+                    }
+                });
+            }
+            
+            console.log('Copy post request:', {
+                owner_id: targetGroupId,
+                message: post.text,
+                attachments: attachments.join(',')
+            });
+            
+            const response = await fetch(`${API_URL}/vk/copy-post`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    access_token: accessToken,
+                    owner_id: targetGroupId,
+                    message: post.text || '',
+                    attachments: attachments.join(','),
+                    from_group: 1
+                })
+            });
+            
+            console.log('Copy response status:', response.status);
+            
+            const contentType = response.headers.get('content-type');
+            let data;
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                console.error('Non-JSON response:', text);
+                throw new Error('Сервер вернул некорректный ответ');
+            }
+            
+            console.log('Copy response data:', data);
+            
+            if (data.error) {
+                statusDiv.className = 'result show error';
+                statusDiv.innerHTML = `<small>Ошибка: ${data.error}</small>`;
+            } else {
+                statusDiv.className = 'result show success';
+                statusDiv.innerHTML = `<small>✓ Пост скопирован! ID: ${data.post_id}</small>`;
+                
+                // Скрываем форму через 2 секунды
+                setTimeout(() => {
+                    if (resultDiv) {
+                        resultDiv.innerHTML = '';
+                    }
+                }, 2000);
+            }
+        } catch (error) {
+            console.error('Copy error:', error);
+            if (statusDiv) {
+                statusDiv.className = 'result show error';
+                statusDiv.innerHTML = `<small>Ошибка: ${error.message}</small>`;
+            }
+        } finally {
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Скопировать';
+            }
+        }
+    });
+    
+    // Обработчик отмены
+    resultDiv.querySelector('.cancel-copy-btn').addEventListener('click', () => {
         resultDiv.innerHTML = '';
     });
 }

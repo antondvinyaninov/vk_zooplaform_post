@@ -315,6 +315,53 @@ def wall_repost():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/vk/wall/copy', methods=['POST'])
+def wall_copy():
+    """Копирование поста (публикация с теми же вложениями)"""
+    try:
+        data = request.json
+        print(f"[VK Service] Received wall.copy request: {data}")
+        
+        token = data.get('access_token')
+        owner_id = data.get('owner_id')
+        message = data.get('message', '')
+        attachments = data.get('attachments', '')
+        from_group = data.get('from_group', 1)
+        
+        if not token or not owner_id:
+            print(f"[VK Service] Missing parameters")
+            return jsonify({'error': 'Missing required parameters'}), 400
+        
+        # Получаем VK API
+        vk_session = get_vk_session(token)
+        api = vk_session['api']
+        print(f"[VK Service] Calling wall.post (copy) for owner_id: {owner_id}")
+        
+        # Публикуем пост с теми же вложениями
+        post_params = {
+            'owner_id': owner_id,
+            'message': message,
+            'from_group': int(from_group)
+        }
+        
+        if attachments:
+            post_params['attachments'] = attachments
+        
+        result = api.wall.post(**post_params)
+        
+        print(f"[VK Service] wall.post (copy) result: {result}")
+        
+        return jsonify({'post_id': result['post_id']})
+        
+    except vk_api.exceptions.ApiError as e:
+        print(f"[VK Service] VK API Error: {e}")
+        return jsonify({'error': f'VK API Error: {str(e)}'}), 400
+    except Exception as e:
+        print(f"[VK Service] Error in wall.copy: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('VK_SERVICE_PORT', 5000))
     print(f"=== Starting VK Service on port {port} ===")
