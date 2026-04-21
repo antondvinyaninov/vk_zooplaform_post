@@ -33,6 +33,7 @@ function checkTokenInURL() {
         resultDiv.innerHTML = `
             <strong>✓ Авторизация успешна!</strong>
             <p>User ID: ${userId}</p>
+            <p>Токен: ${expiresIn === '0' ? 'Бессрочный' : 'Действителен'}</p>
             <br>
             <a href="index.html" class="btn" style="display: inline-block; text-decoration: none;">
                 Перейти к панели управления
@@ -40,22 +41,3 @@ function checkTokenInURL() {
         `;
     }
 }
-
-// Кнопка авторизации
-document.getElementById('vkAuthBtn')?.addEventListener('click', () => {
-    // Используем ваше приложение с вашим доменом
-    const clientId = 54481712;
-    const redirectUri = window.location.origin + '/auth.html';
-    const scope = 'wall,groups,photos,video,offline';
-    
-    const authUrl = `https://oauth.vk.com/authorize?` +
-        `client_id=${clientId}` +
-        `&display=page` +
-        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-        `&scope=${scope}` +
-        `&response_type=token` +
-        `&v=5.131` +
-        `&revoke=1`;
-    
-    window.location.href = authUrl;
-});
