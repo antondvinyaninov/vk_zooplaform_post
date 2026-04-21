@@ -6,6 +6,7 @@ import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import vk_api
+from vk_api import VkUpload
 
 app = Flask(__name__)
 CORS(app)
@@ -13,12 +14,15 @@ CORS(app)
 # Кэш для VK API сессий
 vk_sessions = {}
 
-def get_vk_api(token):
+def get_vk_session(token):
     """Получение VK API сессии с кэшированием"""
     if token not in vk_sessions:
         print(f"[VK Service] Creating new VK API session")
         session = vk_api.VkApi(token=token)
-        vk_sessions[token] = session.get_api()
+        vk_sessions[token] = {
+            'api': session.get_api(),
+            'upload': VkUpload(session)
+        }
     return vk_sessions[token]
 
 @app.route('/health', methods=['GET'])
@@ -41,8 +45,11 @@ def wall_post():
             print(f"[VK Service] Missing parameters")
             return jsonify({'error': 'Missing required parameters'}), 400
         
-        # Получаем VK API
-        api = get_vk_api(token)
+        # Получаем VK API и Upload
+        vk_session = get_vk_session(token)
+        api = vk_session['api']
+        upload = vk_session['upload']
+        
         print(f"[VK Service] Calling wall.post for owner_id: {owner_id}")
         
         # Подготавливаем параметры поста
@@ -61,27 +68,24 @@ def wall_post():
             
             for photo_file in photos:
                 try:
-                    # Получаем upload URL
-                    upload_server = api.photos.getWallUploadServer(group_id=owner_id.replace('-', ''))
-                    upload_url = upload_server['upload_url']
+                    # Сохраняем файл временно
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp:
+                        photo_file.save(tmp.name)
+                        tmp_path = tmp.name
                     
-                    # Загружаем фото
-                    import requests
-                    files = {'photo': photo_file.read()}
-                    upload_response = requests.post(upload_url, files=files).json()
+                    # Загружаем фото через VkUpload
+                    photo = upload.photo_wall(tmp_path, group_id=owner_id.replace('-', ''))[0]
                     
-                    # Сохраняем фото
-                    saved_photo = api.photos.saveWallPhoto(
-                        group_id=owner_id.replace('-', ''),
-                        photo=upload_response['photo'],
-                        server=upload_response['server'],
-                        hash=upload_response['hash']
-                    )[0]
+                    attachments.append(f"photo{photo['owner_id']}_{photo['id']}")
+                    print(f"[VK Service] Photo uploaded: photo{photo['owner_id']}_{photo['id']}")
                     
-                    attachments.append(f"photo{saved_photo['owner_id']}_{saved_photo['id']}")
-                    print(f"[VK Service] Photo uploaded: photo{saved_photo['owner_id']}_{saved_photo['id']}")
+                    # Удаляем временный файл
+                    os.unlink(tmp_path)
                 except Exception as e:
                     print(f"[VK Service] Error uploading photo: {e}")
+                    import traceback
+                    traceback.print_exc()
         
         # Обрабатываем видео
         if 'video' in request.files:
@@ -89,23 +93,28 @@ def wall_post():
             print(f"[VK Service] Uploading video: {video_file.filename}")
             
             try:
-                # Получаем upload URL для видео
-                video_server = api.video.save(
+                # Сохраняем файл временно
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp:
+                    video_file.save(tmp.name)
+                    tmp_path = tmp.name
+                
+                # Загружаем видео через VkUpload
+                video = upload.video(
+                    video_file=tmp_path,
                     name=video_file.filename,
                     group_id=owner_id.replace('-', '')
                 )
-                upload_url = video_server['upload_url']
                 
-                # Загружаем видео
-                import requests
-                files = {'video_file': video_file.read()}
-                upload_response = requests.post(upload_url, files=files).json()
+                attachments.append(f"video{video['owner_id']}_{video['video_id']}")
+                print(f"[VK Service] Video uploaded: video{video['owner_id']}_{video['video_id']}")
                 
-                if 'video_id' in upload_response:
-                    attachments.append(f"video{upload_response['owner_id']}_{upload_response['video_id']}")
-                    print(f"[VK Service] Video uploaded: video{upload_response['owner_id']}_{upload_response['video_id']}")
+                # Удаляем временный файл
+                os.unlink(tmp_path)
             except Exception as e:
                 print(f"[VK Service] Error uploading video: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Добавляем attachments если есть
         if attachments:
@@ -141,7 +150,8 @@ def groups_get():
             return jsonify({'error': 'Missing access_token'}), 400
         
         # Получаем VK API
-        api = get_vk_api(token)
+        vk_session = get_vk_session(token)
+        api = vk_session['api']
         print(f"[VK Service] Calling groups.get")
         
         # Получаем группы
@@ -182,7 +192,8 @@ def users_get():
             return jsonify({'error': 'Missing required parameters'}), 400
         
         # Получаем VK API
-        api = get_vk_api(token)
+        vk_session = get_vk_session(token)
+        api = vk_session['api']
         print(f"[VK Service] Calling users.get for: {user_ids}")
         
         # Получаем информацию о пользователе
@@ -221,7 +232,8 @@ def wall_get():
             return jsonify({'error': 'Missing required parameters'}), 400
         
         # Получаем VK API
-        api = get_vk_api(token)
+        vk_session = get_vk_session(token)
+        api = vk_session['api']
         print(f"[VK Service] Calling wall.get for owner_id: {owner_id}, count: {count}, offset: {offset}")
         
         # Получаем посты

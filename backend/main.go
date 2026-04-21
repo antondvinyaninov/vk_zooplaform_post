@@ -149,7 +149,7 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Добавляем видео
-	if video := r.MultipartForm.File["video"]; video != nil && len(video) > 0 {
+	if video := r.MultipartForm.File["video"]; len(video) > 0 {
 		fileHeader := video[0]
 		file, err := fileHeader.Open()
 		if err == nil {
