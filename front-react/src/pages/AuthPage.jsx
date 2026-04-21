@@ -81,7 +81,10 @@ function AuthPage({ onAuth }) {
     // Открываем в новом окне
     const authWindow = window.open(authUrl, 'vk_oauth', 'width=800,height=600');
     
-    // Проверяем URL окна каждые 500мс
+    // Сразу показываем поле для ввода (так как автоматическое извлечение может не работать из-за CORS)
+    setShowInput(true);
+    
+    // Проверяем URL окна каждые 500мс (на случай если сработает)
     const checkInterval = setInterval(() => {
       try {
         if (!authWindow || authWindow.closed) {
@@ -105,6 +108,9 @@ function AuthPage({ onAuth }) {
             // Закрываем окно
             authWindow.close();
             
+            // Скрываем поле ввода
+            setShowInput(false);
+            
             // Сохраняем токен
             handleOAuthSuccess(accessToken, userId);
           }
@@ -114,13 +120,10 @@ function AuthPage({ onAuth }) {
       }
     }, 500);
     
-    // Останавливаем проверку через 5 минут
+    // Останавливаем проверку через 2 минуты
     setTimeout(() => {
       clearInterval(checkInterval);
-      if (authWindow && !authWindow.closed) {
-        setShowInput(true); // Показываем поле для ручного ввода если не получилось автоматически
-      }
-    }, 300000);
+    }, 120000);
   };
 
   const handleOAuthSuccess = async (accessToken, userId) => {
