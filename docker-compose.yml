@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+      - "3000:3000"
+    environment:
+      - VK_APP_ID=${VK_APP_ID:-54481712}
+      - VK_SERVICE_KEY=${VK_SERVICE_KEY}
+    restart: unless-stopped

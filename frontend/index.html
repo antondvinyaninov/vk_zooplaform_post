@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VK SMM Панель</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>VK SMM Панель</h1>
+        
+        <div class="card">
+            <h2>Ваш аккаунт</h2>
+            <div id="accountStatus"></div>
+            <button id="connectAccountBtn" class="btn">Подключить аккаунт VK</button>
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <div class="card">
+                <h2>Управление группами</h2>
+                <p>Подключите группы для публикации постов</p>
+                <a href="groups.html" class="btn" style="display: inline-block; text-decoration: none;">
+                    Управление группами
+                </a>
+                <div id="connectedGroups" style="margin-top: 15px;"></div>
+            </div>
+
+            <div class="card">
+                <h2>Опубликовать пост</h2>
+                
+                <div class="form-group">
+                    <label for="targetGroup">Выберите группу</label>
+                    <select id="targetGroup" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px;">
+                        <option value="">Сначала подключите группы</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="postMessage">Текст поста</label>
+                    <textarea id="postMessage" rows="5" placeholder="Введите текст поста..."></textarea>
+                </div>
+
+                <button id="postBtn" class="btn">Опубликовать</button>
+                <div id="postResult" class="result"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

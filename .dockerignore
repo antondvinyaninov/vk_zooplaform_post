@@ -1,0 +1,7 @@
+backend/tmp
+backend/build-errors.log
+backend/.env
+.git
+.DS_Store
+*.log
+node_modules

@@ -1,0 +1,56 @@
+#!/bin/bash
+
+echo "🚀 Запуск приложения..."
+
+# Функция для освобождения порта
+kill_port() {
+    local port=$1
+    local pid=$(lsof -ti:$port)
+    if [ ! -z "$pid" ]; then
+        echo "⚠️  Порт $port занят (PID: $pid), освобождаю..."
+        kill -9 $pid 2>/dev/null
+        sleep 1
+    fi
+}
+
+# Проверка и очистка портов
+echo "🔍 Проверка портов..."
+kill_port 8000
+kill_port 3000
+
+# Запуск бэкенда с Air или go run
+echo "📦 Запуск бэкенда..."
+cd backend
+if command -v air &> /dev/null; then
+    echo "   Используется Air (hot reload)"
+    air &
+else
+    echo "   Air не найден, используется go run"
+    echo "   Установите Air для hot reload: go install github.com/cosmtrek/air@latest"
+    go run main.go &
+fi
+BACKEND_PID=$!
+cd ..
+
+# Ожидание запуска бэкенда
+sleep 2
+
+# Запуск фронтенда
+echo "🌐 Запуск фронтенда на http://localhost:3000"
+cd frontend
+python3 -m http.server 3000 &
+FRONTEND_PID=$!
+cd ..
+
+echo ""
+echo "✅ Приложение запущено!"
+echo "   Фронтенд: http://localhost:3000"
+echo "   Бэкенд:   http://localhost:8000"
+echo ""
+echo "Для остановки нажмите Ctrl+C"
+
+# Обработка сигнала завершения
+trap "echo ''; echo '🛑 Остановка...'; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit" INT TERM
+
+# Ожидание
+wait

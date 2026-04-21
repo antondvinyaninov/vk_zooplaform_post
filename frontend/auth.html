@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VK Авторизация</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Авторизация VK</h1>
+        
+        <div class="card">
+            <h2>Настройка приложения</h2>
+            <p>App ID уже настроен для вашего приложения</p>
+            
+            <div class="form-group">
+                <label for="appId">App ID</label>
+                <input type="text" id="appId" placeholder="Введите App ID вашего приложения">
+            </div>
+
+            <button id="authBtn" class="btn">Авторизоваться через VK</button>
+            
+            <div id="tokenResult" class="result"></div>
+        </div>
+
+        <div class="card">
+            <h2>Или используйте готовый токен</h2>
+            <p>Если у вас уже есть токен доступа:</p>
+            <a href="index.html" class="btn" style="display: inline-block; text-decoration: none;">Перейти к панели управления</a>
+        </div>
+    </div>
+
+    <script src="auth.js"></script>
+</body>
+</html>

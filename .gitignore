@@ -1,0 +1,12 @@
+# Backend
+backend/tmp/
+backend/build-errors.log
+backend/.env
+backend/backend
+
+# General
+.DS_Store
+*.log
+
+# Environment
+.env
