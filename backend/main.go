@@ -240,3 +240,85 @@ func vkGetGroupsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(vkResp.Response)
 }
+
+// VK OAuth обмен кода на токен
+func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Code        string `json:"code"`
+		RedirectURI string `json:"redirect_uri"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
+		return
+	}
+
+	if req.Code == "" || req.RedirectURI == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "code and redirect_uri are required"})
+		return
+	}
+
+	// Получаем токен из VK
+	vkURL := "https://oauth.vk.com/access_token"
+	params := url.Values{}
+	params.Set("client_id", os.Getenv("VK_APP_ID"))
+	params.Set("client_secret", os.Getenv("VK_SERVICE_KEY"))
+	params.Set("redirect_uri", req.RedirectURI)
+	params.Set("code", req.Code)
+
+	resp, err := http.PostForm(vkURL, params)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("VK API error: %v", err)})
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read VK response"})
+		return
+	}
+
+	// Парсим ответ VK
+	var vkResp struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
+		UserID      int    `json:"user_id"`
+		Error       string `json:"error"`
+		ErrorDesc   string `json:"error_description"`
+	}
+
+	if err := json.Unmarshal(body, &vkResp); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to parse VK response"})
+		return
+	}
+
+	// Проверяем на ошибки VK
+	if vkResp.Error != "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": fmt.Sprintf("VK Error: %s - %s", vkResp.Error, vkResp.ErrorDesc),
+		})
+		return
+	}
+
+	// Успешный ответ
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(vkResp)
+}
