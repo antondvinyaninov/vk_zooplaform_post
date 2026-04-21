@@ -272,12 +272,6 @@ def wall_get():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':
-    port = int(os.environ.get('VK_SERVICE_PORT', 5000))
-    print(f"=== Starting VK Service on port {port} ===")
-    print(f"vk_api available: True")
-    app.run(host='0.0.0.0', port=port, debug=False)
-
 @app.route('/vk/wall/repost', methods=['POST'])
 def wall_repost():
     """Репост записи в группу"""
@@ -320,3 +314,9 @@ def wall_repost():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('VK_SERVICE_PORT', 5000))
+    print(f"=== Starting VK Service on port {port} ===")
+    print(f"vk_api available: True")
+    app.run(host='0.0.0.0', port=port, debug=False)
