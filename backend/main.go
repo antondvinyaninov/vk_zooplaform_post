@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -283,14 +284,30 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Using App ID: %s", appID)
 
-	vkURL := "https://oauth.vk.com/access_token"
-	params := url.Values{}
-	params.Set("client_id", appID)
-	params.Set("client_secret", serviceKey)
-	params.Set("redirect_uri", req.RedirectURI)
-	params.Set("code", req.Code)
+	// Для VK ID используем новый endpoint
+	vkURL := "https://id.vk.com/oauth2/auth"
 
-	resp, err := http.PostForm(vkURL, params)
+	reqBody := map[string]string{
+		"grant_type":   "authorization_code",
+		"code":         req.Code,
+		"redirect_uri": req.RedirectURI,
+		"client_id":    appID,
+	}
+
+	// Если есть client_secret, добавляем его
+	if serviceKey != "" && serviceKey != "b0278517b0278517b0278517a2b318d627bb027b0278517d99457deeba5ab53cea4c7ea" {
+		reqBody["client_secret"] = serviceKey
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to prepare request"})
+		return
+	}
+
+	resp, err := http.Post(vkURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
