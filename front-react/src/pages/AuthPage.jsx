@@ -81,10 +81,10 @@ function AuthPage({ onAuth }) {
     // Открываем в новом окне
     const authWindow = window.open(authUrl, 'vk_oauth', 'width=800,height=600');
     
-    // Сразу показываем поле для ввода (так как автоматическое извлечение может не работать из-за CORS)
+    // Показываем поле для ввода на случай если автоматическое извлечение не сработает
     setShowInput(true);
     
-    // Проверяем URL окна каждые 500мс (на случай если сработает)
+    // Проверяем URL окна каждые 1000мс
     const checkInterval = setInterval(() => {
       try {
         if (!authWindow || authWindow.closed) {
@@ -92,6 +92,7 @@ function AuthPage({ onAuth }) {
           return;
         }
         
+        // Пытаемся получить URL (может не работать из-за CORS)
         const currentUrl = authWindow.location.href;
         
         // Проверяем что мы на blank.html с токеном
@@ -116,14 +117,15 @@ function AuthPage({ onAuth }) {
           }
         }
       } catch (e) {
-        // Игнорируем ошибки CORS (пока окно на другом домене)
+        // Игнорируем ошибки CORS - это нормально пока окно на другом домене
+        // Пользователь может скопировать URL вручную
       }
-    }, 500);
+    }, 1000);
     
-    // Останавливаем проверку через 2 минуты
+    // Останавливаем проверку через 3 минуты
     setTimeout(() => {
       clearInterval(checkInterval);
-    }, 120000);
+    }, 180000);
   };
 
   const handleOAuthSuccess = async (accessToken, userId) => {

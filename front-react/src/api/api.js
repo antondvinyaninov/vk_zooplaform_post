@@ -3,6 +3,46 @@ const API_URL = import.meta.env.DEV
     ? 'http://localhost/api' 
     : `${window.location.origin}/api`;
 
+// JSONP для обхода CORS при прямых запросах к VK API
+const vkApiJsonp = (method, params) => {
+    return new Promise((resolve, reject) => {
+        const callbackName = 'vkCallback' + Date.now() + Math.random().toString(36).substr(2, 9);
+        
+        // Создаем глобальный callback
+        window[callbackName] = (data) => {
+            // Удаляем script и callback
+            document.head.removeChild(script);
+            delete window[callbackName];
+            resolve(data);
+        };
+        
+        // Формируем URL с callback
+        const queryParams = new URLSearchParams({
+            ...params,
+            callback: callbackName
+        });
+        
+        const script = document.createElement('script');
+        script.src = `https://api.vk.com/method/${method}?${queryParams}`;
+        script.onerror = () => {
+            document.head.removeChild(script);
+            delete window[callbackName];
+            reject(new Error('JSONP request failed'));
+        };
+        
+        // Таймаут на случай если VK не ответит
+        setTimeout(() => {
+            if (window[callbackName]) {
+                document.head.removeChild(script);
+                delete window[callbackName];
+                reject(new Error('JSONP request timeout'));
+            }
+        }, 10000);
+        
+        document.head.appendChild(script);
+    });
+};
+
 // Получение токена
 export const getAccessToken = () => localStorage.getItem('vk_access_token');
 
@@ -21,8 +61,39 @@ export const publishPost = async (formData) => {
     return response.json();
 };
 
-// Получение групп
+// Получение групп напрямую из VK API (обход проблемы с IP)
 export const getGroups = async () => {
+    const token = getAccessToken();
+    if (!token) {
+        return { error: 'Нет токена авторизации' };
+    }
+
+    try {
+        // Пробуем JSONP для обхода CORS
+        const data = await vkApiJsonp('groups.get', {
+            access_token: token,
+            extended: 1,
+            filter: 'admin,editor,moder',
+            v: '5.131'
+        });
+        
+        if (data.response) {
+            return data.response;
+        } else if (data.error) {
+            console.log('JSONP VK API failed, trying through backend...');
+            return await getGroupsThroughBackend();
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('Error in JSONP VK API call:', error);
+        // Fallback на backend
+        return await getGroupsThroughBackend();
+    }
+};
+
+// Запрос через наш backend (старый метод)
+const getGroupsThroughBackend = async () => {
     const response = await fetch(`${API_URL}/vk/groups`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -79,12 +150,39 @@ export const copyPost = async (ownerId, message, attachments) => {
     return response.json();
 };
 
-// Получение информации о пользователе
+// Получение информации о пользователе напрямую из VK API
 export const getUserInfo = async (userId) => {
     console.log('getUserInfo called with:', userId);
-    console.log('Access token:', getAccessToken()?.substring(0, 20) + '...');
+    const token = getAccessToken();
+    console.log('Access token:', token?.substring(0, 20) + '...');
     
-    // Пробуем получить через service key если user token не работает
+    try {
+        // Пробуем JSONP для обхода CORS
+        const data = await vkApiJsonp('users.get', {
+            user_ids: userId,
+            fields: 'photo_200',
+            access_token: token,
+            v: '5.131'
+        });
+        
+        console.log('JSONP VK API response:', data);
+        
+        if (data.response) {
+            return data;
+        } else if (data.error) {
+            console.log('JSONP VK API failed, trying through backend...');
+            return await getUserInfoThroughBackend(userId);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error('Error in JSONP VK API call:', error);
+        return await getUserInfoThroughBackend(userId);
+    }
+};
+
+// Запрос через наш backend с fallback на service key
+const getUserInfoThroughBackend = async (userId) => {
     try {
         const response = await fetch(`${API_URL}/vk/user-info`, {
             method: 'POST',
