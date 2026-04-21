@@ -96,20 +96,32 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Отправка поста в VK
-	vkURL := "https://api.vk.com/method/wall.post"
-	params := url.Values{}
-	params.Set("owner_id", req.OwnerID)
-	params.Set("message", req.Message)
-	params.Set("from_group", fmt.Sprintf("%d", req.FromGroup))
-	params.Set("access_token", req.AccessToken)
-	params.Set("v", "5.131")
+	// Отправляем запрос в VK Service
+	vkServiceURL := os.Getenv("VK_SERVICE_URL")
+	if vkServiceURL == "" {
+		vkServiceURL = "http://localhost:5000"
+	}
 
-	resp, err := http.PostForm(vkURL, params)
+	payload := map[string]interface{}{
+		"access_token": req.AccessToken,
+		"owner_id":     req.OwnerID,
+		"message":      req.Message,
+		"from_group":   req.FromGroup,
+	}
+
+	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(VKPostResponse{Error: fmt.Sprintf("VK API error: %v", err)})
+		json.NewEncoder(w).Encode(VKPostResponse{Error: "Failed to prepare request"})
+		return
+	}
+
+	resp, err := http.Post(vkServiceURL+"/vk/wall/post", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(VKPostResponse{Error: fmt.Sprintf("VK Service error: %v", err)})
 		return
 	}
 	defer resp.Body.Close()
@@ -118,41 +130,32 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(VKPostResponse{Error: "Failed to read VK response"})
+		json.NewEncoder(w).Encode(VKPostResponse{Error: "Failed to read response"})
 		return
 	}
 
-	// Парсим ответ VK
-	var vkResp struct {
-		Response struct {
-			PostID int `json:"post_id"`
-		} `json:"response"`
-		Error struct {
-			ErrorCode int    `json:"error_code"`
-			ErrorMsg  string `json:"error_msg"`
-		} `json:"error"`
+	var result struct {
+		PostID int    `json:"post_id"`
+		Error  string `json:"error"`
 	}
 
-	if err := json.Unmarshal(body, &vkResp); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(VKPostResponse{Error: "Failed to parse VK response"})
+		json.NewEncoder(w).Encode(VKPostResponse{Error: "Failed to parse response"})
 		return
 	}
 
-	// Проверяем на ошибки VK
-	if vkResp.Error.ErrorCode != 0 {
+	if result.Error != "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(VKPostResponse{
-			Error: fmt.Sprintf("VK Error %d: %s", vkResp.Error.ErrorCode, vkResp.Error.ErrorMsg),
-		})
+		json.NewEncoder(w).Encode(VKPostResponse{Error: result.Error})
 		return
 	}
 
 	// Успешный ответ
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(VKPostResponse{PostID: vkResp.Response.PostID})
+	json.NewEncoder(w).Encode(VKPostResponse{PostID: result.PostID})
 }
 
 func vkGetGroupsHandler(w http.ResponseWriter, r *http.Request) {
@@ -363,7 +366,6 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(vkResp)
 }
 
-// Получение информации о пользователе VK
 func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -382,19 +384,30 @@ func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем информацию о пользователе
-	vkURL := "https://api.vk.com/method/users.get"
-	params := url.Values{}
-	params.Set("user_ids", fmt.Sprintf("%d", req.UserID))
-	params.Set("fields", "photo_200")
-	params.Set("access_token", req.AccessToken)
-	params.Set("v", "5.131")
+	// Отправляем запрос в VK Service
+	vkServiceURL := os.Getenv("VK_SERVICE_URL")
+	if vkServiceURL == "" {
+		vkServiceURL = "http://localhost:5000"
+	}
 
-	resp, err := http.PostForm(vkURL, params)
+	payload := map[string]interface{}{
+		"access_token": req.AccessToken,
+		"user_ids":     fmt.Sprintf("%d", req.UserID),
+	}
+
+	jsonData, err := json.Marshal(payload)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("VK API error: %v", err)})
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to prepare request"})
+		return
+	}
+
+	resp, err := http.Post(vkServiceURL+"/vk/users/get", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("VK Service error: %v", err)})
 		return
 	}
 	defer resp.Body.Close()
@@ -403,7 +416,7 @@ func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read VK response"})
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read response"})
 		return
 	}
 
