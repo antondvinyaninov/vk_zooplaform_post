@@ -59,6 +59,7 @@ func main() {
 	http.HandleFunc("/api/health", corsMiddleware(healthHandler))
 	http.HandleFunc("/api/vk/post", corsMiddleware(vkPostHandler))
 	http.HandleFunc("/api/vk/groups", corsMiddleware(vkGetGroupsHandler))
+	http.HandleFunc("/api/vk/exchange-code", corsMiddleware(vkExchangeCodeHandler))
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -68,6 +69,8 @@ func main() {
 	log.Printf("Server starting on :%s", port)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatal(err)
+	}
+}
 	}
 }
 
