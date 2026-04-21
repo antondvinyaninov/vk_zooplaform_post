@@ -222,10 +222,97 @@ window.addEventListener('DOMContentLoaded', () => {
     // Сначала проверяем код в URL
     checkCodeInURL();
     
+    // Проверяем VK OAuth токен в URL (формат: #access_token=...)
+    checkVKOAuthToken();
+    
     // Затем инициализируем VK ID SDK
     if (window.VKIDSDK) {
         initVKID();
     } else {
         console.error('VK ID SDK not loaded');
     }
+    
+    // Добавляем обработчик для VK OAuth кнопки
+    const vkOAuthBtn = document.getElementById('vkOAuthBtn');
+    if (vkOAuthBtn) {
+        vkOAuthBtn.addEventListener('click', startVKOAuth);
+    }
 });
+
+// VK OAuth авторизация (старый метод для доступа к VK API)
+function startVKOAuth() {
+    const appId = 54481712;
+    const redirectUri = window.location.origin + '/auth.html';
+    const scope = 'wall,groups,photos,video,offline';
+    
+    const oauthUrl = `https://oauth.vk.com/authorize?` +
+        `client_id=${appId}` +
+        `&display=page` +
+        `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+        `&scope=${scope}` +
+        `&response_type=token` +
+        `&v=5.131`;
+    
+    window.location.href = oauthUrl;
+}
+
+// Проверка VK OAuth токена в URL
+function checkVKOAuthToken() {
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    
+    const accessToken = params.get('access_token');
+    const expiresIn = params.get('expires_in');
+    const userId = params.get('user_id');
+    
+    if (accessToken && userId) {
+        console.log('VK OAuth token received');
+        
+        // Сохраняем токен
+        localStorage.setItem('vk_access_token', accessToken);
+        localStorage.setItem('vk_user_id', userId);
+        localStorage.setItem('vk_token_expires', Date.now() + (parseInt(expiresIn) * 1000));
+        
+        // Получаем информацию о пользователе через VK API
+        getUserInfoVKAPI(accessToken, userId);
+        
+        // Очищаем URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+}
+
+// Получение информации о пользователе через VK API
+async function getUserInfoVKAPI(accessToken, userId) {
+    try {
+        const response = await fetch(`https://api.vk.com/method/users.get?user_ids=${userId}&fields=photo_200&access_token=${accessToken}&v=5.131`);
+        const data = await response.json();
+        
+        if (data.response && data.response[0]) {
+            const user = data.response[0];
+            
+            // Сохраняем информацию о пользователе
+            localStorage.setItem('vk_user_name', `${user.first_name} ${user.last_name}`);
+            localStorage.setItem('vk_user_photo', user.photo_200);
+            
+            const oauthResult = document.getElementById('oauthResult');
+            if (oauthResult) {
+                oauthResult.className = 'result show success';
+                oauthResult.innerHTML = `
+                    <div style="text-align: center;">
+                        <img src="${user.photo_200}" alt="${user.first_name}" style="width: 100px; height: 100px; border-radius: 50%; margin-bottom: 15px;">
+                        <h3 style="margin: 10px 0;">${user.first_name} ${user.last_name}</h3>
+                        <strong>✓ Авторизация через VK OAuth успешна!</strong>
+                        <p>User ID: ${userId}</p>
+                        <p>Токен действителен: ${Math.floor(parseInt(localStorage.getItem('vk_token_expires') - Date.now()) / 86400000)} дней</p>
+                        <br>
+                        <a href="index.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
+                            Перейти к панели управления
+                        </a>
+                    </div>
+                `;
+            }
+        }
+    } catch (error) {
+        console.error('VK API error:', error);
+    }
+}
