@@ -388,6 +388,11 @@ async function handleRepost(e) {
         const targetGroupId = document.getElementById(`repostGroupSelect-${postId}`).value;
         const statusDiv = resultDiv.querySelector('.repost-status');
         
+        if (!statusDiv) {
+            console.error('Status div not found');
+            return;
+        }
+        
         try {
             confirmBtn.disabled = true;
             confirmBtn.textContent = 'Репостим...';
@@ -416,15 +421,21 @@ async function handleRepost(e) {
                 
                 // Скрываем форму через 2 секунды
                 setTimeout(() => {
-                    resultDiv.innerHTML = '';
+                    if (resultDiv) {
+                        resultDiv.innerHTML = '';
+                    }
                 }, 2000);
             }
         } catch (error) {
-            statusDiv.className = 'result show error';
-            statusDiv.innerHTML = `<small>Ошибка: ${error.message}</small>`;
+            if (statusDiv) {
+                statusDiv.className = 'result show error';
+                statusDiv.innerHTML = `<small>Ошибка: ${error.message}</small>`;
+            }
         } finally {
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = 'Репостнуть';
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Репостнуть';
+            }
         }
     });
     
