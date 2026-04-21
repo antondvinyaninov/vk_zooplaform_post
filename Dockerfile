@@ -7,6 +7,15 @@ RUN go mod download || true
 COPY backend/ ./
 RUN go build -o main .
 
+# Сборка React фронтенда
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app
+COPY front-react/package*.json ./
+RUN npm ci
+COPY front-react/ ./
+RUN npm run build
+
 # Python VK Service
 FROM python:3.11-slim AS vk-service
 
@@ -30,17 +39,17 @@ COPY --from=backend-builder /app/main ./backend/main
 COPY --from=vk-service /app/vk-service ./vk-service
 COPY --from=vk-service /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 
-# Копируем фронтенд
-COPY frontend/ ./frontend/
+# Копируем собранный React фронтенд
+COPY --from=frontend-builder /app/dist ./frontend/
 
 # Переменные окружения
 ENV PORT=80
-ENV VK_SERVICE_PORT=5000
-ENV VK_SERVICE_URL=http://localhost:5000
+ENV VK_SERVICE_PORT=5001
+ENV VK_SERVICE_URL=http://localhost:5001
 ENV VK_SERVICE_KEY=a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d8826cb301184
 
 # Открываем порты
-EXPOSE 80 5000
+EXPOSE 80 5001
 
 # Создаем скрипт запуска обоих сервисов
 RUN echo '#!/bin/sh' > /app/start.sh && \

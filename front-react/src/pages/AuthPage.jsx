@@ -67,7 +67,8 @@ function AuthPage({ onAuth }) {
 
   const handleOAuthDirect = () => {
     const clientId = '54555042'; // Твой App ID
-    const redirectUri = 'https://oauth.vk.com/blank.html'; // Используем blank.html для локальной разработки
+    // Используем blank.html для всех окружений пока не настроим redirect_uri в VK
+    const redirectUri = 'https://oauth.vk.com/blank.html';
     const scope = 'wall,photos,video,groups,offline';
     
     const authUrl = `https://oauth.vk.com/authorize?` +
@@ -75,7 +76,7 @@ function AuthPage({ onAuth }) {
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `display=page&` +
       `scope=${scope}&` +
-      `response_type=token&` + // Используем token вместо code для локальной разработки
+      `response_type=token&` +
       `v=5.199`;
     
     // Открываем в новом окне
