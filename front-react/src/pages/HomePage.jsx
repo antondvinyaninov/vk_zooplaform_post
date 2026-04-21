@@ -62,10 +62,17 @@ function HomePage() {
           // Сохраняем в localStorage
           localStorage.setItem('vk_user_name', fullName);
           localStorage.setItem('vk_user_photo', user.photo_200);
+        } else if (data.error) {
+          console.error('VK API error:', data.error);
+          // Показываем хотя бы "Пользователь" если не удалось загрузить
+          setUserName('Пользователь');
         }
       } catch (error) {
         console.error('Error loading user info:', error);
+        setUserName('Пользователь');
       }
+    } else {
+      setUserName('Пользователь');
     }
   };
 
