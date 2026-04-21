@@ -270,16 +270,16 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем токен из VK
+	// Получаем токен из VK ID
 	appID := os.Getenv("VK_APP_ID")
-	serviceKey := os.Getenv("VK_SERVICE_KEY")
+	clientSecret := os.Getenv("VK_CLIENT_SECRET")
 
 	// Если переменные не установлены, используем значения по умолчанию
 	if appID == "" {
 		appID = "54481712"
 	}
-	if serviceKey == "" {
-		serviceKey = "b0278517b0278517b0278517a2b318d627bb027b0278517d99457deeba5ab53cea4c7ea"
+	if clientSecret == "" {
+		clientSecret = "488uLwXVh0NbUFcrJIvA"
 	}
 
 	log.Printf("Using App ID: %s", appID)
@@ -288,15 +288,11 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 	vkURL := "https://id.vk.com/oauth2/auth"
 
 	reqBody := map[string]string{
-		"grant_type":   "authorization_code",
-		"code":         req.Code,
-		"redirect_uri": req.RedirectURI,
-		"client_id":    appID,
-	}
-
-	// Если есть client_secret, добавляем его
-	if serviceKey != "" && serviceKey != "b0278517b0278517b0278517a2b318d627bb027b0278517d99457deeba5ab53cea4c7ea" {
-		reqBody["client_secret"] = serviceKey
+		"grant_type":    "authorization_code",
+		"code":          req.Code,
+		"redirect_uri":  req.RedirectURI,
+		"client_id":     appID,
+		"client_secret": clientSecret,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
