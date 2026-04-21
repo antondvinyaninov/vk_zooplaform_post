@@ -10,3 +10,7 @@ backend/backend
 
 # Environment
 .env
+
+# VK MCP
+vk_mcp/
+vk_service/__pycache__/
