@@ -302,6 +302,11 @@ func vkExchangeCodeHandler(w http.ResponseWriter, r *http.Request) {
 		reqBody["device_id"] = req.DeviceID
 	}
 
+	// Добавляем code_verifier для PKCE
+	if req.CodeVerifier != "" {
+		reqBody["code_verifier"] = req.CodeVerifier
+	}
+
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
