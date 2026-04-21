@@ -398,6 +398,12 @@ async function handleRepost(e) {
             confirmBtn.textContent = 'Репостим...';
             
             const accessToken = localStorage.getItem('vk_access_token');
+            
+            console.log('Repost request:', {
+                object: `wall${ownerId}_${postId}`,
+                group_id: targetGroupId.replace('-', '')
+            });
+            
             const response = await fetch(`${API_URL}/vk/repost`, {
                 method: 'POST',
                 headers: {
@@ -410,7 +416,21 @@ async function handleRepost(e) {
                 })
             });
             
-            const data = await response.json();
+            console.log('Repost response status:', response.status);
+            
+            const contentType = response.headers.get('content-type');
+            console.log('Content-Type:', contentType);
+            
+            let data;
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                console.error('Non-JSON response:', text);
+                throw new Error('Сервер вернул некорректный ответ');
+            }
+            
+            console.log('Repost response data:', data);
             
             if (data.error) {
                 statusDiv.className = 'result show error';
@@ -427,6 +447,7 @@ async function handleRepost(e) {
                 }, 2000);
             }
         } catch (error) {
+            console.error('Repost error:', error);
             if (statusDiv) {
                 statusDiv.className = 'result show error';
                 statusDiv.innerHTML = `<small>Ошибка: ${error.message}</small>`;
