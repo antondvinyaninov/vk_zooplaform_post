@@ -174,9 +174,11 @@ DATABASE_PATH=./data/app.db     # Путь к БД SQLite
 
 ## 📚 Документация
 
-- [API Structure](backend/api/README.md) - Структура API
-- [ROUTES.md](ROUTES.md) - Описание маршрутов
-- [Old README](Old/README_old.md) - Старая документация (важная информация)
+- [Архитектура проекта](docs/ARCHITECTURE.md) - Подробная архитектура системы
+- [Руководство по разработке](docs/DEVELOPMENT.md) - Как начать разработку
+- [API Routes](docs/ROUTES.md) - Описание маршрутов
+- [VK Post Parameters](docs/VK_POST_PARAMS.md) - Параметры постов VK
+- [Полная документация](docs/README.md) - Все документы проекта
 
 ## � Безопасность
 
