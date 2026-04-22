@@ -1,0 +1,207 @@
+package internal
+
+import (
+	"backend/database"
+	"backend/models"
+	"database/sql"
+	"time"
+)
+
+// PostService сервис для работы с постами
+type PostService struct{}
+
+// NewPostService создает новый сервис постов
+func NewPostService() *PostService {
+	return &PostService{}
+}
+
+// Create создает новый пост в БД
+func (s *PostService) Create(post *models.Post) error {
+	query := `
+		INSERT INTO posts (vk_post_id, group_id, message, attachments, status, publish_date)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+	result, err := database.DB.Exec(query,
+		post.VKPostID,
+		post.GroupID,
+		post.Message,
+		post.Attachments,
+		post.Status,
+		post.PublishDate,
+	)
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	post.ID = int(id)
+	post.CreatedAt = time.Now()
+	post.UpdatedAt = time.Now()
+
+	return nil
+}
+
+// GetByID получает пост по ID
+func (s *PostService) GetByID(id int) (*models.Post, error) {
+	query := `
+		SELECT id, vk_post_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		FROM posts
+		WHERE id = ?
+	`
+
+	post := &models.Post{}
+	var publishDate sql.NullTime
+
+	err := database.DB.QueryRow(query, id).Scan(
+		&post.ID,
+		&post.VKPostID,
+		&post.GroupID,
+		&post.Message,
+		&post.Attachments,
+		&post.Status,
+		&publishDate,
+		&post.CreatedAt,
+		&post.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if publishDate.Valid {
+		post.PublishDate = publishDate.Time
+	}
+
+	return post, nil
+}
+
+// GetByGroupID получает посты группы
+func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Post, error) {
+	query := `
+		SELECT id, vk_post_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		FROM posts
+		WHERE group_id = ?
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := database.DB.Query(query, groupID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*models.Post
+	for rows.Next() {
+		post := &models.Post{}
+		var publishDate sql.NullTime
+
+		err := rows.Scan(
+			&post.ID,
+			&post.VKPostID,
+			&post.GroupID,
+			&post.Message,
+			&post.Attachments,
+			&post.Status,
+			&publishDate,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if publishDate.Valid {
+			post.PublishDate = publishDate.Time
+		}
+
+		posts = append(posts, post)
+	}
+
+	return posts, nil
+}
+
+// GetByStatus получает посты по статусу
+func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.Post, error) {
+	query := `
+		SELECT id, vk_post_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		FROM posts
+		WHERE status = ?
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := database.DB.Query(query, status, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*models.Post
+	for rows.Next() {
+		post := &models.Post{}
+		var publishDate sql.NullTime
+
+		err := rows.Scan(
+			&post.ID,
+			&post.VKPostID,
+			&post.GroupID,
+			&post.Message,
+			&post.Attachments,
+			&post.Status,
+			&publishDate,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if publishDate.Valid {
+			post.PublishDate = publishDate.Time
+		}
+
+		posts = append(posts, post)
+	}
+
+	return posts, nil
+}
+
+// Update обновляет пост
+func (s *PostService) Update(post *models.Post) error {
+	query := `
+		UPDATE posts
+		SET vk_post_id = ?, message = ?, attachments = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`
+	_, err := database.DB.Exec(query,
+		post.VKPostID,
+		post.Message,
+		post.Attachments,
+		post.Status,
+		post.PublishDate,
+		post.ID,
+	)
+	return err
+}
+
+// UpdateStatus обновляет статус поста
+func (s *PostService) UpdateStatus(id int, status string) error {
+	query := `UPDATE posts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := database.DB.Exec(query, status, id)
+	return err
+}
+
+// Delete удаляет пост
+func (s *PostService) Delete(id int) error {
+	query := `DELETE FROM posts WHERE id = ?`
+	_, err := database.DB.Exec(query, id)
+	return err
+}

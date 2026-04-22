@@ -9,6 +9,8 @@ backend/vk_service/*.pyc
 # Frontend
 frontend/node_modules/
 frontend/.cache/
+vk_app/node_modules/
+vk_app/dist/
 
 # General
 .DS_Store
@@ -21,3 +23,6 @@ __pycache__/
 
 # VK MCP
 vk_mcp/
+
+# Old code archive
+Old/

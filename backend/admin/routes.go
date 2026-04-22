@@ -1,0 +1,38 @@
+package admin
+
+import (
+	"backend/middleware"
+	"net/http"
+)
+
+// RegisterRoutes регистрирует маршруты для админки
+func RegisterRoutes(mux *http.ServeMux) {
+	// API endpoints для админки
+	mux.HandleFunc("/api/admin/health", middleware.CORSFunc(healthHandler))
+
+	// VK API endpoints (старые, для обратной совместимости)
+	mux.HandleFunc("/api/vk/post", middleware.CORSFunc(vkPostHandler))
+	mux.HandleFunc("/api/vk/posts", middleware.CORSFunc(vkGetPostsHandler))
+	mux.HandleFunc("/api/vk/repost", middleware.CORSFunc(vkRepostHandler))
+	mux.HandleFunc("/api/vk/copy-post", middleware.CORSFunc(vkCopyPostHandler))
+	mux.HandleFunc("/api/vk/groups", middleware.CORSFunc(vkGetGroupsHandler))
+	mux.HandleFunc("/api/vk/user-info", middleware.CORSFunc(vkUserInfoHandler))
+	mux.HandleFunc("/api/vk/service-key", middleware.CORSFunc(vkServiceKeyHandler))
+	mux.HandleFunc("/api/vk/oauth/callback", middleware.CORSFunc(vkOAuthCallbackHandler))
+	mux.HandleFunc("/api/vk/oauth/token", middleware.CORSFunc(vkOAuthTokenHandler))
+
+	// Редиректы для обратной совместимости
+	mux.HandleFunc("/auth.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/pages/auth.html", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/groups.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/pages/groups.html", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/posts.html", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/pages/posts.html", http.StatusMovedPermanently)
+	})
+
+	// Статические файлы админки (должны быть последними)
+	fs := http.FileServer(http.Dir("./frontend"))
+	mux.Handle("/", fs)
+}

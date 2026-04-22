@@ -1,0 +1,42 @@
+{
+  "name": "vk_petplatform",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "tunnel": "vk-tunnel --http-protocol=http --host=localhost --port=5173",
+    "deploy": "vite build && vk-miniapps-deploy"
+  },
+  "dependencies": {
+    "@vkontakte/icons": "^3.49.0",
+    "@vkontakte/vk-bridge": "^2.13.0",
+    "@vkontakte/vk-bridge-react": "^1.0.1",
+    "@vkontakte/vk-mini-apps-router": "^1.8.4",
+    "@vkontakte/vkui": "^8.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^6.14.0",
+    "@typescript-eslint/parser": "^6.14.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-legacy": "^8.0.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vkontakte/vk-miniapps-deploy": "^1.0.2",
+    "@vkontakte/vk-tunnel": "^0.2.4",
+    "eruda": "^3.0.1",
+    "esbuild": "^0.27.4",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "terser": "^5.46.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.9"
+  }
+}

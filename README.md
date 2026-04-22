@@ -1,202 +1,203 @@
-# VK SMM Панель
+# VK Post Platform
 
-Веб-приложение для управления постами в группах ВКонтакте. Создано для платформы помощи животным [Zooplatforma.ru](https://zooplatforma.ru).
+Платформа для управления публикациями в группах ВКонтакте с VK Mini App интерфейсом.
 
-## 🎯 Возможности
-
-### Публикация постов
-- 📝 Текстовые посты с форматированием
-- 📷 Загрузка фото (до 10 шт)
-- 🎥 Загрузка видео
-- ⏰ Отложенная публикация
-- 🎯 Публикация в несколько групп
-
-### Управление группами
-- 👥 Подключение групп пользователя
-- ✅ Выбор групп для публикации
-- 💾 Сохранение настроек
-
-### Просмотр постов
-- 📖 Просмотр постов из своих групп
-- 🌐 Просмотр постов из любой публичной группы
-- 🔄 Репост записей
-- 📋 Копирование постов с вложениями
-- 🔍 Фильтры: все, от группы, от пользователей, отложенные, предложенные
-
-## 🏗️ Архитектура
+## �️ Архитектура проекта
 
 ```
-┌─────────────┐      ┌──────────────┐      ┌─────────────────┐      ┌─────────┐
-│   Frontend  │─────▶│  Go Backend  │─────▶│  Python VK API  │─────▶│  VK API │
-│  (Vanilla)  │      │   (port 80)  │      │   (port 5000)   │      │         │
-└─────────────┘      └──────────────┘      └─────────────────┘      └─────────┘
+smm/
+├── backend/              # Go backend
+│   ├── admin/           # Админка API (управление группами, постами)
+│   ├── vk-app/          # VK Mini App API (публикация из приложения)
+│   ├── site/            # Основной сайт API
+│   ├── api/             # API слой
+│   │   ├── external/    # Внешние API (VK, Telegram)
+│   │   └── internal/    # Внутренние API (БД, бизнес-логика)
+│   ├── vk/              # VK API клиент
+│   ├── database/        # SQLite подключение и схема
+│   ├── models/          # Модели данных (Group, Post, User)
+│   ├── middleware/      # Middleware (CORS, Logger)
+│   ├── config/          # Конфигурация
+│   ├── services/        # Бизнес-логика
+│   ├── utils/           # Вспомогательные функции
+│   └── main.go          # Главный файл
+├── vk_app/              # VK Mini App (React + VKUI + VK Bridge)
+├── frontend/            # Админка (HTML + JS)
+└── Old/                 # Архив старого кода
 ```
 
-### Backend (Go)
-- HTTP сервер на порту 80
-- Проксирование запросов к VK Service
-- Обслуживание статических файлов фронтенда
-- CORS middleware
+## 🎯 Компоненты системы
 
-### VK Service (Python)
-- Flask API на порту 5000
-- Работа с VK API через vk_api
-- Загрузка медиа (фото, видео)
-- Модульная структура:
-  - `services/post_creator.py` - создание и публикация постов
-  - `services/post_parser.py` - получение постов
-  - `services/groups.py` - работа с группами
-  - `utils/vk_session.py` - управление VK сессиями
+### 1. VK Mini App (`vk_app/`)
+- **Назначение**: Пользовательский интерфейс для создания постов
+- **Технологии**: React, VKUI, VK Bridge, TypeScript
+- **Функционал**:
+  - Авторизация через VK Bridge
+  - Создание и редактирование постов
+  - Загрузка фото и видео
+  - Предпросмотр постов
 
-### Frontend (Vanilla JS)
-- Модульная структура
-- `pages/` - HTML страницы
-- `js/` - JavaScript модули
-- `css/` - стили
+### 2. Админка (`frontend/`)
+- **Назначение**: Управление группами и настройками
+- **Технологии**: HTML, JavaScript, CSS
+- **Функционал**:
+  - Подключение групп ВКонтакте
+  - Управление токенами доступа
+  - Настройки постинга
+  - Статистика публикаций
 
-## 📁 Структура проекта
+### 3. Backend (`backend/`)
+- **Назначение**: Единый API сервер
+- **Технологии**: Go, SQLite
+- **Функционал**:
+  - REST API для всех компонентов
+  - Работа с VK API
+  - Хранение данных в SQLite
+  - Управление публикациями
 
-```
-.
-├── backend/
-│   ├── main.go                    # Go HTTP сервер
-│   ├── vk_service/               # Python VK API сервис
-│   │   ├── main.py               # Flask API
-│   │   ├── services/             # Бизнес-логика
-│   │   │   ├── post_creator.py  # Публикация постов
-│   │   │   ├── post_parser.py   # Парсинг постов
-│   │   │   └── groups.py         # Группы и пользователи
-│   │   └── utils/
-│   │       └── vk_session.py     # VK API сессии
-│   └── .air.toml                 # Hot reload конфиг
-├── frontend/
-│   ├── index.html                # Главная страница
-│   ├── pages/                    # HTML страницы
-│   │   ├── auth.html            # Авторизация
-│   │   ├── groups.html          # Управление группами
-│   │   └── posts.html           # Просмотр постов
-│   ├── js/                       # JavaScript
-│   │   ├── utils.js             # Общие утилиты
-│   │   ├── app.js               # Главная страница
-│   │   ├── auth.js              # Авторизация
-│   │   ├── groups.js            # Группы
-│   │   └── posts.js             # Посты
-│   └── css/
-│       └── style.css            # Стили
-├── Dockerfile                    # Multi-stage сборка
-├── docker-compose.yml
-└── run                          # Скрипт локального запуска
-```
+## 🚀 Запуск проекта
 
-## 🚀 Локальный запуск
+### Локальная разработка
 
-### Требования
-- Go 1.21+
-- Python 3.11+
-- Air (для hot reload)
-
-### Запуск через скрипт
-```bash
-./run
-```
-
-Приложение будет доступно на `http://localhost`
-
-### Ручной запуск
-
-**Backend:**
+#### Backend
 ```bash
 cd backend
-air  # или go run main.go
+go run main.go
 ```
 
-**VK Service:**
+#### VK Mini App
 ```bash
-cd backend/vk_service
-python main.py
+cd vk_app
+npm install
+npm start
 ```
 
-## 🐳 Docker
-
-### Сборка и запуск
+### Docker
 ```bash
-docker-compose up --build
+docker build -t vk-post-platform .
+docker run -p 80:80 vk-post-platform
 ```
 
-### Только сборка
+## 📊 База данных (SQLite)
+
+### Таблицы:
+
+#### `groups` - Подключенные группы
+- `id` - ID записи
+- `vk_group_id` - ID группы в VK
+- `name` - Название группы
+- `screen_name` - Короткое имя
+- `photo_200` - Аватар
+- `access_token` - Токен доступа
+- `is_active` - Активна ли группа
+- `created_at`, `updated_at` - Временные метки
+
+#### `posts` - Посты
+- `id` - ID записи
+- `vk_post_id` - ID поста в VK
+- `group_id` - ID группы
+- `message` - Текст поста
+- `attachments` - Вложения
+- `status` - Статус (draft, scheduled, published, failed)
+- `publish_date` - Дата публикации
+- `created_at`, `updated_at` - Временные метки
+
+#### `users` - Пользователи
+- `id` - ID записи
+- `vk_user_id` - ID пользователя в VK
+- `first_name`, `last_name` - Имя
+- `photo_200` - Аватар
+- `role` - Роль (admin, user)
+- `created_at`, `updated_at` - Временные метки
+
+## 🔑 API Endpoints
+
+### Админка (`/api/vk/`)
+- `POST /api/vk/post` - Публикация поста
+- `POST /api/vk/posts` - Получение постов
+- `POST /api/vk/groups` - Получение групп
+- `POST /api/vk/user-info` - Информация о пользователе
+- `GET /api/vk/service-key` - Service key
+
+### VK Mini App (`/api/app/`)
+- `GET /api/app/health` - Health check
+- TODO: Добавить endpoints для работы с постами
+
+### Основной сайт (`/api/site/`)
+- `GET /api/site/health` - Health check
+- TODO: Добавить endpoints для сайта
+
+## 🔧 Конфигурация
+
+### Переменные окружения:
+
 ```bash
-docker build -t vk-smm-panel .
+PORT=80                          # Порт сервера
+VK_SERVICE_KEY=...              # Service key VK
+VK_CLIENT_ID=54555042           # ID приложения VK
+VK_CLIENT_SECRET=...            # Secret приложения VK
+DATABASE_PATH=./data/app.db     # Путь к БД SQLite
 ```
 
-### Запуск контейнера
-```bash
-docker run -p 80:80 \
-  -e VK_APP_ID=54556179 \
-  -e VK_SERVICE_KEY=your_service_key \
-  vk-smm-panel
-```
+## 📝 Workflow
 
-## ☁️ Деплой на Easypanel
+### Публикация поста:
 
-Приложение развернуто на: https://my-projects-vk-zooplaform-post.crv1ic.easypanel.host/
+1. **Пользователь** создает пост в VK Mini App
+2. **VK Mini App** отправляет запрос на `/api/app/posts/create`
+3. **Backend** сохраняет пост в БД со статусом `draft`
+4. **Backend** публикует пост в выбранные группы через VK API
+5. **Backend** обновляет статус поста на `published`
+6. **Админка** показывает статистику публикаций
 
-### Настройка
+### Подключение группы:
 
-1. Создайте новое приложение в Easypanel
-2. Подключите GitHub репозиторий
-3. Укажите `Dockerfile` для сборки
-4. Добавьте переменные окружения:
-   ```
-   VK_APP_ID=54556179
-   VK_CLIENT_SECRET=488uLwXVh0NbUFcrJIvA
-   VK_SERVICE_KEY=a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d8826cb301184
-   PORT=80
-   VK_SERVICE_PORT=5000
-   ```
-5. Настройте порт: `80`
-6. Деплой!
+1. **Админ** авторизуется в админке
+2. **Админка** получает список групп через VK API
+3. **Админ** выбирает группы для подключения
+4. **Backend** сохраняет группы и токены в БД
+5. **VK Mini App** может публиковать в эти группы
 
-## 🔑 Настройка VK приложения
+## �️ Технологии
 
-### Текущее приложение
-- **App ID**: `54556179`
-- **Тип**: VK ID (новый тип)
-- **Домены**: 
-  - `zooplatforma.ru`
-  - `my-projects-vk-zooplaform-post.crv1ic.easypanel.host`
+### Backend:
+- **Go 1.21** - основной язык
+- **SQLite** - база данных
+- **VK API** - интеграция с ВКонтакте
 
-### Авторизация
-Используется VK Admin app (client_id=2685278) для получения токена с полными правами:
-1. Пользователь нажимает "Авторизоваться"
-2. Открывается окно VK OAuth
-3. После авторизации копирует URL с токеном
-4. Вставляет URL в форму
-5. Токен сохраняется в localStorage
-
-## 📖 Использование
-
-1. Откройте приложение
-2. Нажмите "Подключить аккаунт VK"
-3. Авторизуйтесь и скопируйте URL
-4. Вставьте URL в форму
-5. Перейдите в "Управление группами"
-6. Загрузите и выберите группы
-7. Публикуйте посты!
+### Frontend:
+- **React 18** - UI библиотека
+- **VKUI 8** - компоненты VK
+- **VK Bridge** - интеграция с VK Mini Apps
+- **TypeScript** - типизация
+- **Vite** - сборщик
 
 ## 📚 Документация
 
-- [VK_POST_PARAMS.md](VK_POST_PARAMS.md) - Все параметры публикации постов
-- [backend/README.md](backend/README.md) - Документация backend
-- [frontend/README.md](frontend/README.md) - Документация frontend
+- [API Structure](backend/api/README.md) - Структура API
+- [ROUTES.md](ROUTES.md) - Описание маршрутов
+- [Old README](Old/README_old.md) - Старая документация (важная информация)
 
-## 🛠️ Технологии
+## � Безопасность
 
-- **Backend**: Go 1.21, Gorilla Mux
-- **VK Service**: Python 3.11, Flask, vk_api
-- **Frontend**: Vanilla JavaScript, HTML5, CSS3
-- **API**: VK API v5.131
-- **Deploy**: Docker, Easypanel
+- Токены доступа хранятся в БД
+- CORS настроен для всех endpoints
+- Service key используется для fallback запросов
+- SQLite БД с правильными индексами
 
-## 📝 Лицензия
+## 📈 Планы развития
 
-MIT
+- [ ] Отложенная публикация постов
+- [ ] Статистика по постам (просмотры, лайки, репосты)
+- [ ] Шаблоны постов
+- [ ] Массовая публикация
+- [ ] Интеграция с Telegram
+- [ ] Миграция на PostgreSQL
+
+## 👥 Команда
+
+Разработка: Anton Dvinyaninov
+
+## � Лицензия
+
+Proprietary
