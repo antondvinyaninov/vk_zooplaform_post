@@ -47,9 +47,27 @@ func main() {
 
 	// Health check для всего приложения
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Health check requested from %s", r.RemoteAddr)
+		log.Printf("🏥 API Health check: %s %s from %s (User-Agent: %s)", r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","service":"vk-zooplatforma","version":"1.0.0"}`))
+	})
+
+	// Дополнительные health check эндпоинты для платформы деплоя
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("🏥 Root Health check: %s %s from %s (User-Agent: %s)", r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			log.Printf("🏠 Root path: %s %s from %s (User-Agent: %s)", r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"status":"ok","message":"VK ZooPlatforma API"}`))
+		} else {
+			log.Printf("❌ 404: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+			http.NotFound(w, r)
+		}
 	})
 
 	// Применяем middleware
@@ -70,10 +88,53 @@ func main() {
 		Handler: handler,
 	}
 
-	// Канал для graceful shutdown
+	// Канал для отслеживания ВСЕХ сигналов (включая SIGQUIT)
+	allSignals := make(chan os.Signal, 1)
+	signal.Notify(allSignals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGHUP, syscall.SIGUSR1, syscall.SIGUSR2)
+
+	// Канал для graceful shutdown (только критичные сигналы)
 	quit := make(chan os.Signal, 1)
 	// Игнорируем SIGQUIT, обрабатываем только SIGINT и SIGTERM
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	// Горутина для логирования всех сигналов
+	go func() {
+		for {
+			sig := <-allSignals
+			log.Printf("🚨 SIGNAL RECEIVED: %v (PID: %d)", sig, os.Getpid())
+
+			switch sig {
+			case syscall.SIGQUIT:
+				log.Printf("📋 SIGQUIT received - this is usually sent by:")
+				log.Printf("   - Docker/container orchestrator")
+				log.Printf("   - Health check failure")
+				log.Printf("   - Resource limits exceeded")
+				log.Printf("   - Platform deployment system")
+				log.Printf("🔄 Ignoring SIGQUIT - server continues running...")
+			case syscall.SIGINT:
+				log.Printf("⚠️  SIGINT received - user interrupt (Ctrl+C)")
+				quit <- sig
+			case syscall.SIGTERM:
+				log.Printf("⚠️  SIGTERM received - termination request")
+				quit <- sig
+			case syscall.SIGHUP:
+				log.Printf("📡 SIGHUP received - hangup signal")
+			case syscall.SIGUSR1:
+				log.Printf("👤 SIGUSR1 received - user defined signal 1")
+			case syscall.SIGUSR2:
+				log.Printf("👤 SIGUSR2 received - user defined signal 2")
+			default:
+				log.Printf("❓ Unknown signal received: %v", sig)
+			}
+		}
+	}()
+
+	// Логируем информацию о процессе
+	log.Printf("🔍 Process Info:")
+	log.Printf("   PID: %d", os.Getpid())
+	log.Printf("   PPID: %d", os.Getppid())
+	log.Printf("   UID: %d", os.Getuid())
+	log.Printf("   GID: %d", os.Getgid())
 
 	// Запускаем сервер в горутине
 	go func() {
@@ -83,6 +144,19 @@ func main() {
 	}()
 
 	log.Printf("=== Server is running, waiting for signals ===")
+
+	// Логируем время работы каждые 5 секунд
+	ticker := time.NewTicker(5 * time.Second)
+	go func() {
+		startTime := time.Now()
+		for {
+			select {
+			case <-ticker.C:
+				uptime := time.Since(startTime)
+				log.Printf("⏰ Server uptime: %v", uptime)
+			}
+		}
+	}()
 
 	// Ждем сигнал остановки
 	sig := <-quit

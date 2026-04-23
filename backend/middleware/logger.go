@@ -16,13 +16,18 @@ func Logger(next http.Handler) http.Handler {
 
 		next.ServeHTTP(rw, r)
 
-		log.Printf(
-			"%s %s %d %s",
-			r.Method,
-			r.RequestURI,
-			rw.statusCode,
-			time.Since(start),
-		)
+		duration := time.Since(start)
+
+		// Подробное логирование с эмодзи для легкого поиска
+		if rw.statusCode >= 400 {
+			log.Printf("❌ %s %s %d %s (from %s, UA: %s)",
+				r.Method, r.RequestURI, rw.statusCode, duration, r.RemoteAddr, r.UserAgent())
+		} else if r.RequestURI == "/health" || r.RequestURI == "/api/health" {
+			log.Printf("🏥 %s %s %d %s", r.Method, r.RequestURI, rw.statusCode, duration)
+		} else {
+			log.Printf("✅ %s %s %d %s (from %s)",
+				r.Method, r.RequestURI, rw.statusCode, duration, r.RemoteAddr)
+		}
 	})
 }
 
