@@ -3,6 +3,7 @@ package admin
 import (
 	"backend/vk"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -78,7 +79,10 @@ func vkGetGroupsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("🔍 [VK User Info] Request: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+
 	if r.Method != http.MethodPost {
+		log.Printf("❌ [VK User Info] Method not allowed: %s", r.Method)
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
 		return
 	}
