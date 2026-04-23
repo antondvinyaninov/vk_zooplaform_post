@@ -7,8 +7,13 @@ import (
 	"backend/middleware"
 	"backend/site"
 	vkapp "backend/vk-app"
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 func main() {
@@ -59,7 +64,37 @@ func main() {
 	log.Println("✓ Site API: http://localhost:" + cfg.Port + "/api/site/")
 	log.Printf("=== Server Ready ===")
 
-	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	// Создаем HTTP сервер
+	server := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: handler,
 	}
+
+	// Канал для graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	// Запускаем сервер в горутине
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+
+	log.Printf("=== Server is running, waiting for signals ===")
+
+	// Ждем сигнал остановки
+	sig := <-quit
+	log.Printf("Received signal: %v", sig)
+	log.Printf("Shutting down server...")
+
+	// Graceful shutdown с таймаутом
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Printf("Server exited")
 }
