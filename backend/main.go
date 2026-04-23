@@ -40,8 +40,50 @@ func main() {
 	})
 
 	// VK Mini App - обслуживаем собранные файлы
-	vkAppHandler := http.StripPrefix("/vk_app", http.FileServer(http.Dir("./vk_app/build")))
-	mux.Handle("/vk_app/", vkAppHandler)
+	mux.HandleFunc("/vk_app/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		// Убираем префикс /vk_app
+		filePath := strings.TrimPrefix(path, "/vk_app")
+
+		// Если путь пустой или /, отдаем index.html
+		if filePath == "" || filePath == "/" {
+			filePath = "/index.html"
+		}
+
+		// Читаем файл
+		fullPath := "./vk_app/build" + filePath
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			// Если файл не найден, отдаем index.html (для SPA роутинга)
+			content, err = os.ReadFile("./vk_app/build/index.html")
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		} else {
+			// Определяем Content-Type
+			var contentType string
+			switch {
+			case strings.HasSuffix(filePath, ".html"):
+				contentType = "text/html; charset=utf-8"
+			case strings.HasSuffix(filePath, ".css"):
+				contentType = "text/css"
+			case strings.HasSuffix(filePath, ".js"):
+				contentType = "application/javascript"
+			case strings.HasSuffix(filePath, ".svg"):
+				contentType = "image/svg+xml"
+			case strings.HasSuffix(filePath, ".png"):
+				contentType = "image/png"
+			default:
+				contentType = "application/octet-stream"
+			}
+			w.Header().Set("Content-Type", contentType)
+		}
+
+		w.Write(content)
+	})
 
 	// URL rewriting middleware для красивых URL
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
