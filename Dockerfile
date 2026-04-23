@@ -10,10 +10,16 @@ RUN npm run build
 # Сборка Go бэкенда
 FROM golang:1.21-alpine AS backend-builder
 
+# Устанавливаем необходимые пакеты для CGO и SQLite
+RUN apk add --no-cache gcc musl-dev sqlite-dev
+
 WORKDIR /app
 COPY backend/go.mod backend/go.sum* ./
 RUN go mod download || true
 COPY backend/ ./
+
+# Включаем CGO для работы с SQLite
+ENV CGO_ENABLED=1
 RUN go build -o main .
 
 # Финальный образ
@@ -22,7 +28,7 @@ FROM alpine:latest
 WORKDIR /app
 
 # Устанавливаем необходимые пакеты
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates sqlite
 
 # Копируем Go бэкенд
 COPY --from=backend-builder /app/main ./backend/main
