@@ -37,7 +37,19 @@ export interface AppPost {
   author?: AppUser;
 }
 
-const getVKLaunchSignature = () => window.location.search.slice(1);
+const getVKLaunchSignature = () => {
+  // Используем launch параметры из VK Bridge
+  const launchParams = window.vkLaunchParams || {};
+  const params = new URLSearchParams();
+  
+  Object.entries(launchParams).forEach(([key, value]) => {
+    if (key.startsWith('vk_') && value !== undefined) {
+      params.set(key, String(value));
+    }
+  });
+  
+  return params.toString();
+};
 
 const fetchJSON = async <T>(input: string, init: RequestInit = {}): Promise<T> => {
   const response = await fetch(input, {
@@ -63,16 +75,39 @@ const fetchJSON = async <T>(input: string, init: RequestInit = {}): Promise<T> =
   return response.json();
 };
 
-export const syncUserWithBackend = async (user: UserInfo) => {
+export const syncUserWithBackend = async (user: UserInfo, vkSignature?: string) => {
   const params = new URLSearchParams();
   params.append('firstName', user.first_name);
   params.append('lastName', user.last_name);
   params.append('photo200', user.photo_200);
 
-  return fetchJSON<{ user: AppUser; viewerRole: string; groupId: number }>(
-    `${API_URL}/users/me?${params.toString()}`,
-    { method: 'GET' },
-  );
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (vkSignature) {
+    headers['x-vk-sign'] = vkSignature;
+  } else {
+    headers['x-vk-sign'] = getVKLaunchSignature();
+  }
+
+  const response = await fetch(`${API_URL}/users/me?${params.toString()}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const data = await response.json();
+      message = data.error || data.message || message;
+    } catch {
+      // ignore JSON parse failure and keep default message
+    }
+    throw new Error(message);
+  }
+
+  return response.json() as Promise<{ user: AppUser; viewerRole: string; groupId: number }>;
 };
 
 export const createPost = async (message: string) => {

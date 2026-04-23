@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vk_app/logo.svg" />
@@ -7,53 +7,19 @@
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
     />
-    <title>PetPlatform</title>
-    <script src="/vk_app/vk-bridge.min.js"></script>
-    <script>
-      // Отладочная информация
-      console.log('VK Bridge available:', typeof vkBridge !== 'undefined');
-      console.log('Current URL:', window.location.href);
-      console.log('User Agent:', navigator.userAgent);
-      
-      // Безопасная инициализация VK Bridge
-      try {
-        if (typeof vkBridge !== 'undefined' && vkBridge.send) {
-          console.log('Initializing VK Bridge...');
-          vkBridge.send('VKWebAppInit').then(function() {
-            console.log('VK Bridge initialized successfully');
-          }).catch(function(error) {
-            console.warn('VK Bridge init failed:', error);
-          });
-        } else {
-          console.warn('VK Bridge not available - running outside VK environment');
-        }
-      } catch (error) {
-        console.error('VK Bridge initialization error:', error);
-      }
-    </script>
-    <script type="module" crossorigin src="/vk_app/assets/index-JFk0wHwG.js"></script>
+    <meta name="theme-color" content="#5181b8" />
+    <title>ZooPlatforma</title>
+    
+    <!-- VK Bridge - используем официальную CDN версию -->
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+    <script type="module" crossorigin src="/vk_app/assets/index-CWlvYEbb.js"></script>
     <link rel="modulepreload" crossorigin href="/vk_app/assets/rolldown-runtime-jpDsebLB.js">
     <link rel="modulepreload" crossorigin href="/vk_app/assets/icons-BOfwoAUo.js">
-    <link rel="modulepreload" crossorigin href="/vk_app/assets/vendor-fGZu9Zud.js">
+    <link rel="modulepreload" crossorigin href="/vk_app/assets/vendor-D7r9OFUh.js">
     <link rel="stylesheet" crossorigin href="/vk_app/assets/vendor-Cjbrotpz.css">
     <link rel="stylesheet" crossorigin href="/vk_app/assets/vkui-CbR5bxAs.css">
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      console.log('About to load React app...');
-      console.log('Root element exists:', !!document.getElementById('root'));
-    </script>
-    <script>
-      // Проверяем что React загрузился
-      setTimeout(function() {
-        const root = document.getElementById('root');
-        console.log('Root element after 2 seconds:', root);
-        console.log('Root innerHTML:', root ? root.innerHTML.substring(0, 100) : 'null');
-        if (!root || !root.innerHTML.trim()) {
-          console.error('React app failed to mount!');
-        }
-      }, 2000);
-    </script>
   </body>
 </html>

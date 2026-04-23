@@ -1,5 +1,5 @@
 import { useState, useEffect, ReactNode, lazy, Suspense } from 'react';
-import bridgeModule, { UserInfo } from '@vkontakte/vk-bridge';
+import { UserInfo } from '@vkontakte/vk-bridge';
 import {
   View,
   SplitLayout,
@@ -18,9 +18,6 @@ import {
   Icon28CheckShieldOutline,
 } from '@vkontakte/icons';
 
-const bridge = (bridgeModule && 'send' in bridgeModule) 
-  ? bridgeModule 
-  : (bridgeModule as any).default;
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { useActiveVkuiLocation, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { syncUserWithBackend } from './shared/api';
@@ -89,26 +86,25 @@ export const App = () => {
   const [popout, setPopout] = useState<ReactNode | null>(<ScreenSpinner />);
 
   useEffect(() => {
-    // Проверка контекста запуска: вне сообщества редиректим на лендинг
-    // Читаем параметры из query string и из hash части URL
-    const searchParams = new URLSearchParams(window.location.search);
-    const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    // Получаем VK параметры из launch params
+    const launchParams = window.vkLaunchParams || {};
     
-    const hasGroupId = searchParams.has('vk_group_id') || hashParams.has('vk_group_id');
-    const vkRole = searchParams.get('vk_viewer_group_role') || hashParams.get('vk_viewer_group_role');
+    const hasGroupId = launchParams.vk_group_id;
+    const vkRole = launchParams.vk_viewer_group_role;
+    const vkUserId = launchParams.vk_user_id;
     
+    console.log('VK Launch Params:', launchParams);
     console.log('VK Params check:', {
-      search: window.location.search,
-      hash: window.location.hash,
       hasGroupId,
-      vkRole
+      vkRole,
+      vkUserId
     });
     
     if (vkRole) {
       setRole(vkRole);
     }
     
-    // Если нет VK параметров, показываем onboarding
+    // Если нет VK параметров группы, показываем onboarding
     if (!hasGroupId && activePanel !== DEFAULT_VIEW_PANELS.ONBOARDING) {
       console.log('No group ID found, redirecting to onboarding');
       routeNavigator.replace('/onboarding');
@@ -117,22 +113,27 @@ export const App = () => {
 
     async function fetchData() {
       console.log('Starting fetchData...');
-      console.log('Bridge available:', typeof bridge !== 'undefined');
-      console.log('Bridge.send available:', bridge && typeof bridge.send === 'function');
       
       try {
         // Проверяем что VK Bridge доступен
-        if (typeof bridge === 'undefined' || !bridge.send) {
+        if (typeof window.vkBridge === 'undefined' || !window.vkBridge.send) {
           throw new Error('VK Bridge not available');
         }
         
         console.log('Attempting to get user info...');
-        const user = await bridge.send('VKWebAppGetUserInfo');
+        const user = await window.vkBridge.send('VKWebAppGetUserInfo');
         console.log('User info received:', user);
         setUser(user);
         
-        // Синхронизация с бэкендом
-        await syncUserWithBackend(user);
+        // Синхронизация с бэкендом с VK параметрами
+        const vkSignParams = new URLSearchParams();
+        Object.entries(launchParams).forEach(([key, value]) => {
+          if (key.startsWith('vk_') && value !== undefined) {
+            vkSignParams.set(key, String(value));
+          }
+        });
+        
+        await syncUserWithBackend(user, vkSignParams.toString());
       } catch (e) {
         console.warn('VK Bridge not available or failed to fetch user data:', e);
         console.log('Setting fallback user data...');
@@ -157,8 +158,20 @@ export const App = () => {
       }
     }
     
-    // Небольшая задержка для инициализации VK Bridge
-    setTimeout(fetchData, 100);
+    // Ждем готовности VK Bridge
+    if (window.vkLaunchParams) {
+      fetchData();
+    } else {
+      // Если параметры еще не готовы, ждем
+      const checkParams = () => {
+        if (window.vkLaunchParams) {
+          fetchData();
+        } else {
+          setTimeout(checkParams, 100);
+        }
+      };
+      checkParams();
+    }
   }, [activePanel, routeNavigator]);
 
   const activeStory = getActiveStory(activePanel);
