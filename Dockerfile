@@ -26,10 +26,10 @@ RUN go build -v -o main .
 FROM nginx:alpine
 
 # Устанавливаем необходимые пакеты
-RUN apk add --no-cache ca-certificates sqlite supervisor
+RUN apk add --no-cache ca-certificates sqlite bash
 
 # Создаем необходимые директории
-RUN mkdir -p /var/log/supervisor /app
+RUN mkdir -p /app
 
 # Копируем Go бэкенд
 COPY --from=backend-builder /app/main /app/backend/main
@@ -43,8 +43,9 @@ COPY --from=vk-app-builder /app/vk_app/build /usr/share/nginx/html/vk_app/
 # Копируем конфигурацию Nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Копируем конфигурацию Supervisor
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Копируем стартовый скрипт
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
 # Создаем рабочую директорию для backend
 WORKDIR /app
@@ -62,5 +63,5 @@ ENV VK_MINI_APP_SERVICE_KEY=e59b585ae59b585ae59b585a67e6dbdd75ee59be59b585a8c729
 # Открываем порт
 EXPOSE 80
 
-# Запускаем Supervisor (управляет Nginx + Go backend)
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Запускаем наш стартовый скрипт
+CMD ["/start.sh"]
