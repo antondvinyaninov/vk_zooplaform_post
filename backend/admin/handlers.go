@@ -84,7 +84,6 @@ func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("🔍 [VK User Info] Request: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
 
 	if r.Method != http.MethodPost {
-		log.Printf("❌ [VK User Info] Method not allowed: %s", r.Method)
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
 		return
 	}
@@ -100,33 +99,35 @@ func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req.AccessToken = strings.TrimSpace(req.AccessToken)
-	if req.AccessToken == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Access token required"})
-		return
-	}
-
 	if req.UserID == 0 && strings.TrimSpace(req.UserIDRaw) != "" {
 		if parsed, err := strconv.Atoi(strings.TrimSpace(req.UserIDRaw)); err == nil {
 			req.UserID = parsed
 		}
 	}
 
-	vkClient := vk.NewVKClient(req.AccessToken)
+	cfg := config.Load()
+
 	var (
 		user *vk.User
 		err  error
 	)
 
 	if req.UserID != 0 {
-		user, err = vkClient.GetUserByID(req.UserID, []string{"photo_200"})
-	} else {
-		users, fetchErr := vkClient.UsersGet(nil, []string{"photo_200"})
+		// Используем Service Key — нет привязки к IP
+		serviceClient := vk.NewVKClient(cfg.VKServiceKey)
+		user, err = serviceClient.GetUserByID(req.UserID, []string{"photo_200"})
+	} else if strings.TrimSpace(req.AccessToken) != "" {
+		// Fallback: если user_id не знаем — пробуем через сервисный ключ
+		serviceClient := vk.NewVKClient(cfg.VKServiceKey)
+		users, fetchErr := serviceClient.UsersGet(nil, []string{"photo_200"})
 		if fetchErr != nil {
 			err = fetchErr
 		} else if len(users) > 0 {
 			user = &users[0]
 		}
+	} else {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "user_id or access_token required"})
+		return
 	}
 
 	if err != nil {

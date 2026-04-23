@@ -62,22 +62,54 @@ function applyActiveVKAccountToSession(connectionPayload) {
     }
 }
 
-// Начало авторизации - получаем user token для доступа к списку групп
+// Начало авторизации — Implicit Flow через VK Admin app (blank.html)
 function startAuth() {
-    // Используем правильный ID приложения VK ID API (54481712) с Server Flow
     const authUrl = `https://oauth.vk.com/authorize?` +
-        `client_id=54481712&` +
+        `client_id=2685278&` +
         `scope=wall,photos,video,groups,offline&` +
-        `redirect_uri=https://vk.zooplatforma.ru/api/vk/oauth/callback&` +
+        `redirect_uri=https://oauth.vk.com/blank.html&` +
         `display=page&` +
-        `response_type=code`;
+        `response_type=token`;
     
-    // Открываем в новом окне
+    // Открываем в новом окне и слушаем редирект
     const authWindow = window.open(authUrl, 'vk_auth', 'width=800,height=600');
     
-    // Показываем инструкцию
-    showResult('Скопируйте URL из адресной строки после авторизации и вставьте ниже', false);
-    document.getElementById('manualTokenInput').style.display = 'block';
+    // Опрашиваем popup пока он не окажется на blank.html
+    const pollTimer = setInterval(async () => {
+        try {
+            if (authWindow.closed) {
+                clearInterval(pollTimer);
+                return;
+            }
+            const href = authWindow.location.href;
+            if (href && href.includes('oauth.vk.com/blank.html')) {
+                clearInterval(pollTimer);
+                authWindow.close();
+                
+                const hash = href.split('#')[1] || '';
+                const params = new URLSearchParams(hash);
+                const accessToken = params.get('access_token');
+                const userId = params.get('user_id');
+                const expiresIn = params.get('expires_in');
+                
+                if (accessToken) {
+                    AppStorage.setItem('vk_access_token', accessToken);
+                    AppStorage.setItem('vk_user_id', userId || '');
+                    const tokenExpires = expiresIn === '0'
+                        ? Date.now() + (365 * 24 * 60 * 60 * 1000)
+                        : Date.now() + (parseInt(expiresIn || '0', 10) * 1000);
+                    AppStorage.setItem('vk_token_expires', tokenExpires);
+                    showResult('Авторизация успешна! Получаем профиль...', true);
+                    await getUserInfo(accessToken, userId, tokenExpires);
+                }
+            }
+        } catch (e) {
+            // Cross-origin — ждём пока не окажемся на blank.html
+        }
+    }, 500);
+    
+    showResult('Выполните вход в ВКонтакте в открывшемся окне...', true);
+    document.getElementById('manualTokenInput').style.display = 'none';
 }
 
 // Сохранение токена вручную
