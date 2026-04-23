@@ -13,6 +13,14 @@ echo "✅ Backend started with PID: $BACKEND_PID"
 # Ждем немного, чтобы backend запустился
 sleep 2
 
+# Тестируем подключение к backend
+echo "🧪 Testing backend connection..."
+if curl -s http://127.0.0.1:8000/api/health > /dev/null; then
+    echo "✅ Backend is reachable on 127.0.0.1:8000"
+else
+    echo "❌ Backend is NOT reachable on 127.0.0.1:8000"
+fi
+
 # Запускаем nginx в foreground
 echo "▶️  Starting Nginx..."
 nginx -g "daemon off;" &

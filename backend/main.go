@@ -84,9 +84,11 @@ func main() {
 
 	// Создаем HTTP сервер
 	server := &http.Server{
-		Addr:    ":" + cfg.Port,
+		Addr:    "0.0.0.0:" + cfg.Port, // Явно указываем все интерфейсы
 		Handler: handler,
 	}
+
+	log.Printf("🌐 Server will bind to: 0.0.0.0:%s", cfg.Port)
 
 	// Канал для отслеживания ВСЕХ сигналов (включая SIGQUIT)
 	allSignals := make(chan os.Signal, 1)
