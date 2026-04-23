@@ -16,6 +16,10 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/vk/connection", middleware.CORSFunc(vkConnectionHandler))
 
 	// VK API endpoints (старые, для обратной совместимости)
+	mux.HandleFunc("/api/vk/test", middleware.CORSFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok","message":"VK API backend is working"}`))
+	}))
 	mux.HandleFunc("/api/vk/post", middleware.CORSFunc(vkPostHandler))
 	mux.HandleFunc("/api/vk/posts", middleware.CORSFunc(vkGetPostsHandler))
 	mux.HandleFunc("/api/vk/repost", middleware.CORSFunc(vkRepostHandler))
