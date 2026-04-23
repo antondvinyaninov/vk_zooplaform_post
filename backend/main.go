@@ -139,10 +139,10 @@ func main() {
 
 	// Запускаем сервер
 	log.Printf("=== Starting HTTP Server ===")
-	log.Printf("API Server listening on :%s", cfg.Port)
-	log.Println("✓ API: http://localhost:" + cfg.Port + "/api/")
-	log.Println("✓ VK App API: http://localhost:" + cfg.Port + "/api/app/")
-	log.Println("✓ Site API: http://localhost:" + cfg.Port + "/api/site/")
+	log.Printf("API Server listening on :80 (hardcoded)")
+	log.Println("✓ API: http://localhost:80/api/")
+	log.Println("✓ VK App API: http://localhost:80/api/app/")
+	log.Println("✓ Site API: http://localhost:80/api/site/")
 	log.Printf("=== Server Ready ===")
 
 	// Создаем HTTP сервер (принудительно на порту 80)
