@@ -12,11 +12,11 @@ import {
   Button,
 } from '@vkontakte/vkui';
 import { useParams, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { moderateAd } from '../shared/api';
+import { moderatePost } from '../shared/api';
 
 interface ModerationModalProps {
   id: string;
-  onConfirm?: (adId: number, pubType: string, date?: Date) => void;
+  onConfirm?: (postId: number, pubType: string, date?: Date) => void;
 }
 
 export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => {
@@ -33,20 +33,19 @@ export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => 
 
   const handleConfirm = async () => {
     if (params?.id) {
-      const adId = Number(params.id);
+      const postId = Number(params.id);
       try {
-        await moderateAd(adId, 'ACTIVE', pubType === 'scheduled' ? scheduledDate : undefined);
+        await moderatePost(postId, pubType === 'scheduled' ? 'scheduled' : 'published', pubType === 'scheduled' ? scheduledDate : undefined);
         
         if (onConfirm) {
-          onConfirm(adId, pubType, pubType === 'scheduled' ? scheduledDate : undefined);
+          onConfirm(postId, pubType, pubType === 'scheduled' ? scheduledDate : undefined);
         }
         
-        // Отправляем глобальное событие для уведомления панелей об обновлении
-        window.dispatchEvent(new CustomEvent('adModerated', { detail: { adId } }));
+        window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId } }));
         
         closeModal();
       } catch (error) {
-        console.error('Failed to moderate ad:', error);
+        console.error('Failed to moderate post:', error);
       }
     }
   };

@@ -15,12 +15,59 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+function redirectAfterVKConnect() {
+    const appUser = AppStorage.getItem('app_user');
+    const authTime = AppStorage.getItem('app_auth_time');
+    const isAppSessionValid =
+        !!appUser &&
+        !!authTime &&
+        (Date.now() - parseInt(authTime, 10)) < 24 * 60 * 60 * 1000;
+
+    window.location.href = isAppSessionValid ? '/vk-connect' : '/';
+}
+
+async function saveVKConnectionToBackend(payload) {
+    const response = await fetch(`${API_URL}/admin/vk/connection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || 'Не удалось сохранить подключение ВКонтакте');
+    }
+
+    return data;
+}
+
+function applyActiveVKAccountToSession(connectionPayload) {
+    const active = connectionPayload?.active_account;
+    if (!active || !active.access_token) {
+        return;
+    }
+
+    AppStorage.setItem('vk_access_token', active.access_token);
+    if (active.vk_user_id) {
+        AppStorage.setItem('vk_user_id', String(active.vk_user_id));
+    }
+    if (active.token_expires) {
+        AppStorage.setItem('vk_token_expires', String(active.token_expires));
+    }
+    if (active.user_name) {
+        AppStorage.setItem('vk_user_name', active.user_name);
+    }
+    if (active.user_photo) {
+        AppStorage.setItem('vk_user_photo', active.user_photo);
+    }
+}
+
 // Начало авторизации - получаем user token для доступа к списку групп
 function startAuth() {
-    // Используем VK Admin app с redirect на blank.html
+    // Используем наш VK App с правильными правами
     const authUrl = `https://oauth.vk.com/authorize?` +
-        `client_id=2685278&` +
-        `scope=1073737727&` +
+        `client_id=54555042&` +
+        `scope=wall,photos,video,groups&` +
         `redirect_uri=https://oauth.vk.com/blank.html&` +
         `display=page&` +
         `response_type=token&` +
@@ -35,7 +82,7 @@ function startAuth() {
 }
 
 // Сохранение токена вручную
-function saveManualToken() {
+async function saveManualToken() {
     const input = document.getElementById('tokenUrlInput');
     const url = input.value.trim();
     
@@ -58,16 +105,33 @@ function saveManualToken() {
     const userId = userIdMatch ? userIdMatch[1] : '';
     
     // Сохраняем
-    localStorage.setItem('vk_access_token', accessToken);
-    localStorage.setItem('vk_user_id', userId);
-    localStorage.setItem('vk_token_expires', Date.now() + (365 * 24 * 60 * 60 * 1000));
+    AppStorage.setItem('vk_access_token', accessToken);
+    AppStorage.setItem('vk_user_id', userId);
+    const tokenExpires = Date.now() + (365 * 24 * 60 * 60 * 1000);
+    AppStorage.setItem('vk_token_expires', tokenExpires);
     
-    showResult('Токен сохранен!', true);
+    showResult('Токен сохранен! Получаем информацию о пользователе...', true);
     
-    // Переход на страницу выбора групп
-    setTimeout(() => {
-        window.location.href = '../index.html';
-    }, 1000);
+    // Получаем информацию о пользователе
+    if (userId) {
+        await getUserInfo(accessToken, userId, tokenExpires);
+    } else {
+        try {
+            const payload = await saveVKConnectionToBackend({
+                access_token: accessToken,
+                token_expires: tokenExpires,
+            });
+            applyActiveVKAccountToSession(payload);
+        } catch (error) {
+            showResult(error.message, false);
+            return;
+        }
+
+        // Переход в панель управления (или на вход, если сессия истекла)
+        setTimeout(() => {
+            redirectAfterVKConnect();
+        }, 1000);
+    }
 }
 
 function showResult(message, success) {
@@ -88,24 +152,76 @@ function checkTokenInURL() {
     
     if (accessToken) {
         // Сохраняем user token для получения списка групп
-        localStorage.setItem('vk_access_token', accessToken);
-        localStorage.setItem('vk_user_id', userId || '');
-        
+        AppStorage.setItem('vk_access_token', accessToken);
+        AppStorage.setItem('vk_user_id', userId || '');
+        let tokenExpires = 0;
+
         if (expiresIn === '0') {
-            localStorage.setItem('vk_token_expires', Date.now() + (365 * 24 * 60 * 60 * 1000));
+            tokenExpires = Date.now() + (365 * 24 * 60 * 60 * 1000);
         } else {
-            localStorage.setItem('vk_token_expires', Date.now() + (parseInt(expiresIn) * 1000));
+            tokenExpires = Date.now() + (parseInt(expiresIn, 10) * 1000);
         }
+        AppStorage.setItem('vk_token_expires', tokenExpires);
+        
+        // Получаем информацию о пользователе
+        getUserInfo(accessToken, userId, tokenExpires);
         
         // Очищаем URL
         window.history.replaceState({}, document.title, window.location.pathname);
         
         // Показываем успех
-        showResult('Авторизация успешна!', true);
+        showResult('Авторизация успешна! Получаем информацию о пользователе...', true);
+    }
+}
+
+// Получение информации о пользователе
+async function getUserInfo(accessToken, userId, tokenExpires) {
+    try {
+        const response = await fetch(`${API_URL}/vk/user-info`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                access_token: accessToken,
+                user_id: userId ? parseInt(userId, 10) : 0,
+                user_id_raw: userId || '',
+            }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.error || 'Не удалось получить профиль ВКонтакте');
+        }
+        let fullName = '';
+        let photo200 = '';
+
+        if (data.user) {
+            const user = data.user;
+            fullName = `${user.first_name} ${user.last_name}`;
+            photo200 = user.photo_200 || '';
+            
+            // Сохраняем информацию о пользователе
+            AppStorage.setItem('vk_user_name', fullName);
+            AppStorage.setItem('vk_user_photo', photo200);
+            
+            showResult(`Добро пожаловать, ${fullName}!`, true);
+        }
+
+        const payload = await saveVKConnectionToBackend({
+            access_token: accessToken,
+            vk_user_id: userId ? parseInt(userId, 10) : 0,
+            user_name: fullName,
+            user_photo: photo200,
+            token_expires: tokenExpires || 0,
+        });
+        applyActiveVKAccountToSession(payload);
         
-        // Переход на страницу выбора групп
+        // Переход в панель управления (или на вход, если сессия истекла)
         setTimeout(() => {
-            window.location.href = '../index.html';
-        }, 1000);
+            redirectAfterVKConnect();
+        }, 1500);
+        
+    } catch (error) {
+        console.error('Error getting user info:', error);
+        showResult(error.message || 'Ошибка сохранения подключения', false);
+        return;
     }
 }

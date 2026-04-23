@@ -18,11 +18,12 @@ func NewPostService() *PostService {
 // Create создает новый пост в БД
 func (s *PostService) Create(post *models.Post) error {
 	query := `
-		INSERT INTO posts (vk_post_id, group_id, message, attachments, status, publish_date)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO posts (vk_post_id, user_id, group_id, message, attachments, status, publish_date)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 	result, err := database.DB.Exec(query,
 		post.VKPostID,
+		post.UserID,
 		post.GroupID,
 		post.Message,
 		post.Attachments,
@@ -48,17 +49,19 @@ func (s *PostService) Create(post *models.Post) error {
 // GetByID получает пост по ID
 func (s *PostService) GetByID(id int) (*models.Post, error) {
 	query := `
-		SELECT id, vk_post_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE id = ?
 	`
 
 	post := &models.Post{}
+	var userID sql.NullInt64
 	var publishDate sql.NullTime
 
 	err := database.DB.QueryRow(query, id).Scan(
 		&post.ID,
 		&post.VKPostID,
+		&userID,
 		&post.GroupID,
 		&post.Message,
 		&post.Attachments,
@@ -78,6 +81,9 @@ func (s *PostService) GetByID(id int) (*models.Post, error) {
 	if publishDate.Valid {
 		post.PublishDate = publishDate.Time
 	}
+	if userID.Valid {
+		post.UserID = int(userID.Int64)
+	}
 
 	return post, nil
 }
@@ -85,7 +91,7 @@ func (s *PostService) GetByID(id int) (*models.Post, error) {
 // GetByGroupID получает посты группы
 func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Post, error) {
 	query := `
-		SELECT id, vk_post_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE group_id = ?
 		ORDER BY created_at DESC
@@ -101,11 +107,13 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 	var posts []*models.Post
 	for rows.Next() {
 		post := &models.Post{}
+		var userID sql.NullInt64
 		var publishDate sql.NullTime
 
 		err := rows.Scan(
 			&post.ID,
 			&post.VKPostID,
+			&userID,
 			&post.GroupID,
 			&post.Message,
 			&post.Attachments,
@@ -121,6 +129,9 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 		if publishDate.Valid {
 			post.PublishDate = publishDate.Time
 		}
+		if userID.Valid {
+			post.UserID = int(userID.Int64)
+		}
 
 		posts = append(posts, post)
 	}
@@ -131,7 +142,7 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 // GetByStatus получает посты по статусу
 func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.Post, error) {
 	query := `
-		SELECT id, vk_post_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE status = ?
 		ORDER BY created_at DESC
@@ -147,11 +158,13 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 	var posts []*models.Post
 	for rows.Next() {
 		post := &models.Post{}
+		var userID sql.NullInt64
 		var publishDate sql.NullTime
 
 		err := rows.Scan(
 			&post.ID,
 			&post.VKPostID,
+			&userID,
 			&post.GroupID,
 			&post.Message,
 			&post.Attachments,
@@ -167,6 +180,60 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 		if publishDate.Valid {
 			post.PublishDate = publishDate.Time
 		}
+		if userID.Valid {
+			post.UserID = int(userID.Int64)
+		}
+
+		posts = append(posts, post)
+	}
+
+	return posts, nil
+}
+
+// GetByUserID получает посты пользователя
+func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post, error) {
+	query := `
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		FROM posts
+		WHERE user_id = ?
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := database.DB.Query(query, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var posts []*models.Post
+	for rows.Next() {
+		post := &models.Post{}
+		var dbUserID sql.NullInt64
+		var publishDate sql.NullTime
+
+		err := rows.Scan(
+			&post.ID,
+			&post.VKPostID,
+			&dbUserID,
+			&post.GroupID,
+			&post.Message,
+			&post.Attachments,
+			&post.Status,
+			&publishDate,
+			&post.CreatedAt,
+			&post.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if dbUserID.Valid {
+			post.UserID = int(dbUserID.Int64)
+		}
+		if publishDate.Valid {
+			post.PublishDate = publishDate.Time
+		}
 
 		posts = append(posts, post)
 	}
@@ -178,11 +245,13 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 func (s *PostService) Update(post *models.Post) error {
 	query := `
 		UPDATE posts
-		SET vk_post_id = ?, message = ?, attachments = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
+		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
 	_, err := database.DB.Exec(query,
 		post.VKPostID,
+		post.UserID,
+		post.GroupID,
 		post.Message,
 		post.Attachments,
 		post.Status,

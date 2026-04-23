@@ -9,6 +9,11 @@ import (
 func RegisterRoutes(mux *http.ServeMux) {
 	// API endpoints для админки
 	mux.HandleFunc("/api/admin/health", middleware.CORSFunc(healthHandler))
+	mux.HandleFunc("/api/admin/auth/login", middleware.CORSFunc(loginHandler))
+	mux.HandleFunc("/api/admin/users", middleware.CORSFunc(usersHandler))
+	mux.HandleFunc("/api/admin/users/", middleware.CORSFunc(userByIDHandler))
+	mux.HandleFunc("/api/admin/groups/installed", middleware.CORSFunc(installedGroupsHandler))
+	mux.HandleFunc("/api/admin/vk/connection", middleware.CORSFunc(vkConnectionHandler))
 
 	// VK API endpoints (старые, для обратной совместимости)
 	mux.HandleFunc("/api/vk/post", middleware.CORSFunc(vkPostHandler))
@@ -23,7 +28,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 
 	// Редиректы для обратной совместимости
 	mux.HandleFunc("/auth.html", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/pages/auth.html", http.StatusMovedPermanently)
+		http.Redirect(w, r, "/", http.StatusMovedPermanently)
 	})
 	mux.HandleFunc("/groups.html", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/pages/groups.html", http.StatusMovedPermanently)
@@ -31,8 +36,4 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/posts.html", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/pages/posts.html", http.StatusMovedPermanently)
 	})
-
-	// Статические файлы админки (должны быть последними)
-	fs := http.FileServer(http.Dir("./frontend"))
-	mux.Handle("/", fs)
 }

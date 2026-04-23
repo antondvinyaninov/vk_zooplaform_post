@@ -2,7 +2,6 @@ import { FC } from 'react';
 import {
   Panel,
   PanelHeader,
-  PanelHeaderBack,
   Header,
   Group,
   SimpleCell,
@@ -37,7 +36,7 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, role }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
+      <PanelHeader style={{ textAlign: 'center' }}>
         Профиль
       </PanelHeader>
 
@@ -59,7 +58,7 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, role }) => {
       {isAdmin && (
         <Group header={<Header>Меню администратора</Header>}>
           <List>
-            <SimpleCell before={<Icon28SettingsOutline />} onClick={() => console.log('Admin Settings')}>
+            <SimpleCell before={<Icon28SettingsOutline />} onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS}`)}>
               Настройки сообщества
             </SimpleCell>
             <SimpleCell before={<Icon28UsersOutline />} onClick={() => console.log('Admin Members')}>
@@ -80,12 +79,12 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, role }) => {
 
       <Group header={<Header>Меню пользователя</Header>}>
         <List>
-          <SimpleCell 
-            before={<Icon28ListOutline />} 
-            onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_ADS}`)}
-          >
-            Мои объявления
-          </SimpleCell>
+            <SimpleCell 
+              before={<Icon28ListOutline />} 
+              onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_POSTS}`)}
+            >
+            Мои публикации
+            </SimpleCell>
           <SimpleCell before={<Icon28FavoriteOutline />} onClick={() => console.log('Favorites')}>
             Избранное
           </SimpleCell>

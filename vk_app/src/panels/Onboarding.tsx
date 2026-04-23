@@ -20,7 +20,7 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader>О приложении</PanelHeader>
+      <PanelHeader style={{ textAlign: 'center' }}>О приложении</PanelHeader>
       <Group>
         <Placeholder
           icon={<Icon56ServicesOutline />}
@@ -30,14 +30,13 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
             </Button>
           }
         >
-          <Placeholder.Title>PetPlatform — твой помощник в волонтерстве</Placeholder.Title>
+          <Placeholder.Title>VK ZooPlatforma для публикаций сообщества</Placeholder.Title>
           <Placeholder.Description>
-            Управляйте базой животных, находите дом питомцам и делайте добрые дела вместе с нами прямо внутри ВКонтакте. 
-            Наш плагин специально разработан для волонтерских групп и приютов.
+            Установите мини-приложение в сообщество, чтобы участники могли отправлять публикации, а администраторы проверять и выпускать их на стену.
           </Placeholder.Description>
         </Placeholder>
         <Box padding="m" style={{ color: 'var(--vkui--color_text_secondary)', textAlign: 'center' }}>
-          После установки вы сможете вести каталог животных, публиковать объявления и управлять SOS-радаром своего сообщества.
+          После установки приложение будет работать в контексте сообщества и подключится к нашему backend для модерации и публикации постов.
         </Box>
       </Group>
     </Panel>

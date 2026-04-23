@@ -3,43 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Управление группами - VK SMM Панель</title>
+    <title>Группы - VK ZooPlatforma</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
-    <link rel="stylesheet" href="../css/style.css">
+    
+    <!-- Общие стили VKUI -->
+    <link rel="stylesheet" href="../css/vkui-base.css?v=20260422-2">
+    
+    <!-- Дополнительные стили для страницы групп -->
     <style>
         .groups-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
+            gap: 16px;
+            margin-top: 24px;
         }
         
         .group-card {
-            border: 2px solid #e0e0e0;
+            border: 1px solid #e7e8ec;
             border-radius: 8px;
-            padding: 15px;
+            padding: 20px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             position: relative;
+            background: #ffffff;
         }
         
         .group-card:hover {
-            border-color: #667eea;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+            border-color: #5181b8;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
         }
         
         .group-card.selected {
-            border-color: #667eea;
-            background: #f0f3ff;
+            border-color: #5181b8;
+            background: #e3f2fd;
         }
         
         .group-card.selected::after {
             content: "✓";
             position: absolute;
-            top: 10px;
-            right: 10px;
-            background: #667eea;
+            top: 12px;
+            right: 12px;
+            background: #5181b8;
             color: white;
             width: 24px;
             height: 24px;
@@ -48,90 +52,119 @@
             align-items: center;
             justify-content: center;
             font-weight: bold;
+            font-size: 14px;
         }
         
         .group-photo {
             width: 80px;
             height: 80px;
             border-radius: 50%;
-            margin: 0 auto 10px;
+            margin: 0 auto 16px;
             display: block;
         }
         
         .group-name {
-            font-weight: 600;
-            margin-bottom: 5px;
+            font-weight: 500;
+            margin-bottom: 8px;
             text-align: center;
+            font-size: 14px;
+            line-height: 20px;
         }
         
         .group-info {
-            font-size: 12px;
-            color: #666;
+            font-size: 13px;
+            color: #818c99;
             text-align: center;
+            line-height: 16px;
         }
         
         .selected-count {
-            background: #667eea;
+            background: #5181b8;
             color: white;
-            padding: 10px 20px;
+            padding: 16px 20px;
             border-radius: 8px;
             text-align: center;
-            margin: 20px 0;
+            margin: 24px 0;
+            font-size: 14px;
         }
         
-        .nav-links {
+        .action-buttons {
             display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .nav-links a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        
-        .nav-links a:hover {
-            text-decoration: underline;
+            gap: 12px;
+            margin-top: 24px;
+            flex-wrap: wrap;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>👥 Управление группами</h1>
-            <nav class="nav">
-                <a href="../index.html">Главная</a>
-                <a href="groups.html" class="active">Управление группами</a>
-                <a href="posts.html">Просмотр постов</a>
-            </nav>
-        </div>
-        
-        <div class="card">
-            <h2>Подключенные группы</h2>
-            <p>Выберите группы, в которые хотите постить контент</p>
-            
-            <button id="loadGroupsBtn" class="btn">Загрузить мои группы</button>
-            
-            <div id="selectedCount" class="selected-count" style="display: none;">
-                Выбрано групп: <strong>0</strong>
-            </div>
-            
-            <div id="groupsContainer" class="groups-grid"></div>
-            
-            <div id="loadResult" class="result"></div>
-            
-            <button id="saveBtn" class="btn" style="display: none; margin-top: 20px;">
-                Сохранить выбранные группы
-            </button>
-            
-            <button id="getGroupTokensBtn" class="btn" style="display: none; margin-top: 10px; background: #764ba2;">
-                Получить токены для выбранных групп
-            </button>
+    <div class="layout">
+        <!-- Sidebar -->
+        <div data-sidebar-root></div>
+
+        <!-- Content -->
+        <div class="content panel">
+            <!-- Header -->
+            <header class="header">
+                <div class="header__content">
+                    <div class="header__left">
+                        <button type="button" class="header__menu-btn" aria-label="Открыть меню" onclick="toggleMobileSidebar()">☰</button>
+                    </div>
+                    <div class="header__center">
+                        <h1 class="header__title">Группы</h1>
+                    </div>
+                    <div class="header__right">
+                        <!-- Пустое место для будущих элементов -->
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main content -->
+            <main class="main">
+                <div class="main__header">
+                    <h1 class="main__title">Группы</h1>
+                    <p class="main__subtitle">Управление группами ВКонтакте для публикации контента. Выберите группы, в которые хотите постить.</p>
+                </div>
+
+                <!-- Load Groups Card -->
+                <div class="card">
+                    <div class="card__header">
+                        <h2 class="card__title">Загрузка групп</h2>
+                    </div>
+                    <div class="card__content">
+                        <p style="margin-bottom: 16px; color: #818c99;">Загрузите список ваших групп ВКонтакте, где у вас есть права администратора.</p>
+                        <button id="loadGroupsBtn" class="btn btn--primary">
+                            📥 Загрузить мои группы
+                        </button>
+                        <div id="loadResult" class="result"></div>
+                    </div>
+                </div>
+
+                <!-- Selected Count -->
+                <div id="selectedCount" class="selected-count" style="display: none;">
+                    Выбрано групп: <strong>0</strong>
+                </div>
+
+                <!-- Groups Grid -->
+                <div id="groupsContainer" class="groups-grid"></div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button id="saveBtn" class="btn btn--primary" style="display: none;">
+                        💾 Сохранить выбранные группы
+                    </button>
+                    
+                    <button id="getGroupTokensBtn" class="btn btn--secondary" style="display: none;">
+                        🔑 Получить токены для групп
+                    </button>
+                </div>
+            </main>
         </div>
     </div>
 
+    <!-- Общие скрипты -->
     <script src="../js/utils.js"></script>
+    <script src="../js/layout.js?v=20260422-1"></script>
+    <script src="../js/sidebar.js?v=20260422-4"></script>
     <script src="../js/groups.js"></script>
 </body>
 </html>

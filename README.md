@@ -1,4 +1,4 @@
-# VK Post Platform
+# VK ZooPlatforma
 
 Платформа для управления публикациями в группах ВКонтакте с VK Mini App интерфейсом.
 

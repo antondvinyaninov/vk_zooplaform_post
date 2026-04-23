@@ -9,8 +9,10 @@ import (
 func RegisterRoutes(mux *http.ServeMux) {
 	// API endpoints для VK Mini App
 	mux.HandleFunc("/api/app/health", middleware.CORSFunc(healthHandler))
-
-	// TODO: Добавить endpoints для работы с постами из Mini App
-	// mux.HandleFunc("/api/app/posts/create", middleware.CORSFunc(createPostHandler))
-	// mux.HandleFunc("/api/app/posts/list", middleware.CORSFunc(listPostsHandler))
+	mux.HandleFunc("/api/app/users/me", middleware.CORSFunc(syncUserHandler))
+	mux.HandleFunc("/api/app/posts", middleware.CORSFunc(postsHandler))
+	mux.HandleFunc("/api/app/posts/my", middleware.CORSFunc(myPostsHandler))
+	mux.HandleFunc("/api/app/posts/", middleware.CORSFunc(postByIDHandler))
+	mux.HandleFunc("/api/app/groups/token", middleware.CORSFunc(saveGroupTokenHandler))
+	mux.HandleFunc("/api/app/groups/me", middleware.CORSFunc(groupSettingsHandler))
 }

@@ -22,7 +22,7 @@ function handleModuleDirectivesPlugin() {
  * The details are here: https://dev.vk.ru/mini-apps/development/on-demand-resources.
  */
 export default defineConfig({
-  base: './',
+  base: '/vk_app/',
 
   plugins: [
     react(),
@@ -65,7 +65,7 @@ export default defineConfig({
     host: 'localhost',
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:8000',
         changeOrigin: true,
       },
     },

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель управления - VK ZooPlatforma</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
+    
+    <!-- Общие стили VKUI -->
+    <link rel="stylesheet" href="../css/vkui-base.css?v=20260422-2">
+</head>
+<body>
+    <div class="layout">
+        <!-- Sidebar -->
+        <div data-sidebar-root></div>
+
+        <!-- Content -->
+        <div class="content panel">
+            <!-- Header -->
+            <header class="header">
+                <div class="header__content">
+                    <div class="header__left">
+                        <button type="button" class="header__menu-btn" aria-label="Открыть меню" onclick="toggleMobileSidebar()">☰</button>
+                    </div>
+                    <div class="header__center">
+                        <h1 class="header__title">Панель управления</h1>
+                    </div>
+                    <div class="header__right">
+                        <!-- Пустое место для будущих элементов -->
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main content -->
+            <main class="main">
+                <div class="main__header">
+                    <h1 class="main__title">Панель управления</h1>
+                    <p class="main__subtitle">VK ZooPlatforma — это платформа для управления публикациями в группах ВКонтакте, основанная на одноименной <a href="https://www.figma.com/@vk" style="color: #5181b8; text-decoration: none;">дизайн-системе ВКонтакте ↗</a>.</p>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="groupsCount">0</div>
+                        <div class="stat-label">Подключенных групп</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="postsCount">0</div>
+                        <div class="stat-label">Опубликовано постов</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="scheduledCount">0</div>
+                        <div class="stat-label">Запланировано</div>
+                    </div>
+                </div>
+
+                <!-- Connected Groups -->
+                <div class="card">
+                    <div class="card__header">
+                        <h2 class="card__title">Подключенные группы</h2>
+                    </div>
+                    <div class="card__content">
+                        <div id="connectedGroups"></div>
+                    </div>
+                </div>
+
+                <!-- Quick Post -->
+                <div class="card">
+                    <div class="card__header">
+                        <h2 class="card__title">Быстрая публикация</h2>
+                    </div>
+                    <div class="card__content">
+                        <div class="form-group">
+                            <label class="form-label" for="targetGroup">Выберите группу</label>
+                            <select id="targetGroup" class="form-control">
+                                <option value="">Сначала подключите группы</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="postMessage">Текст поста</label>
+                            <textarea id="postMessage" rows="4" class="form-control" placeholder="Введите текст поста..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="publishDate">Отложенная публикация</label>
+                            <input type="datetime-local" id="publishDate" class="form-control">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="postPhotos">Фотографии</label>
+                            <input type="file" id="postPhotos" accept="image/*" multiple class="form-control">
+                            <div id="photoPreview" style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;"></div>
+                        </div>
+
+                        <button id="postBtn" class="btn btn--primary btn--large">
+                            📤 Опубликовать
+                        </button>
+                        <div id="postResult" class="result"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Общие скрипты -->
+    <script src="../js/utils.js"></script>
+    <script src="../js/layout.js?v=20260422-1"></script>
+    <script src="../js/sidebar.js?v=20260422-4"></script>
+    <script src="../js/dashboard.js"></script>
+</body>
+</html>

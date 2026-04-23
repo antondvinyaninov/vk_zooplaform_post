@@ -16,22 +16,24 @@ export const DEFAULT_VIEW_PANELS = {
   PERSIK: 'persik',
   ONBOARDING: 'onboarding',
   PROFILE: 'profile',
-  MY_ADS: 'my_ads',
-  CREATE_AD: 'create_ad',
-  AD_DETAIL: 'ad_detail',
+  COMMUNITY_SETTINGS: 'community_settings',
+  MY_POSTS: 'my_posts',
+  CREATE_POST: 'create_post',
+  POST_DETAIL: 'post_detail',
   MODERATION: 'moderation',
 } as const;
 
 export const routes = RoutesConfig.create([
   createRoot(DEFAULT_ROOT, [
     createView(DEFAULT_VIEW, [
-      createPanel(DEFAULT_VIEW_PANELS.HOME, '/', []),
+      createPanel(DEFAULT_VIEW_PANELS.HOME, '/home', []),
       createPanel(DEFAULT_VIEW_PANELS.PERSIK, `/${DEFAULT_VIEW_PANELS.PERSIK}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ONBOARDING, `/${DEFAULT_VIEW_PANELS.ONBOARDING}`, []),
       createPanel(DEFAULT_VIEW_PANELS.PROFILE, `/${DEFAULT_VIEW_PANELS.PROFILE}`, []),
-      createPanel(DEFAULT_VIEW_PANELS.MY_ADS, `/${DEFAULT_VIEW_PANELS.MY_ADS}`, []),
-      createPanel(DEFAULT_VIEW_PANELS.CREATE_AD, `/${DEFAULT_VIEW_PANELS.CREATE_AD}`, []),
-      createPanel(DEFAULT_VIEW_PANELS.AD_DETAIL, `/${DEFAULT_VIEW_PANELS.AD_DETAIL}/:id`, []),
+      createPanel(DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS, `/${DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.MY_POSTS, `/${DEFAULT_VIEW_PANELS.MY_POSTS}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.CREATE_POST, `/${DEFAULT_VIEW_PANELS.CREATE_POST}`, []),
+      createPanel(DEFAULT_VIEW_PANELS.POST_DETAIL, `/${DEFAULT_VIEW_PANELS.POST_DETAIL}/:id`, []),
       createPanel(DEFAULT_VIEW_PANELS.MODERATION, `/${DEFAULT_VIEW_PANELS.MODERATION}`, [
         createModal('approve_settings', `/${DEFAULT_VIEW_PANELS.MODERATION}/approve_settings/:id`),
       ]),

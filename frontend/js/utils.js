@@ -2,23 +2,85 @@
  * Утилиты для работы с VK API
  */
 
+const APP_STORAGE_PREFIX = 'vkzp_';
+
+function appStorageCookieName(key) {
+    return `${APP_STORAGE_PREFIX}${key}`;
+}
+
+function parseCookieMap() {
+    const result = {};
+    const raw = document.cookie ? document.cookie.split(';') : [];
+
+    raw.forEach((item) => {
+        const trimmed = item.trim();
+        if (!trimmed) {
+            return;
+        }
+
+        const separatorIndex = trimmed.indexOf('=');
+        const encodedName = separatorIndex >= 0 ? trimmed.slice(0, separatorIndex) : trimmed;
+        const encodedValue = separatorIndex >= 0 ? trimmed.slice(separatorIndex + 1) : '';
+        const name = decodeURIComponent(encodedName);
+
+        if (!name.startsWith(APP_STORAGE_PREFIX)) {
+            return;
+        }
+
+        const key = name.slice(APP_STORAGE_PREFIX.length);
+        result[key] = decodeURIComponent(encodedValue);
+    });
+
+    return result;
+}
+
+const AppStorage = {
+    getItem(key) {
+        const map = parseCookieMap();
+        return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
+    },
+    setItem(key, value) {
+        const safeValue = value == null ? '' : String(value);
+        const encodedName = encodeURIComponent(appStorageCookieName(key));
+        const encodedValue = encodeURIComponent(safeValue);
+        document.cookie = `${encodedName}=${encodedValue}; path=/; max-age=31536000; SameSite=Lax`;
+    },
+    removeItem(key) {
+        const encodedName = encodeURIComponent(appStorageCookieName(key));
+        document.cookie = `${encodedName}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+    },
+    key(index) {
+        const keys = Object.keys(parseCookieMap());
+        return keys[index] ?? null;
+    },
+    clear() {
+        const keys = Object.keys(parseCookieMap());
+        keys.forEach((key) => this.removeItem(key));
+    },
+    get length() {
+        return Object.keys(parseCookieMap()).length;
+    }
+};
+
+window.AppStorage = AppStorage;
+
 // API URL
 const API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost/api' 
+    ? 'http://localhost:8000/api' 
     : `${window.location.origin}/api`;
 
 /**
- * Получение токена из localStorage
+ * Получение токена доступа
  */
 function getAccessToken() {
-    return localStorage.getItem('vk_access_token');
+    return AppStorage.getItem('vk_access_token');
 }
 
 /**
  * Получение ID пользователя
  */
 function getUserId() {
-    return localStorage.getItem('vk_user_id');
+    return AppStorage.getItem('vk_user_id');
 }
 
 /**
@@ -32,11 +94,21 @@ function isAuthorized() {
  * Выход из аккаунта
  */
 function logout() {
-    localStorage.removeItem('vk_access_token');
-    localStorage.removeItem('vk_user_id');
-    localStorage.removeItem('vk_user_name');
-    localStorage.removeItem('vk_user_photo');
-    window.location.href = 'pages/auth.html';
+    // Очищаем данные авторизации в системе
+    AppStorage.removeItem('app_user');
+    AppStorage.removeItem('app_auth_time');
+    
+    // Очищаем данные ВК
+    AppStorage.removeItem('vk_access_token');
+    AppStorage.removeItem('vk_user_id');
+    AppStorage.removeItem('vk_user_name');
+    AppStorage.removeItem('vk_user_photo');
+    AppStorage.removeItem('vk_selected_groups');
+    AppStorage.removeItem('vk_selected_groups_data');
+    AppStorage.removeItem('vk_group_tokens');
+    
+    // Переходим на главную
+    window.location.href = '/';
 }
 
 /**

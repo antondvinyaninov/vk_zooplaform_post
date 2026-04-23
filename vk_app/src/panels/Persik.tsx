@@ -8,7 +8,7 @@ export const Persik: FC<NavIdProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />} style={{ textAlign: 'center' }}>
         Persik
       </PanelHeader>
       <Placeholder>

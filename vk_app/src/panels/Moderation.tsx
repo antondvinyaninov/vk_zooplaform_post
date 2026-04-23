@@ -21,7 +21,7 @@ import {
 } from '@vkontakte/icons';
 import bridgeModule, { parseURLSearchParamsForGetLaunchParams } from '@vkontakte/vk-bridge';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getAllAds, moderateAd, saveGroupToken } from '../shared/api';
+import { getFeedPosts, moderatePost, saveGroupToken } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 const bridge = (bridgeModule && 'send' in bridgeModule) 
@@ -29,7 +29,7 @@ const bridge = (bridgeModule && 'send' in bridgeModule)
   : (bridgeModule as any).default;
 
 export const Moderation: FC<NavIdProps> = ({ id }) => {
-  const [ads, setAds] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGroupLinked, setIsGroupLinked] = useState(false);
   const routeNavigator = useRouteNavigator();
@@ -65,35 +65,35 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
   };
 
   useEffect(() => {
-    async function fetchAdsForModeration() {
+    async function fetchPostsForModeration() {
       try {
-        const data = await getAllAds('PENDING');
-        setAds(data);
+        const data = await getFeedPosts('pending');
+        setPosts(data);
       } catch (error) {
-        console.error('Failed to fetch ads for moderation:', error);
+        console.error('Failed to fetch posts for moderation:', error);
       } finally {
         setLoading(false);
       }
     }
-    fetchAdsForModeration();
+    fetchPostsForModeration();
   }, []);
 
-  const handleApprove = (adId: number) => {
-    routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MODERATION}/approve_settings/${adId}`);
+  const handleApprove = (postId: number) => {
+    routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MODERATION}/approve_settings/${postId}`);
   };
 
-  const handleReject = async (adId: number) => {
+  const handleReject = async (postId: number) => {
     try {
-      await moderateAd(adId, 'REJECTED');
-      setAds(prevAds => prevAds.filter(ad => ad.id !== adId));
+      await moderatePost(postId, 'rejected');
+      setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
     } catch (error) {
-      console.error('Failed to reject ad:', error);
+      console.error('Failed to reject post:', error);
     }
   };
 
   return (
     <Panel id={id}>
-      <PanelHeader>Модерация</PanelHeader>
+      <PanelHeader style={{ textAlign: 'center' }}>Модерация</PanelHeader>
 
       {!isGroupLinked && (
         <Group header={<Header>Настройка публикации</Header>}>
@@ -113,36 +113,33 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
         </Group>
       )}
 
-      <Group header={<Header>Предложенные объявления</Header>}>
+      <Group header={<Header>Публикации на модерации</Header>}>
         {loading ? (
           <PanelSpinner size="l" />
-        ) : ads.length === 0 ? (
+        ) : posts.length === 0 ? (
           <Placeholder
             icon={<Icon56CheckShieldOutline />}
             title="Очередь пуста"
           >
-            Все объявления проверены. Отличная работа!
+            Все публикации проверены. Отличная работа!
           </Placeholder>
         ) : (
           <CardGrid size="l">
-            {ads.map((ad) => (
+            {posts.map((post) => (
               <ContentCard
-                key={ad.id}
-                caption={
-                  ad.type === 'LOST' ? 'Пропал питомец' : 
-                  ad.type === 'FOUND' ? 'Найден питомец' : 'Пристройство'
-                }
-                title={ad.title}
+                key={post.id}
+                caption={post.group?.name || 'Публикация сообщества'}
+                title={post.title}
                 description={
                   <>
-                    <Div style={{ padding: 0, marginBottom: 8 }}>{ad.description}</Div>
+                    <Div style={{ padding: 0, marginBottom: 8 }}>{post.message}</Div>
                     <ButtonGroup mode="horizontal" gap="s" stretched>
                       <Button 
                         size="s" 
                         mode="primary" 
                         appearance="positive"
                         before={<Icon24CheckCircleOutline width={16} height={16} />}
-                        onClick={() => handleApprove(ad.id)}
+                        onClick={() => handleApprove(post.id)}
                         stretched
                       >
                         Одобрить
@@ -152,7 +149,7 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
                         mode="secondary" 
                         appearance="negative"
                         before={<Icon24CancelOutline width={16} height={16} />}
-                        onClick={() => handleReject(ad.id)}
+                        onClick={() => handleReject(post.id)}
                         stretched
                       >
                         Отклонить
@@ -161,7 +158,6 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
                   </>
                 }
                 maxHeight={300}
-                src={ad.photoUrl || undefined}
               />
             ))}
           </CardGrid>

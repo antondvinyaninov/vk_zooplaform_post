@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подключить ВК - VK ZooPlatforma</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
+    
+    <!-- Общие стили VKUI -->
+    <link rel="stylesheet" href="../css/vkui-base.css?v=20260422-2">
+    
+    <!-- Дополнительные стили для страницы подключения -->
+    <style>
+        .token-input-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: #fff3e0;
+            border: 1px solid #ffcc02;
+            border-radius: 8px;
+        }
+        
+        .token-input-section h3 {
+            font-size: 14px;
+            font-weight: 500;
+            margin: 0 0 12px 0;
+            color: #f57c00;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+        
+        .connection-status--connected {
+            background: #e8f5e8;
+            border: 1px solid #c8e6c9;
+            color: #2e7d32;
+        }
+        
+        .connection-status--disconnected {
+            background: #fff3e0;
+            border: 1px solid #ffcc02;
+            color: #f57c00;
+        }
+        
+        .connection-status__icon {
+            font-size: 20px;
+        }
+
+        .connection-status__avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #5181b8;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .connection-status__avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        
+        .connection-status__text {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .accounts-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .account-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            border: 1px solid #dce1e6;
+            border-radius: 10px;
+            padding: 12px;
+            background: #ffffff;
+        }
+
+        .account-item--active {
+            border-color: #a7d4af;
+            background: #f3fbf4;
+        }
+
+        .account-main {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .account-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #5181b8;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .account-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .account-meta {
+            min-width: 0;
+        }
+
+        .account-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #000000;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .account-subtitle {
+            margin-top: 2px;
+            font-size: 12px;
+            color: #6d7885;
+        }
+
+        .account-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .account-actions .btn {
+            padding: 8px 10px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <!-- Sidebar -->
+        <div data-sidebar-root></div>
+
+        <!-- Content -->
+        <div class="content panel">
+            <!-- Header -->
+            <header class="header">
+                <div class="header__content">
+                    <div class="header__left">
+                        <button type="button" class="header__menu-btn" aria-label="Открыть меню" onclick="toggleMobileSidebar()">☰</button>
+                    </div>
+                    <div class="header__center">
+                        <h1 class="header__title">Подключить ВК</h1>
+                    </div>
+                    <div class="header__right">
+                        <a href="/dashboard" class="btn btn--secondary">
+                            ← Панель управления
+                        </a>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main content -->
+            <main class="main">
+                <div class="main__header">
+                    <h1 class="main__title">Подключить ВКонтакте</h1>
+                    <p class="main__subtitle">Авторизуйтесь в ВКонтакте для получения доступа к управлению группами и публикации контента.</p>
+                </div>
+
+                <!-- Connection Status -->
+                <div id="connectionStatus" class="connection-status connection-status--disconnected">
+                    <div class="connection-status__icon">⚠️</div>
+                    <div class="connection-status__text">ВКонтакте не подключен</div>
+                </div>
+
+                <div class="card">
+                    <div class="card__header">
+                        <h2 class="card__title">Подключенные аккаунты</h2>
+                    </div>
+                    <div class="card__content">
+                        <div id="vkAccountsList" class="accounts-list">
+                            <div style="color:#818c99;">Аккаунты пока не подключены</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Authorization Card -->
+                <div class="card">
+                    <div class="card__header">
+                        <h2 class="card__title">Авторизация ВКонтакте</h2>
+                    </div>
+                    <div class="card__content">
+                        <p style="margin-bottom: 24px; color: #818c99;">Для работы с платформой необходимо подключить ваш аккаунт ВКонтакте. Это позволит управлять группами и публиковать контент.</p>
+                        
+                        <button id="authBtn" class="btn btn--primary btn--large">
+                            🔗 Авторизоваться ВКонтакте
+                        </button>
+                        
+                        <div id="authResult" class="result"></div>
+                    </div>
+                </div>
+
+                <!-- Manual Token Input -->
+                <div id="manualTokenInput" class="card" style="display: none;">
+                    <div class="card__header">
+                        <h2 class="card__title">Ввод токена авторизации</h2>
+                    </div>
+                    <div class="card__content">
+                        <div class="token-input-section">
+                            <h3>⚠️ Внимание</h3>
+                            <p style="margin: 0 0 16px 0; font-size: 13px; color: #818c99;">Вставьте полный URL из адресной строки браузера после успешной авторизации ВКонтакте.</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="tokenUrlInput">URL с токеном доступа</label>
+                            <input type="text" id="tokenUrlInput" class="form-control" placeholder="https://oauth.vk.com/blank.html#access_token=...">
+                        </div>
+                        
+                        <div style="display: flex; gap: 12px;">
+                            <button id="saveTokenBtn" class="btn btn--primary">
+                                💾 Сохранить токен
+                            </button>
+                            <button onclick="hideManualInput()" class="btn btn--secondary">
+                                Отмена
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Общие скрипты -->
+    <script src="../js/utils.js"></script>
+    <script src="../js/layout.js?v=20260422-1"></script>
+    <script src="../js/sidebar.js?v=20260422-4"></script>
+    <script src="../js/auth.js?v=20260422-multi-accounts"></script>
+    
+    <script>
+        // Дополнительные функции для страницы
+        function hideManualInput() {
+            document.getElementById('manualTokenInput').style.display = 'none';
+        }
+
+        function getInitials(name) {
+            if (!name) {
+                return 'U';
+            }
+
+            return name
+                .split(' ')
+                .filter(Boolean)
+                .slice(0, 2)
+                .map(part => part[0].toUpperCase())
+                .join('');
+        }
+
+        function renderConnectedStatus(statusElement, userName, userPhoto) {
+            const avatarHtml = userPhoto
+                ? `<span class="connection-status__avatar"><img src="${userPhoto}" alt="${userName}"></span>`
+                : `<span class="connection-status__avatar">${getInitials(userName)}</span>`;
+
+            statusElement.className = 'connection-status connection-status--connected';
+            statusElement.innerHTML = `
+                ${avatarHtml}
+                <div class="connection-status__text">ВКонтакте подключен (${userName})</div>
+            `;
+        }
+
+        function renderDisconnectedStatus(statusElement) {
+            statusElement.className = 'connection-status connection-status--disconnected';
+            statusElement.innerHTML = `
+                <div class="connection-status__icon">⚠️</div>
+                <div class="connection-status__text">ВКонтакте не подключен</div>
+            `;
+        }
+
+        function applyActiveAccountSession(payload) {
+            const active = payload?.active_account;
+            if (!active || !active.access_token) {
+                return;
+            }
+
+            AppStorage.setItem('vk_access_token', active.access_token);
+            if (active.vk_user_id) {
+                AppStorage.setItem('vk_user_id', String(active.vk_user_id));
+            }
+            if (active.token_expires) {
+                AppStorage.setItem('vk_token_expires', String(active.token_expires));
+            }
+            if (active.user_name) {
+                AppStorage.setItem('vk_user_name', active.user_name);
+            }
+            if (active.user_photo) {
+                AppStorage.setItem('vk_user_photo', active.user_photo);
+            }
+        }
+
+        function renderAccountsList(payload) {
+            const container = document.getElementById('vkAccountsList');
+            const accounts = payload.accounts || [];
+
+            if (accounts.length === 0) {
+                container.innerHTML = '<div style="color:#818c99;">Аккаунты пока не подключены</div>';
+                return;
+            }
+
+            container.innerHTML = accounts.map((account) => {
+                const displayName = account.user_name || (account.vk_user_id ? `VK ID ${account.vk_user_id}` : 'Неизвестный аккаунт');
+                const avatarHtml = account.user_photo
+                    ? `<span class="account-avatar"><img src="${account.user_photo}" alt="${displayName}"></span>`
+                    : `<span class="account-avatar">${getInitials(displayName)}</span>`;
+
+                const activeBadge = account.is_active
+                    ? '<span class="status-badge status-badge--success">Основной</span>'
+                    : '<span class="status-badge">Резервный</span>';
+
+                const activateBtn = account.is_active
+                    ? ''
+                    : `<button type="button" class="btn btn--secondary" onclick="activateVKAccount(${account.id})">Сделать основным</button>`;
+
+                return `
+                    <div class="account-item ${account.is_active ? 'account-item--active' : ''}">
+                        <div class="account-main">
+                            ${avatarHtml}
+                            <div class="account-meta">
+                                <div class="account-name">${displayName}</div>
+                                <div class="account-subtitle">
+                                    ${account.vk_user_id ? `ID: ${account.vk_user_id}` : 'ID недоступен'} · ${activeBadge}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="account-actions">
+                            ${activateBtn}
+                            <button type="button" class="btn btn--secondary" onclick="deleteVKAccount(${account.id})">Удалить</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadVKConnections() {
+            const statusElement = document.getElementById('connectionStatus');
+
+            const response = await fetch(`${API_URL}/admin/vk/connection`);
+            const payload = await response.json();
+            if (!response.ok) {
+                throw new Error(payload.error || 'Не удалось загрузить подключение ВКонтакте');
+            }
+
+            if (payload.is_connected && payload.has_token) {
+                const userName = payload.user_name || AppStorage.getItem('app_user_display_name') || 'Пользователь';
+                const userPhoto = payload.user_photo || '';
+                renderConnectedStatus(statusElement, userName, userPhoto);
+            } else {
+                renderDisconnectedStatus(statusElement);
+            }
+
+            renderAccountsList(payload);
+            applyActiveAccountSession(payload);
+        }
+
+        async function activateVKAccount(accountId) {
+            try {
+                const response = await fetch(`${API_URL}/admin/vk/connection`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account_id: accountId }),
+                });
+                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(payload.error || 'Не удалось активировать аккаунт');
+                }
+
+                applyActiveAccountSession(payload);
+                await loadVKConnections();
+            } catch (error) {
+                console.error('[VK Connect] Activate account failed:', error);
+                alert(error.message || 'Не удалось переключить аккаунт');
+            }
+        }
+
+        async function deleteVKAccount(accountId) {
+            const confirmed = window.confirm('Удалить подключенный аккаунт ВКонтакте?');
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/admin/vk/connection?account_id=${encodeURIComponent(accountId)}`, {
+                    method: 'DELETE',
+                });
+                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(payload.error || 'Не удалось удалить аккаунт');
+                }
+
+                applyActiveAccountSession(payload);
+                await loadVKConnections();
+            } catch (error) {
+                console.error('[VK Connect] Delete account failed:', error);
+                alert(error.message || 'Не удалось удалить аккаунт');
+            }
+        }
+
+        window.activateVKAccount = activateVKAccount;
+        window.deleteVKAccount = deleteVKAccount;
+
+        // Проверяем статус подключения при загрузке
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                await loadVKConnections();
+            } catch (error) {
+                console.error('[VK Connect] Failed to load VK connection:', error);
+            }
+        });
+    </script>
+</body>
+</html>

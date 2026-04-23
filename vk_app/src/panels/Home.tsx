@@ -2,7 +2,6 @@ import { FC, useEffect, useState } from 'react';
 import {
   Panel,
   PanelHeader,
-  PanelHeaderBack,
   Group,
   SimpleCell,
   NavIdProps,
@@ -14,35 +13,33 @@ import {
 } from '@vkontakte/vkui';
 import { Icon28UserOutline, Icon28ListOutline, Icon28AddOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getAllAds } from '../shared/api';
+import { getFeedPosts } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export interface HomeProps extends NavIdProps {}
 
 export const Home: FC<HomeProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
-  const [ads, setAds] = useState<any[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchAds() {
+    async function fetchPosts() {
       try {
-        const data = await getAllAds();
-        setAds(data);
+        const data = await getFeedPosts();
+        setPosts(data);
       } catch (error) {
-        console.error('Failed to fetch ads:', error);
+        console.error('Failed to fetch posts:', error);
       } finally {
         setLoading(false);
       }
     }
-    fetchAds();
+    fetchPosts();
   }, []);
 
   return (
     <Panel id={id}>
-      <PanelHeader 
-        before={<PanelHeaderBack onClick={() => window.history.back()} />}
-      >
+      <PanelHeader style={{ textAlign: 'center' }}>
         Главная
       </PanelHeader>
 
@@ -55,9 +52,9 @@ export const Home: FC<HomeProps> = ({ id }) => {
         </SimpleCell>
         <SimpleCell
           before={<Icon28ListOutline />}
-          onClick={() => routeNavigator.push('/my_ads')}
+          onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_POSTS}`)}
         >
-          Мои объявления
+          Мои публикации
         </SimpleCell>
       </Group>
 
@@ -68,31 +65,27 @@ export const Home: FC<HomeProps> = ({ id }) => {
               size="s" 
               mode="tertiary" 
               before={<Icon28AddOutline width={20} height={20} />}
-              onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.CREATE_AD}`)}
+              onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.CREATE_POST}`)}
             >
               Добавить
             </Button>
           }
         >
-          Лента объявлений
+          Лента публикаций
         </Header>
       }>
         {loading ? (
           <PanelSpinner size="l" />
         ) : (
           <CardGrid size="l">
-            {ads.map((ad) => (
+            {posts.map((post) => (
               <ContentCard
-                key={ad.id}
-                onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.AD_DETAIL}/${ad.id}`)}
-                caption={
-                  ad.type === 'LOST' ? 'Пропал питомец' : 
-                  ad.type === 'FOUND' ? 'Найден питомец' : 'Пристройство'
-                }
-                title={ad.title}
-                description={ad.description}
+                key={post.id}
+                onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POST_DETAIL}/${post.id}`)}
+                caption={post.group?.name || 'Публикация сообщества'}
+                title={post.title}
+                description={post.message}
                 maxHeight={250}
-                src={ad.photoUrl || undefined}
               />
             ))}
           </CardGrid>

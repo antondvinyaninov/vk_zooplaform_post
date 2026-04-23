@@ -2,6 +2,11 @@
 
 Фронтенд приложения для управления постами в группах ВКонтакте.
 
+## UI стандарт (обязательно)
+
+- Правила UI зафиксированы в [UI_RULES.md](/Users/dvinyaninov/smm/frontend/UI_RULES.md).
+- Для всех полей выбора из списка используем только **VKUI CustomSelect**: https://vkui.io/components/custom-select/
+
 ## Структура проекта
 
 ```
@@ -12,7 +17,7 @@ frontend/
 │   ├── groups.html        # Управление группами
 │   └── posts.html         # Просмотр постов
 ├── js/                    # JavaScript модули
-│   ├── utils.js           # Общие утилиты (API, localStorage)
+│   ├── utils.js           # Общие утилиты (API, AppStorage)
 │   ├── app.js             # Главная страница
 │   ├── auth.js            # Авторизация
 │   ├── groups.js          # Управление группами
@@ -26,7 +31,7 @@ frontend/
 ### 1. Авторизация (`pages/auth.html`)
 - Авторизация через VK Admin app
 - Ручной ввод токена из URL
-- Сохранение токена в localStorage
+- Сохранение токена в AppStorage
 
 ### 2. Главная страница (`index.html`)
 - Статус авторизации

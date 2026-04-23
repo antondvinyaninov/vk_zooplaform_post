@@ -17,25 +17,25 @@ import {
   Avatar,
 } from '@vkontakte/vkui';
 import { 
-  Icon28CalendarOutline, 
-  Icon28PlaceOutline,
+  Icon28CalendarOutline,
+  Icon28NewsfeedOutline,
   Icon56ErrorOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
-import { getAdById } from '../shared/api';
+import { getPostById } from '../shared/api';
 
 export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const params = useParams();
-  const [ad, setAd] = useState<any>(null);
+  const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchDetail() {
       if (params?.id) {
         setLoading(true);
-        const data = await getAdById(params.id);
-        setAd(data);
+        const data = await getPostById(params.id);
+        setPost(data);
         setLoading(false);
       }
     }
@@ -45,7 +45,7 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
   if (loading) {
     return (
       <Panel id={id}>
-        <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
+        <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />} style={{ textAlign: 'center' }}>
           Загрузка...
         </PanelHeader>
         <PanelSpinner size="l" />
@@ -53,18 +53,18 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
     );
   }
 
-  if (!ad) {
+  if (!post) {
     return (
       <Panel id={id}>
-        <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
+        <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />} style={{ textAlign: 'center' }}>
           Ошибка
         </PanelHeader>
         <Placeholder
           icon={<Icon56ErrorOutline />}
-          title="Объявление не найдено"
+          title="Публикация не найдена"
           action={<Button size="m" onClick={() => routeNavigator.back()}>Вернуться назад</Button>}
         >
-          Возможно, оно было удалено автором или ссылка неверна.
+          Возможно, запись была удалена или ссылка неверна.
         </Placeholder>
       </Panel>
     );
@@ -72,76 +72,61 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
-        Объявление
+      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />} style={{ textAlign: 'center' }}>
+        Публикация
       </PanelHeader>
-
-      {ad.photoUrl && (
-        <Group>
-          <img 
-            src={ad.photoUrl} 
-            alt={ad.title} 
-            style={{ 
-              width: '100%', 
-              display: 'block',
-              maxHeight: 400,
-              objectFit: 'cover'
-            }} 
-          />
-        </Group>
-      )}
 
       <Group>
         <Div>
           <Title level="1" weight="2" style={{ marginBottom: 8 }}>
-            {ad.title}
+            {post.title}
           </Title>
-          <Text weight="3" style={{ color: ad.type === 'LOST' ? 'var(--vkui--color_text_negative)' : 'var(--vkui--color_text_accent)' }}>
-            {ad.type === 'LOST' ? '🔴 ПРОПАЛ ПИТОМЕЦ' : ad.type === 'FOUND' ? '🟢 НАЙДЕН ПИТОМЕЦ' : '🔵 ПРИСТРОЙСТВО'}
+          <Text weight="3" style={{ color: 'var(--vkui--color_text_accent)' }}>
+            Статус: {post.status}
           </Text>
         </Div>
 
         <Div>
           <Text style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-            {ad.description}
+            {post.message}
           </Text>
         </Div>
       </Group>
 
       <Group header={<Header>Информация</Header>}>
         <SimpleCell before={<Icon28CalendarOutline />}>
-          <InfoRow header="Дата публикации">
-            {new Date(ad.createdAt).toLocaleDateString('ru-RU', { 
+          <InfoRow header="Создано">
+            {new Date(post.created_at).toLocaleDateString('ru-RU', { 
               day: 'numeric', 
               month: 'long', 
               year: 'numeric' 
             })}
           </InfoRow>
         </SimpleCell>
-        {ad.cityTitle && (
-          <SimpleCell before={<Icon28PlaceOutline />}>
-            <InfoRow header="Местоположение">
-              {ad.cityTitle}
+        {post.group && (
+          <SimpleCell before={<Icon28NewsfeedOutline />}>
+            <InfoRow header="Сообщество">
+              {post.group.name}
             </InfoRow>
           </SimpleCell>
         )}
       </Group>
 
-      {ad.users && (
-        <Group header={<Header>Автор объявления</Header>}>
+      {post.author && (
+        <Group header={<Header>Автор публикации</Header>}>
           <SimpleCell
-            before={<Avatar src={ad.users.avatar} size={48} />}
+            before={<Avatar src={post.author.photo_200} size={48} />}
             subtitle="Написать автору"
             after={
               <Button 
                 mode="tertiary" 
-                onClick={() => window.open(`https://vk.com/id${ad.users.vk_id}`, '_blank')}
+                onClick={() => window.open(`https://vk.com/id${post.author.vk_user_id}`, '_blank')}
               >
                 Профиль
               </Button>
             }
           >
-            {ad.users.name} {ad.users.lastName}
+            {post.author.first_name} {post.author.last_name}
           </SimpleCell>
         </Group>
       )}

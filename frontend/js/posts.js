@@ -17,7 +17,7 @@ let hasMorePosts = true;
 
 // Загружаем список групп
 function loadGroupsList() {
-    const groupsData = localStorage.getItem('vk_selected_groups_data');
+    const groupsData = AppStorage.getItem('vk_selected_groups_data');
     
     if (!groupsData) {
         groupSelect.innerHTML = '<option value="">Сначала подключите группы</option>';
@@ -188,7 +188,7 @@ function parseGroupId(input) {
 
 // Загрузка постов
 async function loadPosts(append = false) {
-    const accessToken = localStorage.getItem('vk_access_token');
+    const accessToken = AppStorage.getItem('vk_access_token');
     let ownerId = groupSelect.value;
     const customId = customGroupIdInput.value.trim();
     const filter = filterSelect.value;
@@ -203,7 +203,7 @@ async function loadPosts(append = false) {
         loadResult.innerHTML = `
             <strong>✗ Ошибка!</strong>
             <p>Токен доступа не найден</p>
-            <a href="auth.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
+            <a href="/" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
                 Авторизоваться
             </a>
         `;
@@ -358,7 +358,7 @@ async function handleRepost(e) {
     const resultDiv = btn.nextElementSibling;
     
     // Получаем список своих групп
-    const groupsData = localStorage.getItem('vk_selected_groups_data');
+    const groupsData = AppStorage.getItem('vk_selected_groups_data');
     if (!groupsData) {
         resultDiv.className = 'result show error';
         resultDiv.innerHTML = '<small>Сначала подключите свои группы</small>';
@@ -410,7 +410,7 @@ async function handleRepost(e) {
             confirmBtn.disabled = true;
             confirmBtn.textContent = 'Репостим...';
             
-            const accessToken = localStorage.getItem('vk_access_token');
+            const accessToken = AppStorage.getItem('vk_access_token');
             
             console.log('Repost request:', {
                 object: `wall${ownerId}_${postId}`,
@@ -497,7 +497,7 @@ async function handleCopyPost(e) {
     }
     
     // Получаем список своих групп
-    const groupsData = localStorage.getItem('vk_selected_groups_data');
+    const groupsData = AppStorage.getItem('vk_selected_groups_data');
     if (!groupsData) {
         resultDiv.className = 'result show error';
         resultDiv.innerHTML = '<small>Сначала подключите свои группы</small>';
@@ -549,7 +549,7 @@ async function handleCopyPost(e) {
             confirmBtn.disabled = true;
             confirmBtn.textContent = 'Копируем...';
             
-            const accessToken = localStorage.getItem('vk_access_token');
+            const accessToken = AppStorage.getItem('vk_access_token');
             
             // Формируем attachments из поста
             let attachments = [];

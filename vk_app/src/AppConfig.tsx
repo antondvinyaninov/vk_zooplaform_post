@@ -1,5 +1,6 @@
 import vkBridgeModule, { parseURLSearchParamsForGetLaunchParams } from '@vkontakte/vk-bridge';
 import { useAdaptivity, useAppearance, useInsets } from '@vkontakte/vk-bridge-react';
+import { Component, ReactNode } from 'react';
 import { 
   AdaptivityProvider, 
   ConfigProvider, 
@@ -19,6 +20,34 @@ import { transformVKBridgeAdaptivity } from './utils';
 import { router } from './routes';
 import { App } from './App';
 
+class AppErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error: error?.message || 'Unknown render error' };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('App render error:', error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 16, fontFamily: 'sans-serif' }}>
+          <h3>Runtime error</h3>
+          <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error}</pre>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export const AppConfig = () => {
   const vkBridgeAppearance = useAppearance() || undefined;
   const vkBridgeInsets = useInsets() || undefined;
@@ -33,14 +62,22 @@ export const AppConfig = () => {
         sizeX: window.innerWidth >= 768 ? SizeType.REGULAR : SizeType.COMPACT,
         sizeY: SizeType.REGULAR,
       };
-  const { vk_platform } = parseURLSearchParamsForGetLaunchParams(window.location.search);
-  const platform = (vk_platform as string) === 'desktop_web' 
-    ? 'vkcom' 
-    : (vk_platform as string) === 'mobile_android' 
-      ? 'android' 
-      : (vk_platform as string) === 'mobile_ios' 
-        ? 'ios' 
-        : undefined;
+  let vkPlatform: string | undefined;
+  try {
+    const { vk_platform } = parseURLSearchParamsForGetLaunchParams(window.location.search);
+    vkPlatform = vk_platform as string | undefined;
+  } catch {
+    // В локальной отладке мы часто запускаем приложение с урезанными launch params.
+    vkPlatform = new URLSearchParams(window.location.search).get('vk_platform') || undefined;
+  }
+
+  const platform = vkPlatform === 'desktop_web'
+    ? 'vkcom'
+    : vkPlatform === 'mobile_android'
+      ? 'android'
+      : vkPlatform === 'mobile_ios'
+        ? 'ios'
+        : 'ios';
 
   return (
     <ConfigProvider
@@ -51,9 +88,11 @@ export const AppConfig = () => {
     >
       <AdaptivityProvider {...adaptivity}>
         <AppRoot safeAreaInsets={vkBridgeInsets} disableSettingVKUIClassesInRuntime>
-          <RouterProvider router={router}>
-            <App />
-          </RouterProvider>
+          <AppErrorBoundary>
+            <RouterProvider router={router}>
+              <App />
+            </RouterProvider>
+          </AppErrorBoundary>
         </AppRoot>
       </AdaptivityProvider>
     </ConfigProvider>

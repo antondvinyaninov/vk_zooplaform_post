@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{TITLE}} - VK ZooPlatforma</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
+    
+    <!-- Общие стили VKUI -->
+    <link rel="stylesheet" href="../css/vkui-base.css?v=20260422-2">
+    
+    <!-- Дополнительные стили страницы -->
+    {{ADDITIONAL_STYLES}}
+</head>
+<body>
+    <div class="layout">
+        <!-- Sidebar -->
+        {{SIDEBAR}}
+
+        <!-- Content -->
+        <div class="content panel">
+            <!-- Header -->
+            <header class="header">
+                <div class="header__content">
+                    <div class="header__left">
+                        <button type="button" class="header__menu-btn" aria-label="Открыть меню" onclick="toggleMobileSidebar()">☰</button>
+                    </div>
+                    <div class="header__center">
+                        <h1 class="header__title">{{TITLE}}</h1>
+                    </div>
+                    <div class="header__right">
+                        <!-- Пустое место для будущих элементов -->
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main content -->
+            <main class="main">
+                {{MAIN_CONTENT}}
+            </main>
+        </div>
+    </div>
+
+    <!-- Общие скрипты -->
+    <script src="../js/utils.js"></script>
+    <script src="../js/layout.js?v=20260422-1"></script>
+    <script src="../js/sidebar.js?v=20260422-4"></script>
+    
+    <!-- Дополнительные скрипты страницы -->
+    {{ADDITIONAL_SCRIPTS}}
+</body>
+</html>

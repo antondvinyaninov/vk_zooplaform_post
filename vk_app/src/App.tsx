@@ -1,6 +1,22 @@
 import { useState, useEffect, ReactNode, lazy, Suspense } from 'react';
 import bridgeModule, { UserInfo } from '@vkontakte/vk-bridge';
-import { View, SplitLayout, SplitCol, ScreenSpinner, ModalRoot } from '@vkontakte/vkui';
+import {
+  View,
+  SplitLayout,
+  SplitCol,
+  ScreenSpinner,
+  ModalRoot,
+  Epic,
+  Tabbar,
+  TabbarItem,
+} from '@vkontakte/vkui';
+import {
+  Icon28HomeOutline,
+  Icon28ListOutline,
+  Icon28AddOutline,
+  Icon28UserOutline,
+  Icon28CheckShieldOutline,
+} from '@vkontakte/icons';
 
 const bridge = (bridgeModule && 'send' in bridgeModule) 
   ? bridgeModule 
@@ -13,11 +29,57 @@ const Home = lazy(() => import('./panels/Home').then(m => ({ default: m.Home }))
 const Persik = lazy(() => import('./panels/Persik').then(m => ({ default: m.Persik })));
 const Onboarding = lazy(() => import('./panels/Onboarding').then(m => ({ default: m.Onboarding })));
 const Profile = lazy(() => import('./panels/Profile').then(m => ({ default: m.Profile })));
-const MyAds = lazy(() => import('./panels/MyAds').then(m => ({ default: m.MyAds })));
-const CreateAd = lazy(() => import('./panels/CreateAd').then(m => ({ default: m.CreateAd })));
+const CommunitySettings = lazy(() => import('./panels/CommunitySettings'));
+const MyPosts = lazy(() => import('./panels/MyAds').then(m => ({ default: m.MyPosts })));
+const CreatePost = lazy(() => import('./panels/CreateAd').then(m => ({ default: m.CreatePost })));
 const AdDetail = lazy(() => import('./panels/AdDetail'));
 const Moderation = lazy(() => import('./panels/Moderation'));
 const ModerationModal = lazy(() => import('./panels/ModerationModal'));
+
+const STORY_IDS = {
+  HOME: 'home_story',
+  MY_POSTS: 'my_posts_story',
+  CREATE_POST: 'create_post_story',
+  PROFILE: 'profile_story',
+  COMMUNITY_SETTINGS: 'community_settings_story',
+  MODERATION: 'moderation_story',
+  ONBOARDING: 'onboarding_story',
+  POST_DETAIL: 'post_detail_story',
+  PERSIK: 'persik_story',
+} as const;
+
+const MAIN_PANEL_TO_ROUTE: Record<string, string> = {
+  [DEFAULT_VIEW_PANELS.HOME]: '/home',
+  [DEFAULT_VIEW_PANELS.MY_POSTS]: `/${DEFAULT_VIEW_PANELS.MY_POSTS}`,
+  [DEFAULT_VIEW_PANELS.CREATE_POST]: `/${DEFAULT_VIEW_PANELS.CREATE_POST}`,
+  [DEFAULT_VIEW_PANELS.PROFILE]: `/${DEFAULT_VIEW_PANELS.PROFILE}`,
+  [DEFAULT_VIEW_PANELS.MODERATION]: `/${DEFAULT_VIEW_PANELS.MODERATION}`,
+};
+
+const getActiveStory = (panel: string): string => {
+  switch (panel) {
+    case DEFAULT_VIEW_PANELS.HOME:
+      return STORY_IDS.HOME;
+    case DEFAULT_VIEW_PANELS.MY_POSTS:
+      return STORY_IDS.MY_POSTS;
+    case DEFAULT_VIEW_PANELS.CREATE_POST:
+      return STORY_IDS.CREATE_POST;
+    case DEFAULT_VIEW_PANELS.PROFILE:
+      return STORY_IDS.PROFILE;
+    case DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS:
+      return STORY_IDS.COMMUNITY_SETTINGS;
+    case DEFAULT_VIEW_PANELS.MODERATION:
+      return STORY_IDS.MODERATION;
+    case DEFAULT_VIEW_PANELS.ONBOARDING:
+      return STORY_IDS.ONBOARDING;
+    case DEFAULT_VIEW_PANELS.POST_DETAIL:
+      return STORY_IDS.POST_DETAIL;
+    case DEFAULT_VIEW_PANELS.PERSIK:
+      return STORY_IDS.PERSIK;
+    default:
+      return STORY_IDS.HOME;
+  }
+};
 
 export const App = () => {
   const { panel: activePanel = DEFAULT_VIEW_PANELS.HOME, modal: activeModal } = useActiveVkuiLocation();
@@ -56,36 +118,114 @@ export const App = () => {
     fetchData();
   }, [activePanel, routeNavigator]);
 
+  const activeStory = getActiveStory(activePanel);
+  const isAdmin = ['admin', 'editor', 'moder'].includes(role || '');
+  const shouldShowTabbar =
+    activePanel !== DEFAULT_VIEW_PANELS.ONBOARDING &&
+    activePanel !== DEFAULT_VIEW_PANELS.POST_DETAIL &&
+    activePanel !== DEFAULT_VIEW_PANELS.PERSIK &&
+    activePanel !== DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS;
+
   const modal = (
     <ModalRoot activeModal={activeModal} onClose={() => routeNavigator.hideModal()}>
       <Suspense fallback={<ScreenSpinner />}>
         <ModerationModal 
           id="approve_settings" 
-          onConfirm={(adId, type, date) => {
-            console.log(`Action confirmed for ad ${adId}: ${type} at ${date?.toLocaleString() || 'NOW'}`);
-            // Отправляем глобальное событие для уведомления панелей об обновлении
-            window.dispatchEvent(new CustomEvent('adModerated', { detail: { adId } }));
+          onConfirm={(postId, type, date) => {
+            console.log(`Action confirmed for post ${postId}: ${type} at ${date?.toLocaleString() || 'NOW'}`);
+            window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId } }));
           }} 
         />
       </Suspense>
     </ModalRoot>
   );
 
+  const openMainPanel = (panel: keyof typeof MAIN_PANEL_TO_ROUTE) => {
+    const route = MAIN_PANEL_TO_ROUTE[panel];
+    if (route) {
+      routeNavigator.push(route);
+    }
+  };
+
   return (
     <>
       <SplitLayout modal={modal}>
         <SplitCol>
           <Suspense fallback={popout || <ScreenSpinner />}>
-            <View activePanel={activePanel}>
-              <Onboarding id="onboarding" />
-              <Home id="home" />
-              <Persik id="persik" />
-              <Profile id="profile" fetchedUser={fetchedUser} role={role} />
-              <MyAds id="my_ads" />
-              <CreateAd id="create_ad" />
-              <AdDetail id="ad_detail" />
-              <Moderation id="moderation" />
-            </View>
+            <Epic
+              activeStory={activeStory}
+              tabbar={
+                shouldShowTabbar ? (
+                  <Tabbar>
+                    <TabbarItem
+                      selected={activePanel === DEFAULT_VIEW_PANELS.HOME}
+                      onClick={() => openMainPanel(DEFAULT_VIEW_PANELS.HOME)}
+                      aria-label="Главная"
+                    >
+                      <Icon28HomeOutline />
+                    </TabbarItem>
+                    <TabbarItem
+                      selected={activePanel === DEFAULT_VIEW_PANELS.MY_POSTS}
+                      onClick={() => openMainPanel(DEFAULT_VIEW_PANELS.MY_POSTS)}
+                      aria-label="Мои посты"
+                    >
+                      <Icon28ListOutline />
+                    </TabbarItem>
+                    <TabbarItem
+                      selected={activePanel === DEFAULT_VIEW_PANELS.CREATE_POST}
+                      onClick={() => openMainPanel(DEFAULT_VIEW_PANELS.CREATE_POST)}
+                      aria-label="Создать"
+                    >
+                      <Icon28AddOutline />
+                    </TabbarItem>
+                    <TabbarItem
+                      selected={activePanel === DEFAULT_VIEW_PANELS.PROFILE}
+                      onClick={() => openMainPanel(DEFAULT_VIEW_PANELS.PROFILE)}
+                      aria-label="Профиль"
+                    >
+                      <Icon28UserOutline />
+                    </TabbarItem>
+                    {isAdmin && (
+                      <TabbarItem
+                        selected={activePanel === DEFAULT_VIEW_PANELS.MODERATION}
+                        onClick={() => openMainPanel(DEFAULT_VIEW_PANELS.MODERATION)}
+                        aria-label="Модерация"
+                      >
+                        <Icon28CheckShieldOutline />
+                      </TabbarItem>
+                    )}
+                  </Tabbar>
+                ) : undefined
+              }
+            >
+              <View id={STORY_IDS.HOME} activePanel={activePanel}>
+                <Home id="home" />
+              </View>
+              <View id={STORY_IDS.MY_POSTS} activePanel={activePanel}>
+                <MyPosts id="my_posts" />
+              </View>
+              <View id={STORY_IDS.CREATE_POST} activePanel={activePanel}>
+                <CreatePost id="create_post" />
+              </View>
+              <View id={STORY_IDS.PROFILE} activePanel={activePanel}>
+                <Profile id="profile" fetchedUser={fetchedUser} role={role} />
+              </View>
+              <View id={STORY_IDS.COMMUNITY_SETTINGS} activePanel={activePanel}>
+                <CommunitySettings id="community_settings" />
+              </View>
+              <View id={STORY_IDS.MODERATION} activePanel={activePanel}>
+                <Moderation id="moderation" />
+              </View>
+              <View id={STORY_IDS.ONBOARDING} activePanel={activePanel}>
+                <Onboarding id="onboarding" />
+              </View>
+              <View id={STORY_IDS.POST_DETAIL} activePanel={activePanel}>
+                <AdDetail id="post_detail" />
+              </View>
+              <View id={STORY_IDS.PERSIK} activePanel={activePanel}>
+                <Persik id="persik" />
+              </View>
+            </Epic>
           </Suspense>
         </SplitCol>
       </SplitLayout>

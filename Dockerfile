@@ -1,3 +1,12 @@
+# Сборка VK Mini App
+FROM node:18-alpine AS vk-app-builder
+
+WORKDIR /app/vk_app
+COPY vk_app/package*.json ./
+RUN npm ci --only=production
+COPY vk_app/ ./
+RUN npm run build
+
 # Сборка Go бэкенда
 FROM golang:1.21-alpine AS backend-builder
 
@@ -21,8 +30,12 @@ COPY --from=backend-builder /app/main ./backend/main
 # Копируем фронтенд (админка)
 COPY frontend ./frontend/
 
+# Копируем собранный VK Mini App
+COPY --from=vk-app-builder /app/vk_app/build ./vk_app/build/
+
 # Проверяем что файлы скопировались
 RUN ls -la ./frontend/ && echo "Frontend files copied successfully"
+RUN ls -la ./vk_app/build/ && echo "VK Mini App files copied successfully"
 
 # Переменные окружения
 ENV PORT=80

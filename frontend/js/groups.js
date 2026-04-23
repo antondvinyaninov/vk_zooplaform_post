@@ -12,7 +12,7 @@ let selectedGroups = new Set();
 
 // Загружаем сохранённые группы
 function loadSavedGroups() {
-    const saved = localStorage.getItem('vk_selected_groups');
+    const saved = AppStorage.getItem('vk_selected_groups');
     if (saved) {
         selectedGroups = new Set(JSON.parse(saved));
     }
@@ -72,14 +72,14 @@ function toggleGroup(group, card) {
 
 // Загрузка групп из VK
 async function loadGroups() {
-    const accessToken = localStorage.getItem('vk_access_token');
+    const accessToken = AppStorage.getItem('vk_access_token');
     
     if (!accessToken) {
         loadResult.className = 'result show error';
         loadResult.innerHTML = `
             <strong>✗ Ошибка!</strong>
             <p>Токен доступа не найден</p>
-            <a href="auth.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
+            <a href="/" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
                 Авторизоваться
             </a>
         `;
@@ -148,8 +148,8 @@ async function loadGroups() {
 function saveSelectedGroups() {
     const selectedGroupsData = allGroups.filter(g => selectedGroups.has(g.id));
     
-    localStorage.setItem('vk_selected_groups', JSON.stringify(Array.from(selectedGroups)));
-    localStorage.setItem('vk_selected_groups_data', JSON.stringify(selectedGroupsData));
+    AppStorage.setItem('vk_selected_groups', JSON.stringify(Array.from(selectedGroups)));
+    AppStorage.setItem('vk_selected_groups_data', JSON.stringify(selectedGroupsData));
     
     const notification = document.createElement('div');
     notification.className = 'notification';
@@ -206,9 +206,9 @@ function checkGroupTokensInURL() {
     
     if (hasTokens) {
         // Сохраняем токены групп
-        const existingTokens = JSON.parse(localStorage.getItem('vk_group_tokens') || '{}');
+        const existingTokens = JSON.parse(AppStorage.getItem('vk_group_tokens') || '{}');
         Object.assign(existingTokens, groupTokens);
-        localStorage.setItem('vk_group_tokens', JSON.stringify(existingTokens));
+        AppStorage.setItem('vk_group_tokens', JSON.stringify(existingTokens));
         
         // Очищаем URL
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -219,7 +219,7 @@ function checkGroupTokensInURL() {
         loadResult.innerHTML = `
             <strong>✓ Получены токены для ${groupCount} групп!</strong>
             <p>Теперь вы можете публиковать посты в выбранные группы</p>
-            <a href="index.html" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
+            <a href="/dashboard" class="btn" style="display: inline-block; text-decoration: none; margin-top: 10px;">
                 Перейти к публикации
             </a>
         `;

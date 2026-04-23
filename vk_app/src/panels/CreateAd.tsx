@@ -2,7 +2,6 @@ import { FC, useState } from 'react';
 import {
   Panel,
   PanelHeader,
-  PanelHeaderBack,
   Group,
   FormItem,
   Textarea,
@@ -11,10 +10,10 @@ import {
   NavIdProps,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { createAd } from '../shared/api';
+import { createPost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
-export const CreateAd: FC<NavIdProps> = ({ id }) => {
+export const CreatePost: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,9 +26,8 @@ export const CreateAd: FC<NavIdProps> = ({ id }) => {
 
     setIsSubmitting(true);
     try {
-      await createAd(text);
-      // После успеха возвращаемся к списку моих объявлений
-      routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_ADS}`);
+      await createPost(text);
+      routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_POSTS}`);
     } catch (error: any) {
       alert(`Ошибка при сохранении: ${error.message}`);
     } finally {
@@ -39,13 +37,13 @@ export const CreateAd: FC<NavIdProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}>
-        Создать объявление
+      <PanelHeader style={{ textAlign: 'center' }}>
+        Создать публикацию
       </PanelHeader>
 
       <Group>
         <FormItem 
-          top="Текст объявления" 
+          top="Текст публикации" 
           status={text.length >= 10 ? 'valid' : 'default'}
           bottom={text.length >= 10 ? '' : 'Минимум 10 символов для публикации'}
         >
@@ -66,10 +64,12 @@ export const CreateAd: FC<NavIdProps> = ({ id }) => {
             loading={isSubmitting}
             onClick={handlePublish}
           >
-            Опубликовать
+            Отправить на модерацию
           </Button>
         </Div>
       </Group>
     </Panel>
   );
 };
+
+export default CreatePost;
