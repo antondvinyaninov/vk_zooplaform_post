@@ -28,6 +28,9 @@ FROM nginx:alpine
 # Устанавливаем необходимые пакеты
 RUN apk add --no-cache ca-certificates sqlite supervisor
 
+# Создаем необходимые директории
+RUN mkdir -p /var/log/supervisor /app
+
 # Копируем Go бэкенд
 COPY --from=backend-builder /app/main /app/backend/main
 
