@@ -22,14 +22,14 @@ COPY backend/ ./
 ENV CGO_ENABLED=1
 RUN go build -v -o main .
 
-# Финальный образ с Nginx
-FROM nginx:alpine
+# Финальный образ
+FROM alpine:latest
 
 # Устанавливаем необходимые пакеты
-RUN apk add --no-cache ca-certificates sqlite bash
+RUN apk add --no-cache ca-certificates sqlite
 
 # Создаем необходимые директории
-RUN mkdir -p /app
+RUN mkdir -p /app /usr/share/nginx/html
 
 # Копируем Go бэкенд
 COPY --from=backend-builder /app/main /app/backend/main
@@ -40,18 +40,11 @@ COPY frontend /usr/share/nginx/html/
 # Копируем собранный VK Mini App
 COPY --from=vk-app-builder /app/vk_app/build /usr/share/nginx/html/vk_app/
 
-# Копируем конфигурацию Nginx
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# Копируем стартовый скрипт
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
-
 # Создаем рабочую директорию для backend
 WORKDIR /app
 
-# Переменные окружения (обновлено для принудительной пересборки)
-ENV PORT=8000
+# Переменные окружения (Go backend на порту 80)
+ENV PORT=80
 ENV DATABASE_PATH=./data/app.db
 ENV VK_CLIENT_ID=54481712
 ENV VK_CLIENT_SECRET=488uLwXVh0NbUFcrJIvA
@@ -59,10 +52,10 @@ ENV VK_SERVICE_KEY=a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d88
 ENV VK_MINI_APP_ID=54560047
 ENV VK_MINI_APP_SECRET=kI41QDPyyK87kIopZ2U9
 ENV VK_MINI_APP_SERVICE_KEY=e59b585ae59b585ae59b585a67e6dbdd75ee59be59b585a8c7299470181bb987c8b3c03
-ENV BUILD_VERSION=v2.0
+ENV BUILD_VERSION=v3.0
 
 # Открываем порт
 EXPOSE 80
 
-# Запускаем наш стартовый скрипт
-CMD ["/start.sh"]
+# Запускаем Go backend напрямую
+CMD ["/app/backend/main"]

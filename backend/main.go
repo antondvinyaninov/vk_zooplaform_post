@@ -45,6 +45,30 @@ func main() {
 	log.Printf("Registering site routes...")
 	site.RegisterRoutes(mux)
 
+	// Статические файлы фронтенда
+	log.Printf("Setting up static file serving...")
+
+	// Главная страница
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			log.Printf("🏠 Serving index.html to %s", r.RemoteAddr)
+			http.ServeFile(w, r, "/usr/share/nginx/html/index.html")
+			return
+		}
+
+		// Статические файлы
+		filePath := "/usr/share/nginx/html" + r.URL.Path
+		if _, err := os.Stat(filePath); err == nil {
+			log.Printf("📁 Serving static file: %s", r.URL.Path)
+			http.ServeFile(w, r, filePath)
+			return
+		}
+
+		// 404
+		log.Printf("❌ 404: %s", r.URL.Path)
+		http.NotFound(w, r)
+	})
+
 	// Health check для всего приложения
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("🏥 API Health check: %s %s from %s (User-Agent: %s)", r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
@@ -57,17 +81,6 @@ func main() {
 		log.Printf("🏥 Root Health check: %s %s from %s (User-Agent: %s)", r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
-	})
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			log.Printf("🏠 Root path: %s %s from %s (User-Agent: %s)", r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"status":"ok","message":"VK ZooPlatforma API"}`))
-		} else {
-			log.Printf("❌ 404: %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
-			http.NotFound(w, r)
-		}
 	})
 
 	// Применяем middleware
