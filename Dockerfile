@@ -3,7 +3,7 @@ FROM node:18-alpine AS vk-app-builder
 
 WORKDIR /app/vk_app
 COPY vk_app/package*.json ./
-RUN npm ci --only=production
+RUN npm ci --legacy-peer-deps
 COPY vk_app/ ./
 RUN npm run build
 
