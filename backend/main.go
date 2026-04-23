@@ -106,6 +106,16 @@ func main() {
 			return
 		}
 
+		// Специальное правило для URL без расширения (например, /dashboard, /settings)
+		if !strings.Contains(r.URL.Path, ".") && !strings.HasPrefix(r.URL.Path, "/api/") {
+			pagePath := "/usr/share/nginx/html/pages" + r.URL.Path + ".html"
+			if _, err := os.Stat(pagePath); err == nil {
+				log.Printf("📄 Serving page file: %s", pagePath)
+				http.ServeFile(w, r, pagePath)
+				return
+			}
+		}
+
 		// Статические файлы
 		filePath := "/usr/share/nginx/html" + r.URL.Path
 		if _, err := os.Stat(filePath); err == nil {

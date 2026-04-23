@@ -77,9 +77,9 @@ const fetchJSON = async <T>(input: string, init: RequestInit = {}): Promise<T> =
 
 export const syncUserWithBackend = async (user: UserInfo, vkSignature?: string) => {
   const params = new URLSearchParams();
-  params.append('firstName', user.first_name);
-  params.append('lastName', user.last_name);
-  params.append('photo200', user.photo_200);
+  params.append('firstName', user?.first_name || '');
+  params.append('lastName', user?.last_name || '');
+  params.append('photo200', user?.photo_200 || '');
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
