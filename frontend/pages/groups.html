@@ -122,18 +122,18 @@
             <main class="main">
                 <div class="main__header">
                     <h1 class="main__title">Группы</h1>
-                    <p class="main__subtitle">Управление группами ВКонтакте для публикации контента. Выберите группы, в которые хотите постить.</p>
+                    <p class="main__subtitle">Список сообществ, которые установили приложение.</p>
                 </div>
 
                 <!-- Load Groups Card -->
                 <div class="card">
                     <div class="card__header">
-                        <h2 class="card__title">Загрузка групп</h2>
+                        <h2 class="card__title">Установившие приложение</h2>
                     </div>
                     <div class="card__content">
-                        <p style="margin-bottom: 16px; color: #818c99;">Загрузите список ваших групп ВКонтакте, где у вас есть права администратора.</p>
+                        <p style="margin-bottom: 16px; color: #818c99;">Загрузите список групп, в которых приложение уже установлено и зафиксировано в системе.</p>
                         <button id="loadGroupsBtn" class="btn btn--primary">
-                            📥 Загрузить мои группы
+                            🔄 Обновить список
                         </button>
                         <div id="loadResult" class="result"></div>
                     </div>
@@ -141,22 +141,14 @@
 
                 <!-- Selected Count -->
                 <div id="selectedCount" class="selected-count" style="display: none;">
-                    Выбрано групп: <strong>0</strong>
+                    Найдено групп: <strong>0</strong>
                 </div>
 
                 <!-- Groups Grid -->
                 <div id="groupsContainer" class="groups-grid"></div>
 
                 <!-- Action Buttons -->
-                <div class="action-buttons">
-                    <button id="saveBtn" class="btn btn--primary" style="display: none;">
-                        💾 Сохранить выбранные группы
-                    </button>
-                    
-                    <button id="getGroupTokensBtn" class="btn btn--secondary" style="display: none;">
-                        🔑 Получить токены для групп
-                    </button>
-                </div>
+                <div class="action-buttons"></div>
             </main>
         </div>
     </div>
