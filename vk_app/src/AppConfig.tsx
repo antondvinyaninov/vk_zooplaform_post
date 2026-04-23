@@ -49,9 +49,17 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: strin
 }
 
 export const AppConfig = () => {
+  console.log('AppConfig component started');
+  
   const vkBridgeAppearance = useAppearance() || undefined;
   const vkBridgeInsets = useInsets() || undefined;
   const bridgeAdaptivity = useAdaptivity();
+  
+  console.log('VK Bridge hooks loaded:', {
+    appearance: vkBridgeAppearance,
+    insets: vkBridgeInsets,
+    adaptivity: bridgeAdaptivity
+  });
   
   // Вычисляем адаптивность: приоритет у данных из Bridge, но на старте используем window
   const adaptivity = bridgeAdaptivity.type 
@@ -78,6 +86,13 @@ export const AppConfig = () => {
       : vkPlatform === 'mobile_ios'
         ? 'ios'
         : 'ios';
+
+  console.log('AppConfig rendering with:', {
+    platform,
+    colorScheme: vkBridgeAppearance,
+    isWebView: vkBridge.isWebView(),
+    adaptivity
+  });
 
   return (
     <ConfigProvider
