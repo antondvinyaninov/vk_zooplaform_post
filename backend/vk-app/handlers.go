@@ -339,7 +339,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		client := vk.NewVKClient(group.AccessToken)
 		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, nil, true, 0)
 		if err != nil {
-			utils.RespondError(w, http.StatusBadGateway, err.Error())
+			utils.RespondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		post.VKPostID = vkPostID

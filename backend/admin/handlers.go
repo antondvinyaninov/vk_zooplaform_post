@@ -128,7 +128,7 @@ func vkUserInfoHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		respondJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
 	if user == nil {
