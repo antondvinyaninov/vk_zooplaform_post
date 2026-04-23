@@ -749,26 +749,21 @@ func upsertUser(vkUserID int, firstName, lastName, photo200 string) (*models.Use
 }
 
 func createUser(user *models.User) error {
-	result, err := database.DB.Exec(`
+	if err := database.QueryRow(`
 		INSERT INTO users (vk_user_id, first_name, last_name, photo_200, role)
 		VALUES (?, ?, ?, ?, ?)
-	`, user.VKUserID, user.FirstName, user.LastName, user.Photo200, user.Role)
-	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
+		RETURNING id
+	`, user.VKUserID, user.FirstName, user.LastName, user.Photo200, user.Role).Scan(&user.ID); err != nil {
 		return err
 	}
 	now := time.Now()
-	user.ID = int(id)
 	user.CreatedAt = now
 	user.UpdatedAt = now
 	return nil
 }
 
 func updateUser(user *models.User) error {
-	_, err := database.DB.Exec(`
+	_, err := database.Exec(`
 		UPDATE users
 		SET first_name = ?, last_name = ?, photo_200 = ?, role = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
@@ -781,7 +776,7 @@ func updateUser(user *models.User) error {
 }
 
 func getUserByID(id int) (*models.User, error) {
-	row := database.DB.QueryRow(`
+	row := database.QueryRow(`
 		SELECT id, vk_user_id, first_name, last_name, photo_200, role, created_at, updated_at
 		FROM users WHERE id = ?
 	`, id)
@@ -789,7 +784,7 @@ func getUserByID(id int) (*models.User, error) {
 }
 
 func getUserByVKUserID(vkUserID int) (*models.User, error) {
-	row := database.DB.QueryRow(`
+	row := database.QueryRow(`
 		SELECT id, vk_user_id, first_name, last_name, photo_200, role, created_at, updated_at
 		FROM users WHERE vk_user_id = ?
 	`, vkUserID)
@@ -818,26 +813,21 @@ func scanUser(row *sql.Row) (*models.User, error) {
 }
 
 func createGroup(group *models.Group) error {
-	result, err := database.DB.Exec(`
+	if err := database.QueryRow(`
 		INSERT INTO groups (vk_group_id, name, screen_name, photo_200, access_token, is_active)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`, group.VKGroupID, group.Name, group.ScreenName, group.Photo200, group.AccessToken, group.IsActive)
-	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
+		RETURNING id
+	`, group.VKGroupID, group.Name, group.ScreenName, group.Photo200, group.AccessToken, group.IsActive).Scan(&group.ID); err != nil {
 		return err
 	}
 	now := time.Now()
-	group.ID = int(id)
 	group.CreatedAt = now
 	group.UpdatedAt = now
 	return nil
 }
 
 func updateGroup(group *models.Group) error {
-	_, err := database.DB.Exec(`
+	_, err := database.Exec(`
 		UPDATE groups
 		SET name = ?, screen_name = ?, photo_200 = ?, access_token = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
@@ -850,7 +840,7 @@ func updateGroup(group *models.Group) error {
 }
 
 func getGroupByID(id int) (*models.Group, error) {
-	row := database.DB.QueryRow(`
+	row := database.QueryRow(`
 		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, created_at, updated_at
 		FROM groups WHERE id = ?
 	`, id)
@@ -858,7 +848,7 @@ func getGroupByID(id int) (*models.Group, error) {
 }
 
 func getGroupByVKGroupID(vkGroupID int) (*models.Group, error) {
-	row := database.DB.QueryRow(`
+	row := database.QueryRow(`
 		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, created_at, updated_at
 		FROM groups WHERE vk_group_id = ?
 	`, vkGroupID)
@@ -888,26 +878,21 @@ func scanGroup(row *sql.Row) (*models.Group, error) {
 }
 
 func createPost(post *models.Post) error {
-	result, err := database.DB.Exec(`
+	if err := database.QueryRow(`
 		INSERT INTO posts (vk_post_id, user_id, group_id, message, attachments, status, publish_date)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.Status, nullableTime(post.PublishDate))
-	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
+		RETURNING id
+	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.Status, nullableTime(post.PublishDate)).Scan(&post.ID); err != nil {
 		return err
 	}
 	now := time.Now()
-	post.ID = int(id)
 	post.CreatedAt = now
 	post.UpdatedAt = now
 	return nil
 }
 
 func updatePost(post *models.Post) error {
-	_, err := database.DB.Exec(`
+	_, err := database.Exec(`
 		UPDATE posts
 		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
@@ -920,7 +905,7 @@ func updatePost(post *models.Post) error {
 }
 
 func getPostByID(id int) (*models.Post, error) {
-	row := database.DB.QueryRow(`
+	row := database.QueryRow(`
 		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
 		FROM posts WHERE id = ?
 	`, id)
@@ -928,7 +913,7 @@ func getPostByID(id int) (*models.Post, error) {
 }
 
 func getPostsByStatus(status string, limit, offset int) ([]*models.Post, error) {
-	rows, err := database.DB.Query(`
+	rows, err := database.Query(`
 		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE status = ?
@@ -943,7 +928,7 @@ func getPostsByStatus(status string, limit, offset int) ([]*models.Post, error) 
 }
 
 func getPostsByUserID(userID int, limit, offset int) ([]*models.Post, error) {
-	rows, err := database.DB.Query(`
+	rows, err := database.Query(`
 		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE user_id = ?

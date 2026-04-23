@@ -8,21 +8,31 @@ import (
 	"path/filepath"
 	"strings"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 var DB *sql.DB
+var driverName = "sqlite3"
 
 // Init инициализирует подключение к базе данных
-func Init(dbPath string) error {
-	// Создаем директорию для БД если не существует
-	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+func Init(dbPath, dbURL string) error {
+	dsn := strings.TrimSpace(dbPath)
+	driverName = "sqlite3"
+
+	if strings.TrimSpace(dbURL) != "" {
+		driverName = "pgx"
+		dsn = strings.TrimSpace(dbURL)
+	} else {
+		// Создаем директорию для SQLite БД если не существует
+		dir := filepath.Dir(dbPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
 	}
 
 	// Открываем подключение
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open(driverName, dsn)
 	if err != nil {
 		return err
 	}
@@ -33,7 +43,7 @@ func Init(dbPath string) error {
 	}
 
 	DB = db
-	log.Printf("Database connected: %s", dbPath)
+	log.Printf("Database connected (%s)", driverName)
 
 	// Создаем таблицы
 	if err := createTables(); err != nil {
@@ -45,7 +55,37 @@ func Init(dbPath string) error {
 
 // createTables создает необходимые таблицы
 func createTables() error {
-	schema := `
+	schema := sqliteSchema
+	if isPostgres() {
+		schema = postgresSchema
+	}
+
+	_, err := DB.Exec(schema)
+	if err != nil {
+		return err
+	}
+
+	if err := migratePostsTable(); err != nil {
+		return err
+	}
+
+	if err := seedAdminUsers(); err != nil {
+		return err
+	}
+
+	if err := seedVKConnectionRow(); err != nil {
+		return err
+	}
+
+	if err := migrateVKAccountsFromLegacy(); err != nil {
+		return err
+	}
+
+	log.Println("Database tables created successfully")
+	return nil
+}
+
+const sqliteSchema = `
 	CREATE TABLE IF NOT EXISTS groups (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		vk_group_id INTEGER UNIQUE NOT NULL,
@@ -130,32 +170,94 @@ func createTables() error {
 	CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username);
 	CREATE INDEX IF NOT EXISTS idx_vk_accounts_user_id ON vk_accounts(vk_user_id);
 	CREATE INDEX IF NOT EXISTS idx_vk_accounts_active ON vk_accounts(is_active);
-	`
+`
 
-	_, err := DB.Exec(schema)
-	if err != nil {
-		return err
-	}
+const postgresSchema = `
+	CREATE TABLE IF NOT EXISTS groups (
+		id BIGSERIAL PRIMARY KEY,
+		vk_group_id BIGINT UNIQUE NOT NULL,
+		name TEXT NOT NULL,
+		screen_name TEXT,
+		photo_200 TEXT,
+		access_token TEXT,
+		is_active BOOLEAN DEFAULT TRUE,
+		health_status TEXT DEFAULT 'unknown',
+		last_check_at TIMESTAMPTZ,
+		health_error TEXT,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
 
-	if err := migratePostsTable(); err != nil {
-		return err
-	}
+	CREATE TABLE IF NOT EXISTS posts (
+		id BIGSERIAL PRIMARY KEY,
+		vk_post_id BIGINT,
+		user_id BIGINT,
+		group_id BIGINT,
+		message TEXT,
+		attachments TEXT,
+		status TEXT DEFAULT 'draft',
+		publish_date TIMESTAMPTZ,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (user_id) REFERENCES users(id),
+		FOREIGN KEY (group_id) REFERENCES groups(id)
+	);
 
-	if err := seedAdminUsers(); err != nil {
-		return err
-	}
+	CREATE TABLE IF NOT EXISTS users (
+		id BIGSERIAL PRIMARY KEY,
+		vk_user_id BIGINT UNIQUE NOT NULL,
+		first_name TEXT,
+		last_name TEXT,
+		photo_200 TEXT,
+		role TEXT DEFAULT 'user',
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
 
-	if err := seedVKConnectionRow(); err != nil {
-		return err
-	}
+	CREATE TABLE IF NOT EXISTS admin_users (
+		id BIGSERIAL PRIMARY KEY,
+		username TEXT UNIQUE NOT NULL,
+		password TEXT NOT NULL,
+		display_name TEXT NOT NULL,
+		role TEXT NOT NULL DEFAULT 'user',
+		status TEXT NOT NULL DEFAULT 'active',
+		avatar_url TEXT,
+		last_login TIMESTAMPTZ,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
 
-	if err := migrateVKAccountsFromLegacy(); err != nil {
-		return err
-	}
+	CREATE TABLE IF NOT EXISTS vk_connection (
+		id INTEGER PRIMARY KEY,
+		access_token TEXT,
+		vk_user_id BIGINT,
+		user_name TEXT,
+		user_photo TEXT,
+		token_expires BIGINT,
+		is_connected BOOLEAN DEFAULT FALSE,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
 
-	log.Println("Database tables created successfully")
-	return nil
-}
+	CREATE TABLE IF NOT EXISTS vk_accounts (
+		id BIGSERIAL PRIMARY KEY,
+		vk_user_id BIGINT,
+		user_name TEXT,
+		user_photo TEXT,
+		access_token TEXT NOT NULL,
+		token_expires BIGINT,
+		is_active BOOLEAN DEFAULT FALSE,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_groups_vk_id ON groups(vk_group_id);
+	CREATE INDEX IF NOT EXISTS idx_posts_group_id ON posts(group_id);
+	CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status);
+	CREATE INDEX IF NOT EXISTS idx_users_vk_id ON users(vk_user_id);
+	CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username);
+	CREATE INDEX IF NOT EXISTS idx_vk_accounts_user_id ON vk_accounts(vk_user_id);
+	CREATE INDEX IF NOT EXISTS idx_vk_accounts_active ON vk_accounts(is_active);
+`
 
 func migratePostsTable() error {
 	if err := addColumnIfMissing("groups", "health_status", "TEXT DEFAULT 'unknown'"); err != nil {
@@ -180,53 +282,80 @@ func migratePostsTable() error {
 }
 
 func addColumnIfMissing(tableName, columnName, definition string) error {
-	rows, err := DB.Query(fmt.Sprintf("PRAGMA table_info(%s)", tableName))
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			cid        int
-			name       string
-			columnType string
-			notNull    int
-			defaultVal sql.NullString
-			pk         int
-		)
-
-		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultVal, &pk); err != nil {
+	if isPostgres() {
+		var count int
+		if err := QueryRow(`
+			SELECT COUNT(1)
+			FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name = ?
+			  AND column_name = ?
+		`, tableName, columnName).Scan(&count); err != nil {
 			return err
 		}
-
-		if strings.EqualFold(name, columnName) {
+		if count > 0 {
 			return nil
+		}
+	} else {
+		rows, err := DB.Query(fmt.Sprintf("PRAGMA table_info(%s)", tableName))
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var (
+				cid        int
+				name       string
+				columnType string
+				notNull    int
+				defaultVal sql.NullString
+				pk         int
+			)
+
+			if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultVal, &pk); err != nil {
+				return err
+			}
+
+			if strings.EqualFold(name, columnName) {
+				return nil
+			}
 		}
 	}
 
-	_, err = DB.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", tableName, columnName, definition))
+	_, err := DB.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", tableName, columnName, definition))
 	return err
 }
 
 func seedAdminUsers() error {
 	seedQuery := `
-	INSERT OR IGNORE INTO admin_users (username, password, display_name, role, status)
+	INSERT INTO admin_users (username, password, display_name, role, status)
 	VALUES
 		('admin', 'admin123', 'Администратор', 'admin', 'active'),
 		('user', 'user123', 'Пользователь', 'user', 'active'),
 		('moderator', 'mod123', 'Модератор', 'moderator', 'active')
 	`
+	if isPostgres() {
+		seedQuery += ` ON CONFLICT (username) DO NOTHING`
+	} else {
+		seedQuery = strings.Replace(seedQuery, "INSERT INTO", "INSERT OR IGNORE INTO", 1)
+	}
 
 	_, err := DB.Exec(seedQuery)
 	return err
 }
 
 func seedVKConnectionRow() error {
-	_, err := DB.Exec(`
-		INSERT OR IGNORE INTO vk_connection (id, is_connected)
+	query := `
+		INSERT INTO vk_connection (id, is_connected)
 		VALUES (1, 0)
-	`)
+	`
+	if isPostgres() {
+		query += ` ON CONFLICT (id) DO NOTHING`
+	} else {
+		query = strings.Replace(query, "INSERT INTO", "INSERT OR IGNORE INTO", 1)
+	}
+	_, err := DB.Exec(query)
 	return err
 }
 
@@ -283,11 +412,15 @@ func migrateVKAccountsFromLegacy() error {
 
 func tableExists(tableName string) bool {
 	var count int
-	err := DB.QueryRow(`
+	query := `
 		SELECT COUNT(1)
 		FROM sqlite_master
 		WHERE type = 'table' AND name = ?
-	`, tableName).Scan(&count)
+	`
+	if isPostgres() {
+		query = `SELECT COUNT(1) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?`
+	}
+	err := QueryRow(query, tableName).Scan(&count)
 	return err == nil && count > 0
 }
 
@@ -297,4 +430,47 @@ func Close() error {
 		return DB.Close()
 	}
 	return nil
+}
+
+func isPostgres() bool {
+	return driverName == "pgx"
+}
+
+func rebind(query string) string {
+	if !isPostgres() {
+		return query
+	}
+
+	var b strings.Builder
+	b.Grow(len(query) + 16)
+	idx := 1
+	for i := 0; i < len(query); i++ {
+		if query[i] == '?' {
+			b.WriteString(fmt.Sprintf("$%d", idx))
+			idx++
+		} else {
+			b.WriteByte(query[i])
+		}
+	}
+	return b.String()
+}
+
+func Rebind(query string) string {
+	return rebind(query)
+}
+
+func Exec(query string, args ...interface{}) (sql.Result, error) {
+	return DB.Exec(rebind(query), args...)
+}
+
+func Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return DB.Query(rebind(query), args...)
+}
+
+func QueryRow(query string, args ...interface{}) *sql.Row {
+	return DB.QueryRow(rebind(query), args...)
+}
+
+func Begin() (*sql.Tx, error) {
+	return DB.Begin()
 }

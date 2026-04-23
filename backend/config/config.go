@@ -19,6 +19,7 @@ type Config struct {
 	VKMiniAppServiceKey string
 
 	DatabasePath string
+	DatabaseURL  string
 }
 
 // Load загружает конфигурацию из переменных окружения
@@ -37,6 +38,7 @@ func Load() *Config {
 		VKMiniAppServiceKey: getEnv("VK_MINI_APP_SERVICE_KEY", "e59b585ae59b585ae59b585a67e6dbdd75ee59be59b585a8c7299470181bb987c8b3c03"),
 
 		DatabasePath: getEnv("DATABASE_PATH", "./data/app.db"),
+		DatabaseURL:  getEnv("DATABASE_URL", ""),
 	}
 }
 

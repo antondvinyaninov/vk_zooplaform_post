@@ -21,7 +21,7 @@ func (s *PostService) Create(post *models.Post) error {
 		INSERT INTO posts (vk_post_id, user_id, group_id, message, attachments, status, publish_date)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
-	result, err := database.DB.Exec(query,
+	if err := database.QueryRow(query+` RETURNING id`,
 		post.VKPostID,
 		post.UserID,
 		post.GroupID,
@@ -29,17 +29,9 @@ func (s *PostService) Create(post *models.Post) error {
 		post.Attachments,
 		post.Status,
 		post.PublishDate,
-	)
-	if err != nil {
+	).Scan(&post.ID); err != nil {
 		return err
 	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-
-	post.ID = int(id)
 	post.CreatedAt = time.Now()
 	post.UpdatedAt = time.Now()
 
@@ -58,7 +50,7 @@ func (s *PostService) GetByID(id int) (*models.Post, error) {
 	var userID sql.NullInt64
 	var publishDate sql.NullTime
 
-	err := database.DB.QueryRow(query, id).Scan(
+	err := database.QueryRow(query, id).Scan(
 		&post.ID,
 		&post.VKPostID,
 		&userID,
@@ -98,7 +90,7 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := database.DB.Query(query, groupID, limit, offset)
+	rows, err := database.Query(query, groupID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +141,7 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := database.DB.Query(query, status, limit, offset)
+	rows, err := database.Query(query, status, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +192,7 @@ func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post
 		LIMIT ? OFFSET ?
 	`
 
-	rows, err := database.DB.Query(query, userID, limit, offset)
+	rows, err := database.Query(query, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +240,7 @@ func (s *PostService) Update(post *models.Post) error {
 		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
-	_, err := database.DB.Exec(query,
+	_, err := database.Exec(query,
 		post.VKPostID,
 		post.UserID,
 		post.GroupID,
@@ -264,13 +256,13 @@ func (s *PostService) Update(post *models.Post) error {
 // UpdateStatus обновляет статус поста
 func (s *PostService) UpdateStatus(id int, status string) error {
 	query := `UPDATE posts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := database.DB.Exec(query, status, id)
+	_, err := database.Exec(query, status, id)
 	return err
 }
 
 // Delete удаляет пост
 func (s *PostService) Delete(id int) error {
 	query := `DELETE FROM posts WHERE id = ?`
-	_, err := database.DB.Exec(query, id)
+	_, err := database.Exec(query, id)
 	return err
 }

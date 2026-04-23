@@ -21,23 +21,15 @@ func (s *UserService) Create(user *models.User) error {
 		INSERT INTO users (vk_user_id, first_name, last_name, photo_200, role)
 		VALUES (?, ?, ?, ?, ?)
 	`
-	result, err := database.DB.Exec(query,
+	if err := database.QueryRow(query+` RETURNING id`,
 		user.VKUserID,
 		user.FirstName,
 		user.LastName,
 		user.Photo200,
 		user.Role,
-	)
-	if err != nil {
+	).Scan(&user.ID); err != nil {
 		return err
 	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-
-	user.ID = int(id)
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 
@@ -53,7 +45,7 @@ func (s *UserService) GetByID(id int) (*models.User, error) {
 	`
 
 	user := &models.User{}
-	err := database.DB.QueryRow(query, id).Scan(
+	err := database.QueryRow(query, id).Scan(
 		&user.ID,
 		&user.VKUserID,
 		&user.FirstName,
@@ -83,7 +75,7 @@ func (s *UserService) GetByVKUserID(vkUserID int) (*models.User, error) {
 	`
 
 	user := &models.User{}
-	err := database.DB.QueryRow(query, vkUserID).Scan(
+	err := database.QueryRow(query, vkUserID).Scan(
 		&user.ID,
 		&user.VKUserID,
 		&user.FirstName,
@@ -141,7 +133,7 @@ func (s *UserService) Update(user *models.User) error {
 		SET first_name = ?, last_name = ?, photo_200 = ?, role = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
-	_, err := database.DB.Exec(query,
+	_, err := database.Exec(query,
 		user.FirstName,
 		user.LastName,
 		user.Photo200,

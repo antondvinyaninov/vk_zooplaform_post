@@ -30,12 +30,15 @@ func main() {
 	log.Printf("Environment PORT: %s", os.Getenv("PORT"))
 	log.Printf("Final Port: %s", cfg.Port)
 	log.Printf("Database Path: %s", cfg.DatabasePath)
+	if strings.TrimSpace(cfg.DatabaseURL) != "" {
+		log.Printf("Database URL: configured")
+	}
 	log.Printf("VK Client ID: %s", cfg.VKClientID)
 	log.Printf("VK Mini App ID: %s", cfg.VKMiniAppID)
 
 	// Инициализируем базу данных
 	log.Printf("Initializing database...")
-	if err := database.Init(cfg.DatabasePath); err != nil {
+	if err := database.Init(cfg.DatabasePath, cfg.DatabaseURL); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()

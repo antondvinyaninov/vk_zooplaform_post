@@ -68,7 +68,7 @@ func refreshGroupHealthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func listInstalledGroups() ([]installedGroupResponse, error) {
-	rows, err := database.DB.Query(`
+	rows, err := database.Query(`
 		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, health_status, last_check_at, health_error
 		FROM groups
 		WHERE is_active = 1
@@ -173,7 +173,7 @@ func refreshGroupsHealth(groupID int) (int, error) {
 		args = append(args, groupID)
 	}
 
-	rows, err := database.DB.Query(query, args...)
+	rows, err := database.Query(query, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -207,7 +207,7 @@ func refreshGroupsHealth(groupID int) (int, error) {
 			}
 		}
 
-		if _, err := database.DB.Exec(`
+		if _, err := database.Exec(`
 			UPDATE groups
 			SET health_status = ?, last_check_at = CURRENT_TIMESTAMP, health_error = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?

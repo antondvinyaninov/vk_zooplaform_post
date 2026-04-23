@@ -148,7 +148,7 @@ func getAdminUserByCredentials(username, password string) (*models.AdminUser, er
 		LIMIT 1
 	`
 
-	row := database.DB.QueryRow(query, username, password)
+	row := database.QueryRow(query, username, password)
 	return scanAdminUser(row)
 }
 
@@ -159,7 +159,7 @@ func getAdminUserByID(userID int) (*models.AdminUser, error) {
 		WHERE id = ?
 	`
 
-	row := database.DB.QueryRow(query, userID)
+	row := database.QueryRow(query, userID)
 	return scanAdminUser(row)
 }
 
@@ -170,7 +170,7 @@ func listAdminUsers() ([]models.AdminUser, error) {
 		ORDER BY id ASC
 	`
 
-	rows, err := database.DB.Query(query)
+	rows, err := database.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func listAdminUsers() ([]models.AdminUser, error) {
 }
 
 func updateAdminUserRole(userID int, role string) error {
-	_, err := database.DB.Exec(`
+	_, err := database.Exec(`
 		UPDATE admin_users
 		SET role = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
@@ -200,7 +200,7 @@ func updateAdminUserRole(userID int, role string) error {
 }
 
 func updateAdminUserLastLogin(userID int) error {
-	_, err := database.DB.Exec(`
+	_, err := database.Exec(`
 		UPDATE admin_users
 		SET last_login = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?

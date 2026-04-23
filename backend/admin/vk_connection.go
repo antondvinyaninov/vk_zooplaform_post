@@ -164,19 +164,19 @@ func (e stringError) Error() string { return string(e) }
 func errString(v string) error { return stringError(v) }
 
 func upsertVKAccount(accessToken string, vkUserID int, userName, userPhoto string, tokenExpires int64) error {
-	tx, err := database.DB.Begin()
+	tx, err := database.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`UPDATE vk_accounts SET is_active = 0`); err != nil {
+	if _, err := tx.Exec(database.Rebind(`UPDATE vk_accounts SET is_active = 0`)); err != nil {
 		return err
 	}
 
 	updated := false
 	if vkUserID != 0 {
-		result, err := tx.Exec(`
+		result, err := tx.Exec(database.Rebind(`
 			UPDATE vk_accounts
 			SET access_token = ?,
 			    user_name = ?,
@@ -185,7 +185,7 @@ func upsertVKAccount(accessToken string, vkUserID int, userName, userPhoto strin
 			    is_active = 1,
 			    updated_at = CURRENT_TIMESTAMP
 			WHERE vk_user_id = ?
-		`, accessToken, userName, userPhoto, nullInt64(tokenExpires), vkUserID)
+		`), accessToken, userName, userPhoto, nullInt64(tokenExpires), vkUserID)
 		if err != nil {
 			return err
 		}
@@ -194,10 +194,10 @@ func upsertVKAccount(accessToken string, vkUserID int, userName, userPhoto strin
 	}
 
 	if !updated {
-		if _, err := tx.Exec(`
+		if _, err := tx.Exec(database.Rebind(`
 			INSERT INTO vk_accounts (vk_user_id, user_name, user_photo, access_token, token_expires, is_active, updated_at)
 			VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
-		`, nullInt(vkUserID), userName, userPhoto, accessToken, nullInt64(tokenExpires)); err != nil {
+		`), nullInt(vkUserID), userName, userPhoto, accessToken, nullInt64(tokenExpires)); err != nil {
 			return err
 		}
 	}
@@ -206,20 +206,20 @@ func upsertVKAccount(accessToken string, vkUserID int, userName, userPhoto strin
 }
 
 func setActiveVKAccount(accountID int) error {
-	tx, err := database.DB.Begin()
+	tx, err := database.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`UPDATE vk_accounts SET is_active = 0`); err != nil {
+	if _, err := tx.Exec(database.Rebind(`UPDATE vk_accounts SET is_active = 0`)); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`
+	if _, err := tx.Exec(database.Rebind(`
 		UPDATE vk_accounts
 		SET is_active = 1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, accountID); err != nil {
+	`), accountID); err != nil {
 		return err
 	}
 
@@ -227,26 +227,26 @@ func setActiveVKAccount(accountID int) error {
 }
 
 func removeVKAccount(accountID int) error {
-	tx, err := database.DB.Begin()
+	tx, err := database.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
 	var wasActive int
-	if err := tx.QueryRow(`SELECT is_active FROM vk_accounts WHERE id = ?`, accountID).Scan(&wasActive); err != nil {
+	if err := tx.QueryRow(database.Rebind(`SELECT is_active FROM vk_accounts WHERE id = ?`), accountID).Scan(&wasActive); err != nil {
 		if err == sql.ErrNoRows {
 			return nil
 		}
 		return err
 	}
 
-	if _, err := tx.Exec(`DELETE FROM vk_accounts WHERE id = ?`, accountID); err != nil {
+	if _, err := tx.Exec(database.Rebind(`DELETE FROM vk_accounts WHERE id = ?`), accountID); err != nil {
 		return err
 	}
 
 	if wasActive == 1 {
-		if _, err := tx.Exec(`
+		if _, err := tx.Exec(database.Rebind(`
 			UPDATE vk_accounts
 			SET is_active = 1, updated_at = CURRENT_TIMESTAMP
 			WHERE id = (
@@ -255,7 +255,7 @@ func removeVKAccount(accountID int) error {
 				ORDER BY updated_at DESC, id DESC
 				LIMIT 1
 			)
-		`); err != nil {
+		`)); err != nil {
 			return err
 		}
 	}
@@ -264,7 +264,7 @@ func removeVKAccount(accountID int) error {
 }
 
 func loadVKConnections() (*vkConnectionsResponse, error) {
-	rows, err := database.DB.Query(`
+	rows, err := database.Query(`
 		SELECT id, vk_user_id, user_name, user_photo, access_token, token_expires, is_active, updated_at
 		FROM vk_accounts
 		ORDER BY is_active DESC, updated_at DESC, id DESC

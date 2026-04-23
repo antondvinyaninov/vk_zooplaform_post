@@ -21,24 +21,16 @@ func (s *GroupService) Create(group *models.Group) error {
 		INSERT INTO groups (vk_group_id, name, screen_name, photo_200, access_token, is_active)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
-	result, err := database.DB.Exec(query,
+	if err := database.QueryRow(query+` RETURNING id`,
 		group.VKGroupID,
 		group.Name,
 		group.ScreenName,
 		group.Photo200,
 		group.AccessToken,
 		group.IsActive,
-	)
-	if err != nil {
+	).Scan(&group.ID); err != nil {
 		return err
 	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-
-	group.ID = int(id)
 	group.CreatedAt = time.Now()
 	group.UpdatedAt = time.Now()
 
@@ -54,7 +46,7 @@ func (s *GroupService) GetByID(id int) (*models.Group, error) {
 	`
 
 	group := &models.Group{}
-	err := database.DB.QueryRow(query, id).Scan(
+	err := database.QueryRow(query, id).Scan(
 		&group.ID,
 		&group.VKGroupID,
 		&group.Name,
@@ -85,7 +77,7 @@ func (s *GroupService) GetByVKGroupID(vkGroupID int) (*models.Group, error) {
 	`
 
 	group := &models.Group{}
-	err := database.DB.QueryRow(query, vkGroupID).Scan(
+	err := database.QueryRow(query, vkGroupID).Scan(
 		&group.ID,
 		&group.VKGroupID,
 		&group.Name,
@@ -116,7 +108,7 @@ func (s *GroupService) GetAll() ([]*models.Group, error) {
 		ORDER BY created_at DESC
 	`
 
-	rows, err := database.DB.Query(query)
+	rows, err := database.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +144,7 @@ func (s *GroupService) Update(group *models.Group) error {
 		SET name = ?, screen_name = ?, photo_200 = ?, access_token = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
-	_, err := database.DB.Exec(query,
+	_, err := database.Exec(query,
 		group.Name,
 		group.ScreenName,
 		group.Photo200,
@@ -166,6 +158,6 @@ func (s *GroupService) Update(group *models.Group) error {
 // Delete удаляет группу (мягкое удаление)
 func (s *GroupService) Delete(id int) error {
 	query := `UPDATE groups SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := database.DB.Exec(query, id)
+	_, err := database.Exec(query, id)
 	return err
 }
