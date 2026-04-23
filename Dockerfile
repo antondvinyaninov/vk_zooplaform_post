@@ -1,9 +1,9 @@
 # Сборка VK Mini App
-FROM node:18-alpine AS vk-app-builder
+FROM node:20-alpine AS vk-app-builder
 
 WORKDIR /app/vk_app
 COPY vk_app/package*.json ./
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 COPY vk_app/ ./
 RUN npm run build
 
