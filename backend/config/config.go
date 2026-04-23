@@ -24,7 +24,7 @@ type Config struct {
 // Load загружает конфигурацию из переменных окружения
 func Load() *Config {
 	return &Config{
-		Port:         getEnv("PORT", "8000"),
+		Port:         getEnv("PORT", "80"), // По умолчанию порт 80
 		VKServiceKey: getEnv("VK_SERVICE_KEY", "a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d8826cb301184"),
 
 		// VK Standalone App (для постинга)

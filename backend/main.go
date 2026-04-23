@@ -20,7 +20,8 @@ func main() {
 	// Загружаем конфигурацию
 	cfg := config.Load()
 	log.Printf("=== VK ZooPlatforma Backend Starting ===")
-	log.Printf("Port: %s", cfg.Port)
+	log.Printf("Environment PORT: %s", os.Getenv("PORT"))
+	log.Printf("Config Port: %s", cfg.Port)
 	log.Printf("Database Path: %s", cfg.DatabasePath)
 	log.Printf("VK Client ID: %s", cfg.VKClientID)
 	log.Printf("VK Mini App ID: %s", cfg.VKMiniAppID)
