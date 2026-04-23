@@ -64,14 +64,13 @@ function applyActiveVKAccountToSession(connectionPayload) {
 
 // Начало авторизации - получаем user token для доступа к списку групп
 function startAuth() {
-    // Используем собственный Standalone App ID для авторизации без привязки к IP
+    // Используем правильный ID приложения VK ID API (54481712) с Server Flow
     const authUrl = `https://oauth.vk.com/authorize?` +
-        `client_id=54555042&` +
-        `scope=wall,photos,video,groups&` +
-        `redirect_uri=https://oauth.vk.com/blank.html&` +
+        `client_id=54481712&` +
+        `scope=wall,photos,video,groups,offline&` +
+        `redirect_uri=https://vk.zooplatforma.ru/api/vk/oauth/callback&` +
         `display=page&` +
-        `response_type=token&` +
-        `revoke=1`;
+        `response_type=code`;
     
     // Открываем в новом окне
     const authWindow = window.open(authUrl, 'vk_auth', 'width=800,height=600');

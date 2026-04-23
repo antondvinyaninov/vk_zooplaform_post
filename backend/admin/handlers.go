@@ -1,8 +1,10 @@
 package admin
 
 import (
+	"backend/config"
 	"backend/vk"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -146,7 +148,52 @@ func vkServiceKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func vkOAuthCallbackHandler(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		http.Redirect(w, r, "/vk-connect?error=no_code", http.StatusTemporaryRedirect)
+		return
+	}
+
+	cfg := config.Load()
+	redirectURI := "https://vk.zooplatforma.ru/api/vk/oauth/callback"
+	
+	tokenURL := fmt.Sprintf("https://oauth.vk.com/access_token?client_id=%s&client_secret=%s&redirect_uri=%s&code=%s",
+		cfg.VKClientID, cfg.VKClientSecret, redirectURI, code)
+
+	resp, err := http.Get(tokenURL)
+	if err != nil {
+		log.Printf("[VK OAuth] Failed to exchange code: %v", err)
+		http.Redirect(w, r, "/vk-connect?error=exchange_failed", http.StatusTemporaryRedirect)
+		return
+	}
+	defer resp.Body.Close()
+
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+		ExpiresIn   int    `json:"expires_in"`
+		UserID      int    `json:"user_id"`
+		Error       string `json:"error"`
+		ErrorDesc   string `json:"error_description"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		log.Printf("[VK OAuth] Failed to decode token response: %v", err)
+		http.Redirect(w, r, "/vk-connect?error=decode_failed", http.StatusTemporaryRedirect)
+		return
+	}
+
+	if tokenResp.Error != "" {
+		log.Printf("[VK OAuth] VK Error: %s - %s", tokenResp.Error, tokenResp.ErrorDesc)
+		http.Redirect(w, r, "/vk-connect?error=vk_api_error", http.StatusTemporaryRedirect)
+		return
+	}
+
+	// Успешный обмен. Редиректим обратно на фронтенд vk-connect.
+	// Фронтенд подхватит эти данные через checkTokenInURL.
+	finalRedirect := fmt.Sprintf("/vk-connect#access_token=%s&user_id=%d&expires_in=%d",
+		tokenResp.AccessToken, tokenResp.UserID, tokenResp.ExpiresIn)
+	
+	http.Redirect(w, r, finalRedirect, http.StatusTemporaryRedirect)
 }
 
 func vkOAuthTokenHandler(w http.ResponseWriter, r *http.Request) {

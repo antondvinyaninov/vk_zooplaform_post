@@ -28,7 +28,7 @@ func Load() *Config {
 		VKServiceKey: getEnv("VK_SERVICE_KEY", "a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d8826cb301184"),
 
 		// VK Standalone App (для постинга)
-		VKClientID:     getEnv("VK_CLIENT_ID", "54555042"),
+		VKClientID:     getEnv("VK_CLIENT_ID", "54481712"),
 		VKClientSecret: getEnv("VK_CLIENT_SECRET", "488uLwXVh0NbUFcrJIvA"),
 
 		// VK Mini App (для мини-приложения)
