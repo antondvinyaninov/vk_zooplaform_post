@@ -32,9 +32,9 @@ func Load() *Config {
 		VKClientSecret: getEnv("VK_CLIENT_SECRET", "488uLwXVh0NbUFcrJIvA"),
 
 		// VK Mini App (для мини-приложения)
-		VKMiniAppID:         getEnv("VK_MINI_APP_ID", "54490430"),
-		VKMiniAppSecret:     getEnv("VK_MINI_APP_SECRET", "Rv2kFUEMsePsD0vm5Pgg"),
-		VKMiniAppServiceKey: getEnv("VK_MINI_APP_SERVICE_KEY", "a46dd01aa46dd01aa46dd01a51a72da1b8aa46da46dd01acd8bfbaef10dfc86482dd644"),
+		VKMiniAppID:         getEnv("VK_MINI_APP_ID", "54560047"),
+		VKMiniAppSecret:     getEnv("VK_MINI_APP_SECRET", "kI41QDPyyK87kIopZ2U9"),
+		VKMiniAppServiceKey: getEnv("VK_MINI_APP_SERVICE_KEY", "e59b585ae59b585ae59b585a67e6dbdd75ee59be59b585a8c7299470181bb987c8b3c03"),
 
 		DatabasePath: getEnv("DATABASE_PATH", "./data/app.db"),
 	}
