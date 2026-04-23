@@ -365,3 +365,19 @@ func nullInt64(v int64) interface{} {
 	}
 	return v
 }
+
+// getActiveAccountToken возвращает access_token активного аккаунта из vk_accounts
+func getActiveAccountToken() (string, error) {
+	var token string
+	err := database.QueryRow(`
+		SELECT access_token
+		FROM vk_accounts
+		WHERE is_active = ?
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, true).Scan(&token)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(token), nil
+}

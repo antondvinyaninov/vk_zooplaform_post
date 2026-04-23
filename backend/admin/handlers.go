@@ -19,22 +19,159 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// TODO: Перенести все handler'ы из main.go сюда
+// vkPostHandler — публикация нового поста на стене группы
 func vkPostHandler(w http.ResponseWriter, r *http.Request) {
-	// Временная заглушка
-	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	if r.Method != http.MethodPost {
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+		return
+	}
+	var req struct {
+		AccessToken string `json:"access_token"`
+		OwnerID     string `json:"owner_id"`
+		Message     string `json:"message"`
+		FromGroup   int    `json:"from_group"`
+		PublishDate int64  `json:"publish_date"`
+		Attachments string `json:"attachments"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
+		return
+	}
+	token := resolveToken(req.AccessToken)
+	if token == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK account not connected"})
+		return
+	}
+	client := vk.NewVKClient(token)
+	var attachments []string
+	if req.Attachments != "" {
+		attachments = strings.Split(req.Attachments, ",")
+	}
+	postID, err := client.WallPost(req.OwnerID, req.Message, attachments, req.FromGroup == 1, req.PublishDate)
+	if err != nil {
+		log.Printf("[vkPost] error: %v", err)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"post_id": postID})
 }
 
+// vkGetPostsHandler — получение постов со стены (wall.get)
 func vkGetPostsHandler(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	if r.Method != http.MethodPost {
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+		return
+	}
+	var req struct {
+		AccessToken string `json:"access_token"`
+		OwnerID     string `json:"owner_id"`
+		Count       int    `json:"count"`
+		Offset      int    `json:"offset"`
+		Filter      string `json:"filter"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
+		return
+	}
+	token := resolveToken(req.AccessToken)
+	if token == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK account not connected"})
+		return
+	}
+	if req.Count <= 0 {
+		req.Count = 10
+	}
+	client := vk.NewVKClient(token)
+	result, err := client.WallGet(req.OwnerID, req.Count, req.Offset, req.Filter)
+	if err != nil {
+		log.Printf("[vkGetPosts] error: %v", err)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, http.StatusOK, result)
 }
 
+// vkRepostHandler — репост записи в группу (wall.repost)
 func vkRepostHandler(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	if r.Method != http.MethodPost {
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+		return
+	}
+	var req struct {
+		AccessToken string `json:"access_token"`
+		Object      string `json:"object"`
+		GroupID     string `json:"group_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
+		return
+	}
+	token := resolveToken(req.AccessToken)
+	if token == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK account not connected"})
+		return
+	}
+	client := vk.NewVKClient(token)
+	result, err := client.WallRepost(req.Object, req.GroupID)
+	if err != nil {
+		log.Printf("[vkRepost] error: %v", err)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"post_id":      result.PostID,
+		"reposts_count": result.RepostsCount,
+		"likes_count":   result.LikesCount,
+	})
 }
 
+// vkCopyPostHandler — копирование поста (wall.post с текстом и вложениями)
 func vkCopyPostHandler(w http.ResponseWriter, r *http.Request) {
-	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	if r.Method != http.MethodPost {
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+		return
+	}
+	var req struct {
+		AccessToken string `json:"access_token"`
+		OwnerID     string `json:"owner_id"`
+		Message     string `json:"message"`
+		Attachments string `json:"attachments"`
+		FromGroup   int    `json:"from_group"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
+		return
+	}
+	token := resolveToken(req.AccessToken)
+	if token == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK account not connected"})
+		return
+	}
+	client := vk.NewVKClient(token)
+	var attachments []string
+	if req.Attachments != "" {
+		attachments = strings.Split(req.Attachments, ",")
+	}
+	postID, err := client.WallPost(req.OwnerID, req.Message, attachments, req.FromGroup == 1, 0)
+	if err != nil {
+		log.Printf("[vkCopyPost] error: %v", err)
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"post_id": postID})
+}
+
+// resolveToken возвращает токен из запроса или активный из vk_accounts
+func resolveToken(fromRequest string) string {
+	if t := strings.TrimSpace(fromRequest); t != "" {
+		return t
+	}
+	// fallback: активный аккаунт из БД
+	token, err := getActiveAccountToken()
+	if err != nil {
+		log.Printf("[resolveToken] db error: %v", err)
+	}
+	return token
 }
 
 func vkGetGroupsHandler(w http.ResponseWriter, r *http.Request) {

@@ -8,6 +8,7 @@ import (
 	"backend/vk"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -348,8 +349,10 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 
 		client := vk.NewVKClient(token)
-		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, nil, true, 0)
+		// from_group=false: постим с пользовательского аккаунта (user token не поддерживает from_group=1)
+		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, nil, false, 0)
 		if err != nil {
+			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
 			utils.RespondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
