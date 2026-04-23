@@ -22,33 +22,36 @@ COPY backend/ ./
 ENV CGO_ENABLED=1
 RUN go build -o main .
 
-# Финальный образ
-FROM alpine:latest
-
-WORKDIR /app
+# Финальный образ с Nginx
+FROM nginx:alpine
 
 # Устанавливаем необходимые пакеты
-RUN apk add --no-cache ca-certificates sqlite
+RUN apk add --no-cache ca-certificates sqlite supervisor
 
 # Копируем Go бэкенд
-COPY --from=backend-builder /app/main ./backend/main
+COPY --from=backend-builder /app/main /app/backend/main
 
 # Копируем фронтенд (админка)
-COPY frontend ./frontend/
+COPY frontend /usr/share/nginx/html/
 
 # Копируем собранный VK Mini App
-COPY --from=vk-app-builder /app/vk_app/build ./vk_app/build/
+COPY --from=vk-app-builder /app/vk_app/build /usr/share/nginx/html/vk_app/
 
-# Проверяем что файлы скопировались
-RUN ls -la ./frontend/ && echo "Frontend files copied successfully"
-RUN ls -la ./vk_app/build/ && echo "VK Mini App files copied successfully" || echo "VK Mini App build folder not found!"
+# Копируем конфигурацию Nginx
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Копируем конфигурацию Supervisor
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Создаем рабочую директорию для backend
+WORKDIR /app
 
 # Переменные окружения
-ENV PORT=80
+ENV PORT=8000
 ENV VK_SERVICE_KEY=a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d8826cb301184
 
 # Открываем порт
 EXPOSE 80
 
-# Запускаем Go backend
-CMD ["./backend/main"]
+# Запускаем Supervisor (управляет Nginx + Go backend)
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

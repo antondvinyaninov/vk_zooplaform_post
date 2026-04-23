@@ -94,6 +94,10 @@ export const AppConfig = () => {
     adaptivity
   });
 
+  console.log('Router:', router);
+  console.log('Current URL hash:', window.location.hash);
+  console.log('Current URL pathname:', window.location.pathname);
+
   return (
     <ConfigProvider
       colorScheme={vkBridgeAppearance}

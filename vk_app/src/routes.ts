@@ -26,6 +26,7 @@ export const DEFAULT_VIEW_PANELS = {
 export const routes = RoutesConfig.create([
   createRoot(DEFAULT_ROOT, [
     createView(DEFAULT_VIEW, [
+      createPanel(DEFAULT_VIEW_PANELS.HOME, '/', []), // Добавляем корневой роут
       createPanel(DEFAULT_VIEW_PANELS.HOME, '/home', []),
       createPanel(DEFAULT_VIEW_PANELS.PERSIK, `/${DEFAULT_VIEW_PANELS.PERSIK}`, []),
       createPanel(DEFAULT_VIEW_PANELS.ONBOARDING, `/${DEFAULT_VIEW_PANELS.ONBOARDING}`, []),

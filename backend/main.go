@@ -9,14 +9,12 @@ import (
 	vkapp "backend/vk-app"
 	"log"
 	"net/http"
-	"os"
-	"strings"
 )
 
 func main() {
 	// Загружаем конфигурацию
 	cfg := config.Load()
-	log.Printf("Starting VK ZooPlatforma on port %s", cfg.Port)
+	log.Printf("Starting VK ZooPlatforma API on port %s", cfg.Port)
 
 	// Инициализируем базу данных
 	if err := database.Init(cfg.DatabasePath); err != nil {
@@ -28,7 +26,7 @@ func main() {
 	// Создаем роутер
 	mux := http.NewServeMux()
 
-	// Регистрируем маршруты для каждого модуля
+	// Регистрируем маршруты для каждого модуля (только API)
 	admin.RegisterRoutes(mux)
 	vkapp.RegisterRoutes(mux)
 	site.RegisterRoutes(mux)
@@ -39,142 +37,11 @@ func main() {
 		w.Write([]byte(`{"status":"ok","service":"vk-zooplatforma","version":"1.0.0"}`))
 	})
 
-	// VK Mini App - обслуживаем собранные файлы
-	mux.HandleFunc("/vk_app/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		log.Printf("VK App request: %s", path)
-
-		// Убираем префикс /vk_app
-		filePath := strings.TrimPrefix(path, "/vk_app")
-
-		// Если путь пустой или /, отдаем index.html
-		if filePath == "" || filePath == "/" {
-			filePath = "/index.html"
-		}
-
-		// Читаем файл
-		fullPath := "./vk_app/build" + filePath
-		log.Printf("Trying to read file: %s", fullPath)
-
-		content, err := os.ReadFile(fullPath)
-		if err != nil {
-			log.Printf("File not found: %s, error: %v", fullPath, err)
-			// Если файл не найден, отдаем index.html (для SPA роутинга)
-			content, err = os.ReadFile("./vk_app/build/index.html")
-			if err != nil {
-				log.Printf("Index.html also not found: %v", err)
-				http.NotFound(w, r)
-				return
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		} else {
-			log.Printf("File found: %s, size: %d bytes", fullPath, len(content))
-			// Определяем Content-Type
-			var contentType string
-			switch {
-			case strings.HasSuffix(filePath, ".html"):
-				contentType = "text/html; charset=utf-8"
-			case strings.HasSuffix(filePath, ".css"):
-				contentType = "text/css"
-			case strings.HasSuffix(filePath, ".js"):
-				contentType = "application/javascript"
-			case strings.HasSuffix(filePath, ".svg"):
-				contentType = "image/svg+xml"
-			case strings.HasSuffix(filePath, ".png"):
-				contentType = "image/png"
-			default:
-				contentType = "application/octet-stream"
-			}
-			w.Header().Set("Content-Type", contentType)
-		}
-
-		w.Write(content)
-	})
-
-	// URL rewriting middleware для красивых URL
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		// Если это API запрос, пропускаем
-		if strings.HasPrefix(path, "/api/") {
-			http.NotFound(w, r)
-			return
-		}
-
-		// Если это VK Mini App, пропускаем (обрабатывается выше)
-		if strings.HasPrefix(path, "/vk_app/") {
-			http.NotFound(w, r)
-			return
-		}
-
-		// Если это статический файл (css, js, изображения), отдаем как есть
-		if strings.Contains(path, ".") && !strings.HasSuffix(path, ".html") {
-			fs := http.FileServer(http.Dir("./frontend"))
-			fs.ServeHTTP(w, r)
-			return
-		}
-
-		// URL rewriting для страниц
-		var filePath string
-		switch path {
-		case "/":
-			filePath = "/index.html"
-		case "/dashboard":
-			filePath = "/pages/dashboard.html"
-		case "/auth":
-			filePath = "/index.html"
-		case "/vk-connect":
-			filePath = "/pages/vk-connect.html"
-		case "/groups":
-			filePath = "/pages/groups.html"
-		case "/posts":
-			filePath = "/pages/posts.html"
-		case "/settings":
-			filePath = "/pages/settings.html"
-		case "/users":
-			filePath = "/pages/users.html"
-		default:
-			// Если путь заканчивается на /, добавляем index.html
-			if strings.HasSuffix(path, "/") {
-				filePath = path + "index.html"
-			} else {
-				// Пробуем добавить .html
-				filePath = path + ".html"
-			}
-		}
-
-		// Читаем файл напрямую
-		fullPath := "./frontend" + filePath
-		content, err := os.ReadFile(fullPath)
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-
-		// Определяем Content-Type
-		var contentType string
-		switch {
-		case strings.HasSuffix(filePath, ".html"):
-			contentType = "text/html; charset=utf-8"
-		case strings.HasSuffix(filePath, ".css"):
-			contentType = "text/css"
-		case strings.HasSuffix(filePath, ".js"):
-			contentType = "application/javascript"
-		default:
-			contentType = "text/plain"
-		}
-
-		w.Header().Set("Content-Type", contentType)
-		w.Write(content)
-	})
-
 	// Применяем middleware
 	handler := middleware.Logger(middleware.CORS(mux))
 
 	// Запускаем сервер
-	log.Printf("Server listening on :%s", cfg.Port)
-	log.Println("✓ Admin panel: http://localhost:" + cfg.Port + "/")
-	log.Println("✓ VK Mini App: http://localhost:" + cfg.Port + "/vk_app/")
+	log.Printf("API Server listening on :%s", cfg.Port)
 	log.Println("✓ API: http://localhost:" + cfg.Port + "/api/")
 	log.Println("✓ VK App API: http://localhost:" + cfg.Port + "/api/app/")
 	log.Println("✓ Site API: http://localhost:" + cfg.Port + "/api/site/")
