@@ -23,6 +23,30 @@ type Group struct {
 	MembersCount int    `json:"members_count"`
 }
 
+// GroupsGetByID получает информацию о группе по ID.
+func (c *VKClient) GroupsGetByID(groupID int) (*Group, error) {
+	params := map[string]string{
+		"group_ids": strconv.Itoa(groupID),
+		"fields":    "screen_name,photo_200",
+	}
+
+	resp, err := c.CallMethod("groups.getById", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var groups []Group
+	if err := json.Unmarshal(resp, &groups); err != nil {
+		return nil, fmt.Errorf("failed to parse groups.getById response: %w", err)
+	}
+
+	if len(groups) == 0 {
+		return nil, fmt.Errorf("group not found")
+	}
+
+	return &groups[0], nil
+}
+
 // GroupsGet получает список групп пользователя
 func (c *VKClient) GroupsGet(extended bool, filter string) (*GroupsGetResponse, error) {
 	params := map[string]string{}

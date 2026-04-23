@@ -499,6 +499,15 @@ func ensureGroup(vkGroupID int) (*models.Group, error) {
 		return nil, err
 	}
 	if group != nil {
+		// Если запись была создана с дефолтными данными, пробуем обогатить ее из VK.
+		if groupNeedsVKSync(group) {
+			if vkData, err := fetchVKGroupData(vkGroupID); err == nil && vkData != nil {
+				group.Name = vkData.Name
+				group.ScreenName = vkData.ScreenName
+				group.Photo200 = vkData.Photo200
+				_ = updateGroup(group)
+			}
+		}
 		return group, nil
 	}
 	group = &models.Group{
@@ -507,10 +516,64 @@ func ensureGroup(vkGroupID int) (*models.Group, error) {
 		ScreenName: "club" + strconv.Itoa(vkGroupID),
 		IsActive:   true,
 	}
+	if vkData, err := fetchVKGroupData(vkGroupID); err == nil && vkData != nil {
+		group.Name = vkData.Name
+		group.ScreenName = vkData.ScreenName
+		group.Photo200 = vkData.Photo200
+	}
 	if err := createGroup(group); err != nil {
 		return nil, err
 	}
 	return group, nil
+}
+
+func groupNeedsVKSync(group *models.Group) bool {
+	if group == nil {
+		return false
+	}
+
+	defaultName := "VK Community #" + strconv.Itoa(group.VKGroupID)
+	defaultScreenName := "club" + strconv.Itoa(group.VKGroupID)
+
+	return strings.TrimSpace(group.Name) == "" ||
+		strings.TrimSpace(group.ScreenName) == "" ||
+		strings.TrimSpace(group.Photo200) == "" ||
+		group.Name == defaultName ||
+		group.ScreenName == defaultScreenName
+}
+
+func fetchVKGroupData(vkGroupID int) (*models.Group, error) {
+	cfg := config.Load()
+	token := strings.TrimSpace(cfg.VKMiniAppServiceKey)
+	if token == "" {
+		token = strings.TrimSpace(cfg.VKServiceKey)
+	}
+	if token == "" {
+		return nil, nil
+	}
+
+	client := vk.NewVKClient(token)
+	groupInfo, err := client.GroupsGetByID(vkGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	name := strings.TrimSpace(groupInfo.Name)
+	if name == "" {
+		name = "VK Community #" + strconv.Itoa(vkGroupID)
+	}
+	screenName := strings.TrimSpace(groupInfo.ScreenName)
+	if screenName == "" {
+		screenName = "club" + strconv.Itoa(vkGroupID)
+	}
+
+	return &models.Group{
+		VKGroupID:  vkGroupID,
+		Name:       name,
+		ScreenName: screenName,
+		Photo200:   strings.TrimSpace(groupInfo.Photo200),
+		IsActive:   true,
+	}, nil
 }
 
 func serializePosts(posts []*models.Post) ([]postResponse, error) {
