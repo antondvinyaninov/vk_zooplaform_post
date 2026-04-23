@@ -10,8 +10,25 @@
     <title>PetPlatform</title>
     <script src="/vk-bridge.min.js"></script>
     <script>
-      if (typeof vkBridge !== 'undefined') {
-        vkBridge.send('VKWebAppInit');
+      // Отладочная информация
+      console.log('VK Bridge available:', typeof vkBridge !== 'undefined');
+      console.log('Current URL:', window.location.href);
+      console.log('User Agent:', navigator.userAgent);
+      
+      // Безопасная инициализация VK Bridge
+      try {
+        if (typeof vkBridge !== 'undefined' && vkBridge.send) {
+          console.log('Initializing VK Bridge...');
+          vkBridge.send('VKWebAppInit').then(function() {
+            console.log('VK Bridge initialized successfully');
+          }).catch(function(error) {
+            console.warn('VK Bridge init failed:', error);
+          });
+        } else {
+          console.warn('VK Bridge not available - running outside VK environment');
+        }
+      } catch (error) {
+        console.error('VK Bridge initialization error:', error);
       }
     </script>
   </head>

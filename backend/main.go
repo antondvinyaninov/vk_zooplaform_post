@@ -42,6 +42,7 @@ func main() {
 	// VK Mini App - обслуживаем собранные файлы
 	mux.HandleFunc("/vk_app/", func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
+		log.Printf("VK App request: %s", path)
 
 		// Убираем префикс /vk_app
 		filePath := strings.TrimPrefix(path, "/vk_app")
@@ -53,16 +54,21 @@ func main() {
 
 		// Читаем файл
 		fullPath := "./vk_app/build" + filePath
+		log.Printf("Trying to read file: %s", fullPath)
+
 		content, err := os.ReadFile(fullPath)
 		if err != nil {
+			log.Printf("File not found: %s, error: %v", fullPath, err)
 			// Если файл не найден, отдаем index.html (для SPA роутинга)
 			content, err = os.ReadFile("./vk_app/build/index.html")
 			if err != nil {
+				log.Printf("Index.html also not found: %v", err)
 				http.NotFound(w, r)
 				return
 			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		} else {
+			log.Printf("File found: %s, size: %d bytes", fullPath, len(content))
 			// Определяем Content-Type
 			var contentType string
 			switch {

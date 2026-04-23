@@ -101,17 +101,30 @@ export const App = () => {
     // Если нет VK параметров, показываем onboarding
     if (!hasGroupId && activePanel !== DEFAULT_VIEW_PANELS.ONBOARDING) {
       routeNavigator.replace('/onboarding');
+      return;
     }
 
     async function fetchData() {
+      console.log('Starting fetchData...');
+      console.log('Bridge available:', typeof bridge !== 'undefined');
+      console.log('Bridge.send available:', bridge && typeof bridge.send === 'function');
+      
       try {
+        // Проверяем что VK Bridge доступен
+        if (typeof bridge === 'undefined' || !bridge.send) {
+          throw new Error('VK Bridge not available');
+        }
+        
+        console.log('Attempting to get user info...');
         const user = await bridge.send('VKWebAppGetUserInfo');
+        console.log('User info received:', user);
         setUser(user);
         
         // Синхронизация с бэкендом
         await syncUserWithBackend(user);
       } catch (e) {
-        console.error('Failed to fetch user', e);
+        console.warn('VK Bridge not available or failed to fetch user data:', e);
+        console.log('Setting fallback user data...');
         // Если не удалось получить данные пользователя (не в VK среде),
         // устанавливаем тестовые данные
         setUser({
@@ -128,10 +141,13 @@ export const App = () => {
           bdate_visibility: 0
         });
       } finally {
+        console.log('Removing popout...');
         setPopout(null);
       }
     }
-    fetchData();
+    
+    // Небольшая задержка для инициализации VK Bridge
+    setTimeout(fetchData, 100);
   }, [activePanel, routeNavigator]);
 
   const activeStory = getActiveStory(activePanel);

@@ -10,11 +10,28 @@
     <title>PetPlatform</title>
     <script src="/vk_app/vk-bridge.min.js"></script>
     <script>
-      if (typeof vkBridge !== 'undefined') {
-        vkBridge.send('VKWebAppInit');
+      // Отладочная информация
+      console.log('VK Bridge available:', typeof vkBridge !== 'undefined');
+      console.log('Current URL:', window.location.href);
+      console.log('User Agent:', navigator.userAgent);
+      
+      // Безопасная инициализация VK Bridge
+      try {
+        if (typeof vkBridge !== 'undefined' && vkBridge.send) {
+          console.log('Initializing VK Bridge...');
+          vkBridge.send('VKWebAppInit').then(function() {
+            console.log('VK Bridge initialized successfully');
+          }).catch(function(error) {
+            console.warn('VK Bridge init failed:', error);
+          });
+        } else {
+          console.warn('VK Bridge not available - running outside VK environment');
+        }
+      } catch (error) {
+        console.error('VK Bridge initialization error:', error);
       }
     </script>
-    <script type="module" crossorigin src="/vk_app/assets/index-CIthPuow.js"></script>
+    <script type="module" crossorigin src="/vk_app/assets/index-DS3lfDyx.js"></script>
     <link rel="modulepreload" crossorigin href="/vk_app/assets/rolldown-runtime-jpDsebLB.js">
     <link rel="modulepreload" crossorigin href="/vk_app/assets/icons-BOfwoAUo.js">
     <link rel="modulepreload" crossorigin href="/vk_app/assets/vendor-fGZu9Zud.js">

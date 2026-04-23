@@ -41,7 +41,7 @@ COPY --from=vk-app-builder /app/vk_app/build ./vk_app/build/
 
 # Проверяем что файлы скопировались
 RUN ls -la ./frontend/ && echo "Frontend files copied successfully"
-RUN ls -la ./vk_app/build/ && echo "VK Mini App files copied successfully"
+RUN ls -la ./vk_app/build/ && echo "VK Mini App files copied successfully" || echo "VK Mini App build folder not found!"
 
 # Переменные окружения
 ENV PORT=80
