@@ -40,7 +40,7 @@ func main() {
 	})
 
 	// VK Mini App - обслуживаем собранные файлы
-	vkAppHandler := http.StripPrefix("/vk_app", http.FileServer(http.Dir("../vk_app/build")))
+	vkAppHandler := http.StripPrefix("/vk_app", http.FileServer(http.Dir("./vk_app/build")))
 	mux.Handle("/vk_app/", vkAppHandler)
 
 	// URL rewriting middleware для красивых URL
@@ -61,7 +61,7 @@ func main() {
 
 		// Если это статический файл (css, js, изображения), отдаем как есть
 		if strings.Contains(path, ".") && !strings.HasSuffix(path, ".html") {
-			fs := http.FileServer(http.Dir("../frontend"))
+			fs := http.FileServer(http.Dir("./frontend"))
 			fs.ServeHTTP(w, r)
 			return
 		}
@@ -96,7 +96,7 @@ func main() {
 		}
 
 		// Читаем файл напрямую
-		fullPath := "../frontend" + filePath
+		fullPath := "./frontend" + filePath
 		content, err := os.ReadFile(fullPath)
 		if err != nil {
 			http.NotFound(w, r)
