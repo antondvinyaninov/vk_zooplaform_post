@@ -50,7 +50,7 @@ RUN chmod +x /start.sh
 # Создаем рабочую директорию для backend
 WORKDIR /app
 
-# Переменные окружения
+# Переменные окружения (обновлено для принудительной пересборки)
 ENV PORT=8000
 ENV DATABASE_PATH=./data/app.db
 ENV VK_CLIENT_ID=54481712
@@ -59,6 +59,7 @@ ENV VK_SERVICE_KEY=a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d88
 ENV VK_MINI_APP_ID=54560047
 ENV VK_MINI_APP_SECRET=kI41QDPyyK87kIopZ2U9
 ENV VK_MINI_APP_SERVICE_KEY=e59b585ae59b585ae59b585a67e6dbdd75ee59be59b585a8c7299470181bb987c8b3c03
+ENV BUILD_VERSION=v2.0
 
 # Открываем порт
 EXPOSE 80

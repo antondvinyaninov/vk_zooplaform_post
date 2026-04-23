@@ -1,6 +1,8 @@
 #!/bin/bash
 
-echo "🚀 Starting VK ZooPlatforma..."
+echo "🚀 Starting VK ZooPlatforma with SHELL SCRIPT (not supervisor)..."
+echo "📅 Build version: v2.0"
+echo "🐚 Shell script PID: $$"
 
 # Запускаем backend в фоне
 echo "▶️  Starting Go backend..."
