@@ -14,37 +14,50 @@ import (
 func main() {
 	// Загружаем конфигурацию
 	cfg := config.Load()
-	log.Printf("Starting VK ZooPlatforma API on port %s", cfg.Port)
+	log.Printf("=== VK ZooPlatforma Backend Starting ===")
+	log.Printf("Port: %s", cfg.Port)
+	log.Printf("Database Path: %s", cfg.DatabasePath)
+	log.Printf("VK Client ID: %s", cfg.VKClientID)
+	log.Printf("VK Mini App ID: %s", cfg.VKMiniAppID)
 
 	// Инициализируем базу данных
+	log.Printf("Initializing database...")
 	if err := database.Init(cfg.DatabasePath); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
-	log.Println("Database initialized successfully")
+	log.Println("✓ Database initialized successfully")
 
 	// Создаем роутер
+	log.Printf("Setting up routes...")
 	mux := http.NewServeMux()
 
 	// Регистрируем маршруты для каждого модуля (только API)
+	log.Printf("Registering admin routes...")
 	admin.RegisterRoutes(mux)
+	log.Printf("Registering vk-app routes...")
 	vkapp.RegisterRoutes(mux)
+	log.Printf("Registering site routes...")
 	site.RegisterRoutes(mux)
 
 	// Health check для всего приложения
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Health check requested from %s", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","service":"vk-zooplatforma","version":"1.0.0"}`))
 	})
 
 	// Применяем middleware
+	log.Printf("Applying middleware...")
 	handler := middleware.Logger(middleware.CORS(mux))
 
 	// Запускаем сервер
+	log.Printf("=== Starting HTTP Server ===")
 	log.Printf("API Server listening on :%s", cfg.Port)
 	log.Println("✓ API: http://localhost:" + cfg.Port + "/api/")
 	log.Println("✓ VK App API: http://localhost:" + cfg.Port + "/api/app/")
 	log.Println("✓ Site API: http://localhost:" + cfg.Port + "/api/site/")
+	log.Printf("=== Server Ready ===")
 
 	if err := http.ListenAndServe(":"+cfg.Port, handler); err != nil {
 		log.Fatalf("Server failed: %v", err)

@@ -14,13 +14,13 @@ FROM golang:1.21-alpine AS backend-builder
 RUN apk add --no-cache gcc musl-dev sqlite-dev
 
 WORKDIR /app
-COPY backend/go.mod backend/go.sum* ./
-RUN go mod download || true
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
 COPY backend/ ./
 
 # Включаем CGO для работы с SQLite
 ENV CGO_ENABLED=1
-RUN go build -o main .
+RUN go build -v -o main .
 
 # Финальный образ с Nginx
 FROM nginx:alpine

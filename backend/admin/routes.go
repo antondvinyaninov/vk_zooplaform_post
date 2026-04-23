@@ -2,11 +2,14 @@ package admin
 
 import (
 	"backend/middleware"
+	"log"
 	"net/http"
 )
 
 // RegisterRoutes регистрирует маршруты для админки
 func RegisterRoutes(mux *http.ServeMux) {
+	log.Printf("[Admin] Registering admin routes...")
+
 	// API endpoints для админки
 	mux.HandleFunc("/api/admin/health", middleware.CORSFunc(healthHandler))
 	mux.HandleFunc("/api/admin/auth/login", middleware.CORSFunc(loginHandler))
@@ -15,8 +18,10 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/groups/installed", middleware.CORSFunc(installedGroupsHandler))
 	mux.HandleFunc("/api/admin/vk/connection", middleware.CORSFunc(vkConnectionHandler))
 
+	log.Printf("[Admin] Registering VK API routes...")
 	// VK API endpoints (старые, для обратной совместимости)
 	mux.HandleFunc("/api/vk/test", middleware.CORSFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[VK] Test endpoint called from %s", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok","message":"VK API backend is working"}`))
 	}))
@@ -30,6 +35,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/vk/oauth/callback", middleware.CORSFunc(vkOAuthCallbackHandler))
 	mux.HandleFunc("/api/vk/oauth/token", middleware.CORSFunc(vkOAuthTokenHandler))
 
+	log.Printf("[Admin] Registering redirect routes...")
 	// Редиректы для обратной совместимости
 	mux.HandleFunc("/auth.html", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusMovedPermanently)
@@ -40,4 +46,6 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/posts.html", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/pages/posts.html", http.StatusMovedPermanently)
 	})
+
+	log.Printf("[Admin] ✓ All admin routes registered")
 }
