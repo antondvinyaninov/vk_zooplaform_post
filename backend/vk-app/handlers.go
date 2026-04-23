@@ -1,6 +1,7 @@
 package vkapp
 
 import (
+	"backend/config"
 	"backend/database"
 	"backend/models"
 	"backend/utils"
@@ -64,6 +65,19 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondSuccess(w, map[string]string{
 		"status":  "ok",
 		"service": "vk-app",
+	})
+}
+
+func configHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	cfg := config.Load()
+	utils.RespondSuccess(w, map[string]interface{}{
+		"vk_mini_app_id": cfg.VKMiniAppID,
+		"vk_client_id":   cfg.VKClientID, // Для постинга через API
 	})
 }
 

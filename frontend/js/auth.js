@@ -68,7 +68,7 @@ function startAuth() {
     const authUrl = `https://oauth.vk.com/authorize?` +
         `client_id=54555042&` +
         `scope=wall,photos,video,groups&` +
-        `redirect_uri=https://oauth.vk.com/blank.html&` +
+        `redirect_uri=https://vk.zooplatforma.ru/auth&` +
         `display=page&` +
         `response_type=token&` +
         `revoke=1`;

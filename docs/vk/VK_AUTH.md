@@ -10,7 +10,7 @@
 
 ```javascript
 const clientId = '54555042';
-const redirectUri = 'https://oauth.vk.com/blank.html';
+const redirectUri = 'https://vk.zooplatforma.ru/auth';
 const scope = 'wall,photos,video,groups';
 
 const authUrl = `https://oauth.vk.com/authorize?` +
@@ -323,7 +323,7 @@ class VKAuth {
 }
 
 // Использование
-const auth = new VKAuth('54555042', 'https://oauth.vk.com/blank.html');
+const auth = new VKAuth('54555042', 'https://vk.zooplatforma.ru/auth');
 
 // Авторизация
 if (!auth.isAuthorized()) {

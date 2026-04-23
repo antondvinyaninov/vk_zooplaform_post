@@ -6,21 +6,35 @@ import (
 )
 
 type Config struct {
-	Port           string
-	VKServiceKey   string
+	Port         string
+	VKServiceKey string
+
+	// VK Standalone App (для постинга через API)
 	VKClientID     string
 	VKClientSecret string
-	DatabasePath   string
+
+	// VK Mini App (для мини-приложения в сообществе)
+	VKMiniAppID     string
+	VKMiniAppSecret string
+
+	DatabasePath string
 }
 
 // Load загружает конфигурацию из переменных окружения
 func Load() *Config {
 	return &Config{
-		Port:           getEnv("PORT", "8000"),
-		VKServiceKey:   getEnv("VK_SERVICE_KEY", ""),
+		Port:         getEnv("PORT", "8000"),
+		VKServiceKey: getEnv("VK_SERVICE_KEY", ""),
+
+		// VK Standalone App (для постинга)
 		VKClientID:     getEnv("VK_CLIENT_ID", "54555042"),
 		VKClientSecret: getEnv("VK_CLIENT_SECRET", "488uLwXVh0NbUFcrJIvA"),
-		DatabasePath:   getEnv("DATABASE_PATH", "./data/app.db"),
+
+		// VK Mini App (для мини-приложения)
+		VKMiniAppID:     getEnv("VK_MINI_APP_ID", "54490430"),
+		VKMiniAppSecret: getEnv("VK_MINI_APP_SECRET", ""),
+
+		DatabasePath: getEnv("DATABASE_PATH", "./data/app.db"),
 	}
 }
 

@@ -2,6 +2,13 @@
 
 Платформа для управления публикациями в группах ВКонтакте с VK Mini App интерфейсом.
 
+## 🌐 Продакшен
+
+- **Сайт**: https://vk.zooplatforma.ru/
+- **Админка**: https://vk.zooplatforma.ru/dashboard
+- **VK Mini App**: https://vk.zooplatforma.ru/vk_app/
+- **API**: https://vk.zooplatforma.ru/api/health
+
 ## �️ Архитектура проекта
 
 ```
@@ -134,8 +141,15 @@ docker run -p 80:80 vk-post-platform
 ```bash
 PORT=80                          # Порт сервера
 VK_SERVICE_KEY=...              # Service key VK
-VK_CLIENT_ID=54555042           # ID приложения VK
-VK_CLIENT_SECRET=...            # Secret приложения VK
+
+# VK Standalone App (для постинга через API)
+VK_CLIENT_ID=54555042           # ID приложения VK для постинга
+VK_CLIENT_SECRET=...            # Secret приложения VK для постинга
+
+# VK Mini App (для мини-приложения в сообществе)  
+VK_MINI_APP_ID=54490430         # ID VK Mini App
+VK_MINI_APP_SECRET=...          # Secret VK Mini App
+
 DATABASE_PATH=./data/app.db     # Путь к БД SQLite
 ```
 
