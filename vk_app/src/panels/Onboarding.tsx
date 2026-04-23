@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useEffect, useState } from 'react';
 import {
   Panel,
   PanelHeader,
@@ -7,10 +7,29 @@ import {
   Group,
   Box,
   NavIdProps,
+  Link,
 } from '@vkontakte/vkui';
-import { Icon56ServicesOutline } from '@vkontakte/icons';
+import { Icon56ServicesOutline, Icon56ErrorOutline } from '@vkontakte/icons';
 
 export const Onboarding: FC<NavIdProps> = ({ id }) => {
+  const [isOutsideVK, setIsOutsideVK] = useState(false);
+
+  useEffect(() => {
+    // Проверяем, запущено ли приложение вне VK
+    const checkVKEnvironment = () => {
+      const hasVKParams = window.vkLaunchParams && Object.keys(window.vkLaunchParams).length > 0;
+      const hasVKBridge = window.vkBridge && typeof window.vkBridge.send === 'function';
+      
+      // Если нет VK параметров и VK Bridge недоступен, значит запущено вне VK
+      if (!hasVKParams && !hasVKBridge) {
+        setIsOutsideVK(true);
+      }
+    };
+
+    // Проверяем через небольшую задержку, чтобы VK Bridge успел инициализироваться
+    setTimeout(checkVKEnvironment, 1000);
+  }, []);
+
   const installToCommunity = () => {
     if (window.vkBridge && window.vkBridge.send) {
       window.vkBridge.send('VKWebAppAddToCommunity').catch((error) => {
@@ -20,6 +39,31 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
       console.warn('VK Bridge not available');
     }
   };
+
+  // Если приложение запущено вне VK, показываем соответствующее сообщение
+  if (isOutsideVK) {
+    return (
+      <Panel id={id}>
+        <PanelHeader style={{ textAlign: 'center' }}>VK ZooPlatforma</PanelHeader>
+        <Group>
+          <Placeholder
+            icon={<Icon56ErrorOutline />}
+          >
+            <Placeholder.Title>Приложение работает только в ВКонтакте</Placeholder.Title>
+            <Placeholder.Description>
+              Это мини-приложение предназначено для работы внутри ВКонтакте. 
+              Откройте его через сообщество или каталог приложений ВКонтакте.
+            </Placeholder.Description>
+          </Placeholder>
+          <Box padding="m" style={{ textAlign: 'center' }}>
+            <Link href="https://vk.com/apps" target="_blank">
+              Перейти в каталог приложений ВКонтакте
+            </Link>
+          </Box>
+        </Group>
+      </Panel>
+    );
+  }
 
   return (
     <Panel id={id}>

@@ -123,35 +123,64 @@ export const App = () => {
         console.log('Attempting to get user info...');
         const user = await window.vkBridge.send('VKWebAppGetUserInfo');
         console.log('User info received:', user);
+        
+        // СНАЧАЛА устанавливаем данные пользователя
         setUser(user);
         
-        // Синхронизация с бэкендом с VK параметрами
-        const vkSignParams = new URLSearchParams();
-        Object.entries(launchParams).forEach(([key, value]) => {
-          if (key.startsWith('vk_') && value !== undefined) {
-            vkSignParams.set(key, String(value));
-          }
-        });
+        // ПОТОМ пытаемся синхронизироваться с backend (не критично если упадет)
+        try {
+          const vkSignParams = new URLSearchParams();
+          Object.entries(launchParams).forEach(([key, value]) => {
+            if (key.startsWith('vk_') && value !== undefined) {
+              vkSignParams.set(key, String(value));
+            }
+          });
+          
+          console.log('Syncing with backend, VK params:', vkSignParams.toString());
+          await syncUserWithBackend(user, vkSignParams.toString());
+          console.log('Backend sync successful');
+        } catch (backendError) {
+          console.warn('Backend sync failed, but user data is available:', backendError);
+          // Не падаем, если backend недоступен, но пользователь есть
+        }
         
-        await syncUserWithBackend(user, vkSignParams.toString());
       } catch (e) {
-        console.warn('VK Bridge not available or failed to fetch user data:', e);
-        console.log('Setting fallback user data...');
-        // Если не удалось получить данные пользователя (не в VK среде),
-        // устанавливаем тестовые данные
-        setUser({
-          id: 1,
-          first_name: 'Test',
-          last_name: 'User',
-          photo_200: '',
-          photo_100: '',
-          is_closed: false,
-          can_access_closed: true,
-          sex: 0,
-          city: { id: 0, title: '' },
-          country: { id: 0, title: '' },
-          bdate_visibility: 0
-        });
+        console.warn('VK Bridge failed to get user data:', e);
+        
+        // Проверяем, есть ли хотя бы launch параметры с пользователем
+        if (launchParams.vk_user_id) {
+          console.log('Using launch params for user data');
+          setUser({
+            id: launchParams.vk_user_id,
+            first_name: 'VK User',
+            last_name: `#${launchParams.vk_user_id}`,
+            photo_200: '',
+            photo_100: '',
+            is_closed: false,
+            can_access_closed: true,
+            sex: 0,
+            city: { id: 0, title: '' },
+            country: { id: 0, title: '' },
+            bdate_visibility: 0
+          });
+        } else {
+          console.log('Setting fallback user data...');
+          // Если не удалось получить данные пользователя (не в VK среде),
+          // устанавливаем тестовые данные
+          setUser({
+            id: 1,
+            first_name: 'Test',
+            last_name: 'User',
+            photo_200: '',
+            photo_100: '',
+            is_closed: false,
+            can_access_closed: true,
+            sex: 0,
+            city: { id: 0, title: '' },
+            country: { id: 0, title: '' },
+            bdate_visibility: 0
+          });
+        }
       } finally {
         console.log('Removing popout...');
         setPopout(null);
