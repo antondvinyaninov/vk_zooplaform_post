@@ -108,8 +108,8 @@ function startAuth() {
         }
     }, 500);
     
-    showResult('Выполните вход в ВКонтакте в открывшемся окне...', true);
-    document.getElementById('manualTokenInput').style.display = 'none';
+    showResult('Выполните вход в ВКонтакте в открывшемся окне, затем скопируйте URL из адресной строки и вставьте ниже...', true);
+    document.getElementById('manualTokenInput').style.display = 'block';
 }
 
 // Сохранение токена вручную
