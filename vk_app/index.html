@@ -34,6 +34,21 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      console.log('About to load React app...');
+      console.log('Root element exists:', !!document.getElementById('root'));
+    </script>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Проверяем что React загрузился
+      setTimeout(function() {
+        const root = document.getElementById('root');
+        console.log('Root element after 2 seconds:', root);
+        console.log('Root innerHTML:', root ? root.innerHTML.substring(0, 100) : 'null');
+        if (!root || !root.innerHTML.trim()) {
+          console.error('React app failed to mount!');
+        }
+      }, 2000);
+    </script>
   </body>
 </html>
