@@ -145,13 +145,13 @@ func main() {
 	log.Println("✓ Site API: http://localhost:" + cfg.Port + "/api/site/")
 	log.Printf("=== Server Ready ===")
 
-	// Создаем HTTP сервер
+	// Создаем HTTP сервер (принудительно на порту 80)
 	server := &http.Server{
-		Addr:    "0.0.0.0:" + cfg.Port, // Явно указываем все интерфейсы
+		Addr:    ":80", // Хардкод порт 80 для продакшена
 		Handler: handler,
 	}
 
-	log.Printf("🌐 Server will bind to: 0.0.0.0:%s", cfg.Port)
+	log.Printf("🌐 Server HARDCODED to bind to: :80")
 
 	// Канал для отслеживания ВСЕХ сигналов (включая SIGQUIT)
 	allSignals := make(chan os.Signal, 1)
