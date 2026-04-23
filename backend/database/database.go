@@ -54,6 +54,9 @@ func createTables() error {
 		photo_200 TEXT,
 		access_token TEXT,
 		is_active BOOLEAN DEFAULT 1,
+		health_status TEXT DEFAULT 'unknown',
+		last_check_at DATETIME,
+		health_error TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -155,6 +158,16 @@ func createTables() error {
 }
 
 func migratePostsTable() error {
+	if err := addColumnIfMissing("groups", "health_status", "TEXT DEFAULT 'unknown'"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("groups", "last_check_at", "DATETIME"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("groups", "health_error", "TEXT"); err != nil {
+		return err
+	}
+
 	if err := addColumnIfMissing("posts", "user_id", "INTEGER"); err != nil {
 		return err
 	}
