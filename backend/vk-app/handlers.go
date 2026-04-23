@@ -331,12 +331,23 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			utils.RespondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		if group == nil || strings.TrimSpace(group.AccessToken) == "" {
-			utils.RespondError(w, http.StatusBadRequest, "community token is not connected")
+		if group == nil {
+			utils.RespondError(w, http.StatusBadRequest, "group not found")
 			return
 		}
 
-		client := vk.NewVKClient(group.AccessToken)
+		// Берём активный токен из vk_accounts (подключённый через /vk-connect)
+		token, err := getActiveVKToken()
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if token == "" {
+			utils.RespondError(w, http.StatusBadRequest, "VK account is not connected — please login at /vk-connect")
+			return
+		}
+
+		client := vk.NewVKClient(token)
 		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, nil, true, 0)
 		if err != nil {
 			utils.RespondError(w, http.StatusBadRequest, err.Error())
@@ -1032,4 +1043,24 @@ func nullableTime(t time.Time) interface{} {
 		return nil
 	}
 	return t
+}
+
+// getActiveVKToken возвращает активный access_token из vk_accounts
+// (тот, что подключён через страницу /vk-connect)
+func getActiveVKToken() (string, error) {
+	var token string
+	err := database.QueryRow(`
+		SELECT access_token
+		FROM vk_accounts
+		WHERE is_active = ?
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`, true).Scan(&token)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(token), nil
 }
