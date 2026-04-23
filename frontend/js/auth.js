@@ -66,7 +66,7 @@ function applyActiveVKAccountToSession(connectionPayload) {
 function startAuth() {
     // Используем наш VK App с правильными правами
     const authUrl = `https://oauth.vk.com/authorize?` +
-        `client_id=54555042&` +
+        `client_id=54481712&` +
         `scope=wall,photos,video,groups&` +
         `redirect_uri=https://vk.zooplatforma.ru/auth&` +
         `display=page&` +
