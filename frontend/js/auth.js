@@ -177,7 +177,7 @@ function checkTokenInURL() {
 // Получение информации о пользователе
 async function getUserInfo(accessToken, userId, tokenExpires) {
     try {
-        const response = await fetch(`${API_URL}/api/vk/user-info`, {
+        const response = await fetch(`${API_URL}/vk/user-info`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
