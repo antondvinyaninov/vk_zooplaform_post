@@ -90,9 +90,19 @@ export const App = () => {
 
   useEffect(() => {
     // Проверка контекста запуска: вне сообщества редиректим на лендинг
-    const params = new URLSearchParams(window.location.search);
-    const hasGroupId = params.has('vk_group_id');
-    const vkRole = params.get('vk_viewer_group_role');
+    // Читаем параметры из query string и из hash части URL
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    
+    const hasGroupId = searchParams.has('vk_group_id') || hashParams.has('vk_group_id');
+    const vkRole = searchParams.get('vk_viewer_group_role') || hashParams.get('vk_viewer_group_role');
+    
+    console.log('VK Params check:', {
+      search: window.location.search,
+      hash: window.location.hash,
+      hasGroupId,
+      vkRole
+    });
     
     if (vkRole) {
       setRole(vkRole);
@@ -100,6 +110,7 @@ export const App = () => {
     
     // Если нет VK параметров, показываем onboarding
     if (!hasGroupId && activePanel !== DEFAULT_VIEW_PANELS.ONBOARDING) {
+      console.log('No group ID found, redirecting to onboarding');
       routeNavigator.replace('/onboarding');
       return;
     }
