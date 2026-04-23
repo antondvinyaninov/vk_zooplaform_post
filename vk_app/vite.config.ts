@@ -29,6 +29,7 @@ export default defineConfig({
     handleModuleDirectivesPlugin(),
     legacy({
       targets: ['defaults', 'not IE 11', 'ios >= 12'],
+      renderLegacyChunks: false,
     }),
   ],
 

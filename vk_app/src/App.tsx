@@ -86,7 +86,7 @@ export const App = () => {
   const routeNavigator = useRouteNavigator();
   const [fetchedUser, setUser] = useState<UserInfo | undefined>();
   const [role, setRole] = useState<string | null>(null);
-  const [popout, setPopout] = useState<ReactNode | null>(null);
+  const [popout, setPopout] = useState<ReactNode | null>(<ScreenSpinner />);
 
   useEffect(() => {
     // Проверка контекста запуска: вне сообщества редиректим на лендинг
@@ -98,6 +98,7 @@ export const App = () => {
       setRole(vkRole);
     }
     
+    // Если нет VK параметров, показываем onboarding
     if (!hasGroupId && activePanel !== DEFAULT_VIEW_PANELS.ONBOARDING) {
       routeNavigator.replace('/onboarding');
     }
@@ -111,6 +112,21 @@ export const App = () => {
         await syncUserWithBackend(user);
       } catch (e) {
         console.error('Failed to fetch user', e);
+        // Если не удалось получить данные пользователя (не в VK среде),
+        // устанавливаем тестовые данные
+        setUser({
+          id: 1,
+          first_name: 'Test',
+          last_name: 'User',
+          photo_200: '',
+          photo_100: '',
+          is_closed: false,
+          can_access_closed: true,
+          sex: 0,
+          city: { id: 0, title: '' },
+          country: { id: 0, title: '' },
+          bdate_visibility: 0
+        });
       } finally {
         setPopout(null);
       }
