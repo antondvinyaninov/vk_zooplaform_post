@@ -355,14 +355,16 @@ func seedAdminUsers() error {
 }
 
 func seedVKConnectionRow() error {
-	query := `
-		INSERT INTO vk_connection (id, is_connected)
-		VALUES (1, 0)
-	`
+	var query string
 	if isPostgres() {
-		query += ` ON CONFLICT (id) DO NOTHING`
+		query = `
+			INSERT INTO vk_connection (id, is_connected)
+			VALUES (1, FALSE)
+			ON CONFLICT (id) DO NOTHING`
 	} else {
-		query = strings.Replace(query, "INSERT INTO", "INSERT OR IGNORE INTO", 1)
+		query = `
+			INSERT OR IGNORE INTO vk_connection (id, is_connected)
+			VALUES (1, 0)`
 	}
 	_, err := DB.Exec(query)
 	return err
@@ -373,37 +375,68 @@ func migrateVKAccountsFromLegacy() error {
 		return nil
 	}
 
-	if _, err := DB.Exec(`
-		INSERT INTO vk_accounts (vk_user_id, user_name, user_photo, access_token, token_expires, is_active, created_at, updated_at)
-		SELECT
-			vk_user_id,
-			COALESCE(user_name, ''),
-			COALESCE(user_photo, ''),
-			access_token,
-			token_expires,
-			CASE WHEN is_connected = 1 THEN 1 ELSE 0 END,
-			CURRENT_TIMESTAMP,
-			COALESCE(updated_at, CURRENT_TIMESTAMP)
-		FROM vk_connection
-		WHERE TRIM(COALESCE(access_token, '')) <> ''
-		  AND NOT EXISTS (
-			  SELECT 1 FROM vk_accounts acc
-			  WHERE acc.vk_user_id = vk_connection.vk_user_id
-			    AND vk_connection.vk_user_id IS NOT NULL
-		  )
-	`); err != nil {
+	var migrateQuery string
+	if isPostgres() {
+		migrateQuery = `
+			INSERT INTO vk_accounts (vk_user_id, user_name, user_photo, access_token, token_expires, is_active, created_at, updated_at)
+			SELECT
+				vk_user_id,
+				COALESCE(user_name, ''),
+				COALESCE(user_photo, ''),
+				access_token,
+				token_expires,
+				CASE WHEN is_connected = TRUE THEN TRUE ELSE FALSE END,
+				CURRENT_TIMESTAMP,
+				COALESCE(updated_at, CURRENT_TIMESTAMP)
+			FROM vk_connection
+			WHERE TRIM(COALESCE(access_token, '')) <> ''
+			  AND NOT EXISTS (
+				  SELECT 1 FROM vk_accounts acc
+				  WHERE acc.vk_user_id = vk_connection.vk_user_id
+				    AND vk_connection.vk_user_id IS NOT NULL
+			  )`
+	} else {
+		migrateQuery = `
+			INSERT INTO vk_accounts (vk_user_id, user_name, user_photo, access_token, token_expires, is_active, created_at, updated_at)
+			SELECT
+				vk_user_id,
+				COALESCE(user_name, ''),
+				COALESCE(user_photo, ''),
+				access_token,
+				token_expires,
+				CASE WHEN is_connected = 1 THEN 1 ELSE 0 END,
+				CURRENT_TIMESTAMP,
+				COALESCE(updated_at, CURRENT_TIMESTAMP)
+			FROM vk_connection
+			WHERE TRIM(COALESCE(access_token, '')) <> ''
+			  AND NOT EXISTS (
+				  SELECT 1 FROM vk_accounts acc
+				  WHERE acc.vk_user_id = vk_connection.vk_user_id
+				    AND vk_connection.vk_user_id IS NOT NULL
+			  )`
+	}
+
+	if _, err := DB.Exec(migrateQuery); err != nil {
 		return err
 	}
 
 	var activeCount int
-	if err := DB.QueryRow(`SELECT COUNT(1) FROM vk_accounts WHERE is_active = 1`).Scan(&activeCount); err != nil {
+	activeVal := "1"
+	if isPostgres() {
+		activeVal = "TRUE"
+	}
+	if err := DB.QueryRow(fmt.Sprintf(`SELECT COUNT(1) FROM vk_accounts WHERE is_active = %s`, activeVal)).Scan(&activeCount); err != nil {
 		return err
 	}
 
 	if activeCount == 0 {
-		if _, err := DB.Exec(`
+		setActive := "1"
+		if isPostgres() {
+			setActive = "TRUE"
+		}
+		if _, err := DB.Exec(fmt.Sprintf(`
 			UPDATE vk_accounts
-			SET is_active = 1, updated_at = CURRENT_TIMESTAMP
+			SET is_active = %s, updated_at = CURRENT_TIMESTAMP
 			WHERE id = (
 				SELECT id
 				FROM vk_accounts
@@ -411,7 +444,7 @@ func migrateVKAccountsFromLegacy() error {
 				ORDER BY updated_at DESC, id DESC
 				LIMIT 1
 			)
-		`); err != nil {
+		`, setActive)); err != nil {
 			return err
 		}
 	}

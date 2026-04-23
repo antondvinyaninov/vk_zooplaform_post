@@ -104,11 +104,11 @@ func (s *GroupService) GetAll() ([]*models.Group, error) {
 	query := `
 		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, created_at, updated_at
 		FROM groups
-		WHERE is_active = 1
+		WHERE is_active = ?
 		ORDER BY created_at DESC
 	`
 
-	rows, err := database.Query(query)
+	rows, err := database.Query(query, true)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (s *GroupService) Update(group *models.Group) error {
 
 // Delete удаляет группу (мягкое удаление)
 func (s *GroupService) Delete(id int) error {
-	query := `UPDATE groups SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := database.Exec(query, id)
+	query := `UPDATE groups SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := database.Exec(query, false, id)
 	return err
 }

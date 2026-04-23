@@ -71,9 +71,9 @@ func listInstalledGroups() ([]installedGroupResponse, error) {
 	rows, err := database.Query(`
 		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, health_status, last_check_at, health_error
 		FROM groups
-		WHERE is_active = 1
+		WHERE is_active = ?
 		ORDER BY updated_at DESC
-	`)
+	`, true)
 	if err != nil {
 		return nil, err
 	}
@@ -165,9 +165,9 @@ func refreshGroupsHealth(groupID int) (int, error) {
 	query := `
 		SELECT id, vk_group_id, access_token
 		FROM groups
-		WHERE is_active = 1
+		WHERE is_active = ?
 	`
-	args := []interface{}{}
+	args := []interface{}{true}
 	if groupID > 0 {
 		query += " AND id = ?"
 		args = append(args, groupID)
