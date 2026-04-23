@@ -188,6 +188,17 @@ const postgresSchema = `
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 
+	CREATE TABLE IF NOT EXISTS users (
+		id BIGSERIAL PRIMARY KEY,
+		vk_user_id BIGINT UNIQUE NOT NULL,
+		first_name TEXT,
+		last_name TEXT,
+		photo_200 TEXT,
+		role TEXT DEFAULT 'user',
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+
 	CREATE TABLE IF NOT EXISTS posts (
 		id BIGSERIAL PRIMARY KEY,
 		vk_post_id BIGINT,
@@ -201,17 +212,6 @@ const postgresSchema = `
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		FOREIGN KEY (user_id) REFERENCES users(id),
 		FOREIGN KEY (group_id) REFERENCES groups(id)
-	);
-
-	CREATE TABLE IF NOT EXISTS users (
-		id BIGSERIAL PRIMARY KEY,
-		vk_user_id BIGINT UNIQUE NOT NULL,
-		first_name TEXT,
-		last_name TEXT,
-		photo_200 TEXT,
-		role TEXT DEFAULT 'user',
-		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS admin_users (
@@ -263,18 +263,27 @@ func migratePostsTable() error {
 	if err := addColumnIfMissing("groups", "health_status", "TEXT DEFAULT 'unknown'"); err != nil {
 		return err
 	}
-	if err := addColumnIfMissing("groups", "last_check_at", "DATETIME"); err != nil {
+
+	lastCheckAtType := "DATETIME"
+	if isPostgres() {
+		lastCheckAtType = "TIMESTAMPTZ"
+	}
+	if err := addColumnIfMissing("groups", "last_check_at", lastCheckAtType); err != nil {
 		return err
 	}
 	if err := addColumnIfMissing("groups", "health_error", "TEXT"); err != nil {
 		return err
 	}
 
-	if err := addColumnIfMissing("posts", "user_id", "INTEGER"); err != nil {
+	userIDType := "INTEGER"
+	if isPostgres() {
+		userIDType = "BIGINT"
+	}
+	if err := addColumnIfMissing("posts", "user_id", userIDType); err != nil {
 		return err
 	}
 
-	if _, err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id)`); err != nil {
+	if _, err := DB.Exec(rebind(`CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id)`)); err != nil {
 		return err
 	}
 
