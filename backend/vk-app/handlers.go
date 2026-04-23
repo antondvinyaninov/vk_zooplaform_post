@@ -76,8 +76,9 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 
 	cfg := config.Load()
 	utils.RespondSuccess(w, map[string]interface{}{
-		"vk_mini_app_id": cfg.VKMiniAppID,
-		"vk_client_id":   cfg.VKClientID, // Для постинга через API
+		"vk_mini_app_id":          cfg.VKMiniAppID,
+		"vk_mini_app_service_key": cfg.VKMiniAppServiceKey,
+		"vk_client_id":            cfg.VKClientID, // Для постинга через API
 	})
 }
 

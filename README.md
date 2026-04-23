@@ -148,7 +148,8 @@ VK_CLIENT_SECRET=...            # Secret приложения VK для пост
 
 # VK Mini App (для мини-приложения в сообществе)  
 VK_MINI_APP_ID=54490430         # ID VK Mini App
-VK_MINI_APP_SECRET=...          # Secret VK Mini App
+VK_MINI_APP_SECRET=Rv2kFUEMsePsD0vm5Pgg    # Защищённый ключ VK Mini App
+VK_MINI_APP_SERVICE_KEY=a46dd01aa46dd01aa46dd01a51a72da1b8aa46da46dd01acd8bfbaef10dfc86482dd644  # Сервисный ключ VK Mini App
 
 DATABASE_PATH=./data/app.db     # Путь к БД SQLite
 ```
