@@ -72,7 +72,8 @@ func main() {
 
 	// Канал для graceful shutdown
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	// Игнорируем SIGQUIT, обрабатываем только SIGINT и SIGTERM
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	// Запускаем сервер в горутине
 	go func() {
