@@ -5,8 +5,10 @@ import (
 	"backend/vk"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -19,37 +21,94 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// vkPostHandler — публикация нового поста на стене группы
+// vkPostHandler — публикация нового поста на стене группы.
+// Принимает multipart/form-data (с фото) или JSON.
 func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
 		return
 	}
-	var req struct {
-		AccessToken string `json:"access_token"`
-		OwnerID     string `json:"owner_id"`
-		Message     string `json:"message"`
-		FromGroup   int    `json:"from_group"`
-		PublishDate int64  `json:"publish_date"`
-		Attachments string `json:"attachments"`
+
+	// Парсим тело — поддерживаем и FormData, и JSON
+	var (
+		accessToken string
+		ownerID     string
+		message     string
+		fromGroup   int
+		publishDate int64
+	)
+
+	ct := r.Header.Get("Content-Type")
+	if strings.HasPrefix(ct, "multipart/form-data") || strings.HasPrefix(ct, "application/x-www-form-urlencoded") {
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			r.ParseForm()
+		}
+		accessToken = r.FormValue("access_token")
+		ownerID = r.FormValue("owner_id")
+		message = r.FormValue("message")
+		if v := r.FormValue("from_group"); v == "1" {
+			fromGroup = 1
+		}
+		if v := r.FormValue("publish_date"); v != "" {
+			fmt.Sscanf(v, "%d", &publishDate)
+		}
+	} else {
+		var req struct {
+			AccessToken string `json:"access_token"`
+			OwnerID     string `json:"owner_id"`
+			Message     string `json:"message"`
+			FromGroup   int    `json:"from_group"`
+			PublishDate int64  `json:"publish_date"`
+			Attachments string `json:"attachments"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
+			return
+		}
+		accessToken = req.AccessToken
+		ownerID = req.OwnerID
+		message = req.Message
+		fromGroup = req.FromGroup
+		publishDate = req.PublishDate
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
-		return
-	}
-	token := resolveToken(req.AccessToken)
+
+	token := resolveToken(accessToken)
 	if token == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK account not connected"})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK account not connected — please login at /vk-connect"})
 		return
 	}
+
 	client := vk.NewVKClient(token)
+
+	// Загружаем фотографии если есть
 	var attachments []string
-	if req.Attachments != "" {
-		attachments = strings.Split(req.Attachments, ",")
+	if r.MultipartForm != nil {
+		files := r.MultipartForm.File["photos"]
+		groupIDStr := strings.TrimPrefix(ownerID, "-")
+		for _, fh := range files {
+			f, err := fh.Open()
+			if err != nil {
+				continue
+			}
+			// Сохраняем во временный файл
+			tmpPath := "/tmp/upload_" + fh.Filename
+			if out, err := os.Create(tmpPath); err == nil {
+				io.Copy(out, f)
+				out.Close()
+				if att, err := client.UploadPhotoToWall(tmpPath, groupIDStr); err == nil {
+					attachments = append(attachments, att)
+				} else {
+					log.Printf("[vkPost] photo upload error: %v", err)
+				}
+				os.Remove(tmpPath)
+			}
+			f.Close()
+		}
 	}
-	postID, err := client.WallPost(req.OwnerID, req.Message, attachments, req.FromGroup == 1, req.PublishDate)
+
+	postID, err := client.WallPost(ownerID, message, attachments, fromGroup == 1, publishDate)
 	if err != nil {
-		log.Printf("[vkPost] error: %v", err)
+		log.Printf("[vkPost] VK wall.post error: %v", err)
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
