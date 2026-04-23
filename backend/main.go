@@ -53,8 +53,22 @@ func main() {
 	log.Printf("Registering site routes...")
 	site.RegisterRoutes(mux)
 
-	// VK Mini App - специальная обработка с заголовками для iframe
-	mux.HandleFunc("/vk_app/", func(w http.ResponseWriter, r *http.Request) {
+	// Редиректы для путей без слеша в конце (чтобы избежать 403/404)
+	mux.HandleFunc("/vk_app", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/vk_app/", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/vk-app", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/vk-app/", http.StatusMovedPermanently)
+	})
+
+	// VK Mini App - поддержка обоих вариантов написания (через дефис и через подчеркивание)
+	vkAppHandler := func(w http.ResponseWriter, r *http.Request) {
+		// Определяем какой префикс используется
+		prefix := "/vk_app/"
+		if strings.HasPrefix(r.URL.Path, "/vk-app/") {
+			prefix = "/vk-app/"
+		}
+
 		log.Printf("📱 VK Mini App request: %s", r.URL.Path)
 
 		// Заголовки для работы в VK iframe
@@ -63,23 +77,27 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
 
-		// Убираем /vk_app/ из пути для поиска файла
-		filePath := "/usr/share/nginx/html/vk_app" + strings.TrimPrefix(r.URL.Path, "/vk_app")
+		// Убираем префикс из пути для поиска файла
+		// Сами файлы всегда лежат в папке vk_app (с подчеркиванием)
+		filePath := "/usr/share/nginx/html/vk_app/" + strings.TrimPrefix(r.URL.Path, prefix)
 
 		// Если путь заканчивается на /, ищем index.html
-		if strings.HasSuffix(filePath, "/") {
-			filePath += "index.html"
+		if strings.HasSuffix(filePath, "/") || filePath == "/usr/share/nginx/html/vk_app/" {
+			filePath = "/usr/share/nginx/html/vk_app/index.html"
 		}
 
 		// Проверяем существование файла
 		if _, err := os.Stat(filePath); err != nil {
-			// Если файл не найден, возвращаем index.html (SPA fallback)
+			// Если это не файл (например, внутренний роут React), возвращаем index.html (SPA fallback)
 			filePath = "/usr/share/nginx/html/vk_app/index.html"
 		}
 
-		log.Printf("📱 Serving VK Mini App file: %s", filePath)
+		log.Printf("📱 Serving VK Mini App file: %s (requested: %s)", filePath, r.URL.Path)
 		http.ServeFile(w, r, filePath)
-	})
+	}
+
+	mux.HandleFunc("/vk_app/", vkAppHandler)
+	mux.HandleFunc("/vk-app/", vkAppHandler)
 
 	// Альтернативный endpoint для VK Mini App без ограничений
 	mux.HandleFunc("/vk_app_embed/", func(w http.ResponseWriter, r *http.Request) {
