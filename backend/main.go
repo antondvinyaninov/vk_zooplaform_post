@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -19,9 +20,15 @@ import (
 func main() {
 	// Загружаем конфигурацию
 	cfg := config.Load()
+
+	// Принудительно устанавливаем порт 80 для продакшена
+	if os.Getenv("PORT") == "" {
+		cfg.Port = "80"
+	}
+
 	log.Printf("=== VK ZooPlatforma Backend Starting ===")
 	log.Printf("Environment PORT: %s", os.Getenv("PORT"))
-	log.Printf("Config Port: %s", cfg.Port)
+	log.Printf("Final Port: %s", cfg.Port)
 	log.Printf("Database Path: %s", cfg.DatabasePath)
 	log.Printf("VK Client ID: %s", cfg.VKClientID)
 	log.Printf("VK Mini App ID: %s", cfg.VKMiniAppID)
@@ -45,6 +52,48 @@ func main() {
 	vkapp.RegisterRoutes(mux)
 	log.Printf("Registering site routes...")
 	site.RegisterRoutes(mux)
+
+	// VK Mini App - специальная обработка с заголовками для iframe
+	mux.HandleFunc("/vk_app/", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("📱 VK Mini App request: %s", r.URL.Path)
+
+		// Заголовки для работы в VK iframe
+		w.Header().Set("X-Frame-Options", "ALLOWALL")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
+
+		// Убираем /vk_app/ из пути для поиска файла
+		filePath := "/usr/share/nginx/html/vk_app" + strings.TrimPrefix(r.URL.Path, "/vk_app")
+
+		// Если путь заканчивается на /, ищем index.html
+		if strings.HasSuffix(filePath, "/") {
+			filePath += "index.html"
+		}
+
+		// Проверяем существование файла
+		if _, err := os.Stat(filePath); err != nil {
+			// Если файл не найден, возвращаем index.html (SPA fallback)
+			filePath = "/usr/share/nginx/html/vk_app/index.html"
+		}
+
+		log.Printf("📱 Serving VK Mini App file: %s", filePath)
+		http.ServeFile(w, r, filePath)
+	})
+
+	// Альтернативный endpoint для VK Mini App без ограничений
+	mux.HandleFunc("/vk_app_embed/", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("📱 VK Mini App embed request: %s", r.URL.Path)
+
+		// Максимально открытые заголовки для VK
+		w.Header().Set("X-Frame-Options", "ALLOWALL")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
+
+		// Всегда возвращаем index.html для этого endpoint
+		http.ServeFile(w, r, "/usr/share/nginx/html/vk_app/index.html")
+	})
 
 	// Статические файлы фронтенда
 	log.Printf("Setting up static file serving...")
