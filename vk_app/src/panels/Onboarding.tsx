@@ -9,13 +9,16 @@ import {
   NavIdProps,
 } from '@vkontakte/vkui';
 import { Icon56ServicesOutline } from '@vkontakte/icons';
-import bridge from '@vkontakte/vk-bridge';
 
 export const Onboarding: FC<NavIdProps> = ({ id }) => {
   const installToCommunity = () => {
-    bridge.send('VKWebAppAddToCommunity').catch((error) => {
-      console.error('Failed to add to community:', error);
-    });
+    if (window.vkBridge && window.vkBridge.send) {
+      window.vkBridge.send('VKWebAppAddToCommunity').catch((error) => {
+        console.error('Failed to add to community:', error);
+      });
+    } else {
+      console.warn('VK Bridge not available');
+    }
   };
 
   return (

@@ -19,14 +19,10 @@ import {
   Icon24CheckCircleOutline, 
   Icon24CancelOutline 
 } from '@vkontakte/icons';
-import bridgeModule, { parseURLSearchParamsForGetLaunchParams } from '@vkontakte/vk-bridge';
+import { parseURLSearchParamsForGetLaunchParams } from '@vkontakte/vk-bridge';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getFeedPosts, moderatePost, saveGroupToken } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
-
-const bridge = (bridgeModule && 'send' in bridgeModule) 
-  ? bridgeModule 
-  : (bridgeModule as any).default;
 
 export const Moderation: FC<NavIdProps> = ({ id }) => {
   const [posts, setPosts] = useState<any[]>([]);
@@ -47,8 +43,12 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
         return;
       }
 
-      // Используем приведение к any для обхода конфликтов типов в разных версиях моста
-      const data = await bridge.send('VKWebAppGetGroupToken' as any, {
+      // Используем window.vkBridge для получения токена группы
+      if (!window.vkBridge) {
+        throw new Error('VK Bridge not available');
+      }
+      
+      const data = await window.vkBridge.send('VKWebAppGetGroupToken', {
         app_id: appId,
         group_id: groupId,
         scope: 'manage,wall,photos',

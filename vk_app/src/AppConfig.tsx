@@ -1,4 +1,4 @@
-import vkBridgeModule, { parseURLSearchParamsForGetLaunchParams } from '@vkontakte/vk-bridge';
+import { parseURLSearchParamsForGetLaunchParams } from '@vkontakte/vk-bridge';
 import { useAdaptivity, useAppearance, useInsets } from '@vkontakte/vk-bridge-react';
 import { Component, ReactNode } from 'react';
 import { 
@@ -11,10 +11,6 @@ import {
 } from '@vkontakte/vkui';
 import { RouterProvider } from '@vkontakte/vk-mini-apps-router';
 import '@vkontakte/vkui/dist/cssm/styles/themes.css';
-
-const vkBridge = (vkBridgeModule && 'isWebView' in vkBridgeModule) 
-  ? vkBridgeModule 
-  : (vkBridgeModule as any).default;
 
 import { transformVKBridgeAdaptivity } from './utils';
 import { router } from './routes';
@@ -87,10 +83,13 @@ export const AppConfig = () => {
         ? 'ios'
         : 'ios';
 
+  // Определяем isWebView из launch параметров или платформы
+  const isWebView = vkPlatform === 'mobile_web' || vkPlatform === 'desktop_web';
+
   console.log('AppConfig rendering with:', {
     platform,
     colorScheme: vkBridgeAppearance,
-    isWebView: vkBridge.isWebView(),
+    isWebView,
     adaptivity
   });
 
@@ -102,7 +101,7 @@ export const AppConfig = () => {
     <ConfigProvider
       colorScheme={vkBridgeAppearance}
       platform={platform}
-      isWebView={vkBridge.isWebView()}
+      isWebView={isWebView}
       hasCustomPanelHeaderAfter={true}
     >
       <AdaptivityProvider {...adaptivity}>
