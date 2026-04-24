@@ -14,6 +14,7 @@ func (c *VKClient) AddSnippet(title, description, button, imageURL, hash string)
 		"image_url":   imageURL,
 		"button":      button,
 		"description": description,
+		"v":           "5.199", // Override API version for this method
 	}
 
 	resp, err := c.CallMethod("apps.addSnippet", params)
