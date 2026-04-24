@@ -22,6 +22,7 @@ type installedGroupResponse struct {
 	HealthStatus string  `json:"health_status"`
 	LastCheckAt  *string `json:"last_check_at,omitempty"`
 	HealthError  string  `json:"health_error,omitempty"`
+	MembersCount int     `json:"members_count"`
 }
 
 func installedGroupsHandler(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +69,7 @@ func refreshGroupHealthHandler(w http.ResponseWriter, r *http.Request) {
 
 func listInstalledGroups() ([]installedGroupResponse, error) {
 	rows, err := database.Query(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, health_status, last_check_at, health_error
+		SELECT id, vk_group_id, name, screen_name, photo_200, is_active, health_status, last_check_at, health_error, members_count
 		FROM groups
 		WHERE is_active = ?
 		ORDER BY updated_at DESC
@@ -80,7 +81,7 @@ func listInstalledGroups() ([]installedGroupResponse, error) {
 
 	result := make([]installedGroupResponse, 0)
 	for rows.Next() {
-		group, _, err := scanInstalledGroup(rows)
+		group, err := scanInstalledGroup(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -94,6 +95,7 @@ func listInstalledGroups() ([]installedGroupResponse, error) {
 			IsActive:     group.IsActive,
 			HealthStatus: normalizeHealthStatus(group.HealthStatus),
 			HealthError:  strings.TrimSpace(group.HealthError),
+			MembersCount: group.MembersCount,
 		}
 		if !group.LastCheckAt.IsZero() {
 			ts := group.LastCheckAt.Format(time.RFC3339)
@@ -107,10 +109,9 @@ func listInstalledGroups() ([]installedGroupResponse, error) {
 
 func scanInstalledGroup(scanner interface {
 	Scan(dest ...interface{}) error
-}) (*models.Group, string, error) {
+}) (*models.Group, error) {
 	var (
 		group          models.Group
-		accessToken    sql.NullString
 		healthStatus   sql.NullString
 		lastCheckAt    sql.NullTime
 		healthErrorRaw sql.NullString
@@ -122,19 +123,14 @@ func scanInstalledGroup(scanner interface {
 		&group.Name,
 		&group.ScreenName,
 		&group.Photo200,
-		&accessToken,
 		&group.IsActive,
 		&healthStatus,
 		&lastCheckAt,
 		&healthErrorRaw,
+		&group.MembersCount,
 	)
 	if err != nil {
-		return nil, "", err
-	}
-
-	token := ""
-	if accessToken.Valid {
-		token = accessToken.String
+		return nil, err
 	}
 	if healthStatus.Valid {
 		group.HealthStatus = healthStatus.String
@@ -146,7 +142,7 @@ func scanInstalledGroup(scanner interface {
 		group.HealthError = healthErrorRaw.String
 	}
 
-	return &group, token, nil
+	return &group, nil
 }
 
 func normalizeHealthStatus(status string) string {
@@ -201,6 +197,8 @@ func refreshGroupsHealth(groupID int) (int, error) {
 
 		status := "error"
 		errText := "admin VK token is not connected"
+		membersCount := 0
+
 		if adminToken != "" {
 			client := vk.NewVKClient(adminToken)
 			_, checkErr := client.CallMethod("wall.get", map[string]string{
@@ -213,13 +211,37 @@ func refreshGroupsHealth(groupID int) (int, error) {
 			} else {
 				errText = checkErr.Error()
 			}
+
+			groupsResp, errGroups := client.CallMethod("groups.getById", map[string]string{
+				"group_id": strconv.Itoa(vkGroupID),
+				"fields":   "members_count",
+			})
+			if errGroups == nil {
+				var groupsData []struct {
+					MembersCount int `json:"members_count"`
+				}
+				// VK API response is an array for groups.getById
+				if json.Unmarshal(groupsResp, &groupsData) == nil && len(groupsData) > 0 {
+					membersCount = groupsData[0].MembersCount
+				} else {
+					// Sometimes it might return an object with "groups" array depending on version/endpoint, but usually array
+					var groupsDataObj struct {
+						Groups []struct {
+							MembersCount int `json:"members_count"`
+						} `json:"groups"`
+					}
+					if json.Unmarshal(groupsResp, &groupsDataObj) == nil && len(groupsDataObj.Groups) > 0 {
+						membersCount = groupsDataObj.Groups[0].MembersCount
+					}
+				}
+			}
 		}
 
 		if _, err := database.Exec(`
 			UPDATE groups
-			SET health_status = ?, last_check_at = CURRENT_TIMESTAMP, health_error = ?, updated_at = CURRENT_TIMESTAMP
+			SET health_status = ?, last_check_at = CURRENT_TIMESTAMP, health_error = ?, members_count = ?, updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?
-		`, status, errText, id); err != nil {
+		`, status, errText, membersCount, id); err != nil {
 			return updated, err
 		}
 		updated++

@@ -48,9 +48,12 @@ function renderGroups(groups) {
                     </div>
                 </td>
                 <td>${group.vk_group_id}</td>
-                <td><span class="status-chip status-chip--${status}">${statusLabel}</span></td>
+                <td>
+                    <span class="status-chip status-chip--${status}">${statusLabel}</span>
+                    ${errorText !== '—' ? `<br><small style="color: #b42318; margin-top: 4px; display: block;">${errorText}</small>` : ''}
+                </td>
                 <td>${checkedAt}</td>
-                <td>${errorText}</td>
+                <td>${group.members_count ? group.members_count.toLocaleString('ru-RU') : '0'}</td>
                 <td><button class="btn btn--secondary js-check-group" data-group-id="${group.id}">Проверить</button></td>
             </tr>
         `;
@@ -64,7 +67,7 @@ function renderGroups(groups) {
                     <th>ID</th>
                     <th>Статус</th>
                     <th>Последняя проверка</th>
-                    <th>Ошибка</th>
+                    <th>Подписчики</th>
                     <th>Действие</th>
                 </tr>
             </thead>

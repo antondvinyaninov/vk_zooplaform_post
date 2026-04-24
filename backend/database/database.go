@@ -283,6 +283,10 @@ func migratePostsTable() error {
 		return err
 	}
 
+	if err := addColumnIfMissing("groups", "members_count", "INTEGER DEFAULT 0"); err != nil {
+		return err
+	}
+
 	if _, err := DB.Exec(rebind(`CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id)`)); err != nil {
 		return err
 	}
