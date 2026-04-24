@@ -127,13 +127,16 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
                     <IconButton 
                       onClick={() => removeFile(index)}
                       style={{ 
-                        position: 'absolute', top: -12, right: -12, 
+                        position: 'absolute', top: -8, right: -8, 
+                        width: 24, height: 24,
+                        padding: 0,
                         background: 'white', borderRadius: '50%',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                       }}
                       disabled={isSubmitting}
                     >
-                      <Icon28CancelCircleFillRed />
+                      <Icon28CancelCircleFillRed width={24} height={24} />
                     </IconButton>
                   </div>
                 ))}
