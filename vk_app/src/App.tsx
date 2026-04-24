@@ -24,7 +24,7 @@ const Home = lazy(() => import('./panels/Home').then(m => ({ default: m.Home }))
 const Onboarding = lazy(() => import('./panels/Onboarding').then(m => ({ default: m.Onboarding })));
 const Profile = lazy(() => import('./panels/Profile').then(m => ({ default: m.Profile })));
 const CommunitySettings = lazy(() => import('./panels/CommunitySettings'));
-const MyPosts = lazy(() => import('./panels/MyAds').then(m => ({ default: m.MyPosts })));
+
 const CreatePost = lazy(() => import('./panels/CreateAd').then(m => ({ default: m.CreatePost })));
 const AdDetail = lazy(() => import('./panels/AdDetail'));
 const Moderation = lazy(() => import('./panels/Moderation'));
@@ -32,7 +32,7 @@ const ModerationModal = lazy(() => import('./panels/ModerationModal'));
 
 const STORY_IDS = {
   HOME: 'home_story',
-  MY_POSTS: 'my_posts_story',
+
   CREATE_POST: 'create_post_story',
   PROFILE: 'profile_story',
   COMMUNITY_SETTINGS: 'community_settings_story',
@@ -43,7 +43,7 @@ const STORY_IDS = {
 
 const MAIN_PANEL_TO_ROUTE: Record<string, string> = {
   [DEFAULT_VIEW_PANELS.HOME]: '/home',
-  [DEFAULT_VIEW_PANELS.MY_POSTS]: `/${DEFAULT_VIEW_PANELS.MY_POSTS}`,
+
   [DEFAULT_VIEW_PANELS.CREATE_POST]: `/${DEFAULT_VIEW_PANELS.CREATE_POST}`,
   [DEFAULT_VIEW_PANELS.PROFILE]: `/${DEFAULT_VIEW_PANELS.PROFILE}`,
   [DEFAULT_VIEW_PANELS.MODERATION]: `/${DEFAULT_VIEW_PANELS.MODERATION}`,
@@ -53,8 +53,7 @@ const getActiveStory = (panel: string): string => {
   switch (panel) {
     case DEFAULT_VIEW_PANELS.HOME:
       return STORY_IDS.HOME;
-    case DEFAULT_VIEW_PANELS.MY_POSTS:
-      return STORY_IDS.MY_POSTS;
+
     case DEFAULT_VIEW_PANELS.CREATE_POST:
       return STORY_IDS.CREATE_POST;
     case DEFAULT_VIEW_PANELS.PROFILE:
@@ -262,9 +261,7 @@ export const App = () => {
               <View id={STORY_IDS.HOME} activePanel={activePanel}>
                 <Home id="home" />
               </View>
-              <View id={STORY_IDS.MY_POSTS} activePanel={activePanel}>
-                <MyPosts id="my_posts" />
-              </View>
+
               <View id={STORY_IDS.CREATE_POST} activePanel={activePanel}>
                 <CreatePost id="create_post" />
               </View>

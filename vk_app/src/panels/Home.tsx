@@ -3,7 +3,6 @@ import {
   Panel,
   PanelHeader,
   Group,
-  SimpleCell,
   NavIdProps,
   CardGrid,
   ContentCard,
@@ -11,9 +10,9 @@ import {
   Header,
   Button,
 } from '@vkontakte/vkui';
-import { Icon28UserOutline, Icon28ListOutline, Icon28AddOutline } from '@vkontakte/icons';
+import { Icon28AddOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getFeedPosts } from '../shared/api';
+import { getMyPosts } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export interface HomeProps extends NavIdProps {}
@@ -26,7 +25,7 @@ export const Home: FC<HomeProps> = ({ id }) => {
   useEffect(() => {
     async function fetchPosts() {
       try {
-        const data = await getFeedPosts();
+        const data = await getMyPosts();
         setPosts(data);
       } catch (error) {
         console.error('Failed to fetch posts:', error);
@@ -43,20 +42,7 @@ export const Home: FC<HomeProps> = ({ id }) => {
         Главная
       </PanelHeader>
 
-      <Group>
-        <SimpleCell
-          before={<Icon28UserOutline />}
-          onClick={() => routeNavigator.push('/profile')}
-        >
-          Мой профиль
-        </SimpleCell>
-        <SimpleCell
-          before={<Icon28ListOutline />}
-          onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_POSTS}`)}
-        >
-          Мои публикации
-        </SimpleCell>
-      </Group>
+
 
       <Group header={
         <Header 
@@ -82,7 +68,13 @@ export const Home: FC<HomeProps> = ({ id }) => {
               <ContentCard
                 key={post.id}
                 onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POST_DETAIL}/${post.id}`)}
-                caption={post.group?.name || 'Публикация сообщества'}
+                caption={
+                  post.status === 'published' ? '✅ Опубликовано' :
+                  post.status === 'pending' ? '⏳ На модерации' :
+                  post.status === 'rejected' ? '❌ Отклонено' :
+                  post.status === 'draft' ? '📝 Черновик' :
+                  post.status
+                }
                 title={post.title}
                 description={post.message}
                 maxHeight={250}

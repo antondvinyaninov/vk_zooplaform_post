@@ -12,7 +12,6 @@ import {
 } from '@vkontakte/vkui';
 import {
   Icon28SettingsOutline,
-  Icon28ListOutline,
   Icon28CheckShieldOutline,
 } from '@vkontakte/icons';
 import { UserInfo } from '@vkontakte/vk-bridge';
@@ -68,17 +67,7 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, role }) => {
         </Group>
       )}
 
-      <Group header={<Header>Меню пользователя</Header>}>
-        <List>
-            <SimpleCell 
-              before={<Icon28ListOutline />} 
-              onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_POSTS}`)}
-            >
-            Мои публикации
-            </SimpleCell>
 
-        </List>
-      </Group>
     </Panel>
   );
 };

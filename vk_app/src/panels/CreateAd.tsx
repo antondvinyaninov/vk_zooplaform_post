@@ -38,7 +38,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
       }
 
       await createPost(text);
-      routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_POSTS}`);
+      routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`);
     } catch (error: any) {
       alert(`Ошибка при сохранении: ${error?.message || String(error)}`);
     } finally {

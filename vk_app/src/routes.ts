@@ -16,7 +16,7 @@ export const DEFAULT_VIEW_PANELS = {
   ONBOARDING: 'onboarding',
   PROFILE: 'profile',
   COMMUNITY_SETTINGS: 'community_settings',
-  MY_POSTS: 'my_posts',
+
   CREATE_POST: 'create_post',
   POST_DETAIL: 'post_detail',
   MODERATION: 'moderation',
@@ -30,7 +30,7 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.ONBOARDING, `/${DEFAULT_VIEW_PANELS.ONBOARDING}`, []),
       createPanel(DEFAULT_VIEW_PANELS.PROFILE, `/${DEFAULT_VIEW_PANELS.PROFILE}`, []),
       createPanel(DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS, `/${DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS}`, []),
-      createPanel(DEFAULT_VIEW_PANELS.MY_POSTS, `/${DEFAULT_VIEW_PANELS.MY_POSTS}`, []),
+
       createPanel(DEFAULT_VIEW_PANELS.CREATE_POST, `/${DEFAULT_VIEW_PANELS.CREATE_POST}`, []),
       createPanel(DEFAULT_VIEW_PANELS.POST_DETAIL, `/${DEFAULT_VIEW_PANELS.POST_DETAIL}/:id`, []),
       createPanel(DEFAULT_VIEW_PANELS.MODERATION, `/${DEFAULT_VIEW_PANELS.MODERATION}`, [
