@@ -422,8 +422,8 @@ func snippetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Title == "" || req.ImageURL == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Title and Image URL are required"})
+	if req.Title == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Title is required"})
 		return
 	}
 

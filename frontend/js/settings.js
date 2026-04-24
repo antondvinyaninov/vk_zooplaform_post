@@ -394,9 +394,9 @@ async function updateSnippet() {
     const imageUrl = document.getElementById('snippetImage').value.trim();
     const resultSpan = document.getElementById('snippetResult');
 
-    if (!title || !imageUrl) {
+    if (!title) {
         resultSpan.style.color = '#e64646';
-        resultSpan.textContent = 'Заголовок и ссылка на изображение обязательны';
+        resultSpan.textContent = 'Заголовок обязателен';
         return;
     }
 
