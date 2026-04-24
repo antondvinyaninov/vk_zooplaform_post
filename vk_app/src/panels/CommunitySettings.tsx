@@ -121,23 +121,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
           )}
 
           <Group>
-            <FormItem top="ID сообщества">
-              <Input value={settings?.vk_group_id ? String(settings.vk_group_id) : ''} disabled />
-            </FormItem>
-            <FormItem top="Название сообщества">
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </FormItem>
-            <FormItem top="Короткое имя (screen_name)">
-              <Input value={screenName} onChange={(e) => setScreenName(e.target.value)} />
-            </FormItem>
-            <FormItem top="URL аватара (photo_200)">
-              <Input value={photo200} onChange={(e) => setPhoto200(e.target.value)} />
-            </FormItem>
-            <FormItem top="Статус сообщества">
+            <FormItem top="Активировать приложение в сообществе">
               <Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            </FormItem>
-            <FormItem top="Токен сообщества">
-              <Input value={settings?.has_token ? 'Подключен' : 'Не подключен'} disabled />
             </FormItem>
             <FormItem top="Получатели уведомлений">
               <ChipsSelect
