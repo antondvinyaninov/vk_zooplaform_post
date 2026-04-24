@@ -172,7 +172,6 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                 placeholder="Введите название населенного пункта"
                 emptyText="Ничего не найдено"
                 fetching={citySearchLoading}
-                clearButtonAriaLabel="Очистить"
               />
             </FormItem>
             <FormItem top="Активировать приложение в сообществе">
