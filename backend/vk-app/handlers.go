@@ -188,8 +188,18 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, err := getUserByVKUserID(ctx.UserID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if user == nil {
+		utils.RespondError(w, http.StatusBadRequest, "user not synced")
+		return
+	}
+
 	post := &models.Post{
-		UserID:  ctx.UserID,
+		UserID:  user.ID,
 		GroupID: group.ID,
 		Message: req.Message,
 		Status:  "pending",
@@ -224,7 +234,17 @@ func myPostsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := getPostsByUserID(ctx.UserID, 100, 0)
+	user, err := getUserByVKUserID(ctx.UserID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if user == nil {
+		utils.RespondSuccess(w, []postResponse{})
+		return
+	}
+
+	posts, err := getPostsByUserID(user.ID, 100, 0)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
