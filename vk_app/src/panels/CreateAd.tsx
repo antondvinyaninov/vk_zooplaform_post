@@ -11,7 +11,6 @@ import {
   File as VKFile,
   HorizontalScroll,
   Image,
-  IconButton,
 } from '@vkontakte/vkui';
 import { Icon24Camera, Icon28CancelCircleFillRed, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -22,17 +21,60 @@ import { DEFAULT_VIEW_PANELS } from '../routes';
 export const CreatePost: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [text, setText] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<{ file: File, thumbnail?: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const getVideoThumbnail = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.src = URL.createObjectURL(file);
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.playsInline = true;
+      
+      video.onloadeddata = () => {
+        video.currentTime = 1; // 1 second
+      };
+      
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg'));
+        } else {
+          resolve('');
+        }
+      };
+      
+      video.onerror = () => {
+        resolve('');
+      };
+    });
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const newFiles = Array.from(e.target.files);
-    if (files.length + newFiles.length > 10) {
+    const newFilesList = Array.from(e.target.files);
+    if (files.length + newFilesList.length > 10) {
       alert('Можно прикрепить не более 10 файлов');
       return;
     }
-    setFiles((prev) => [...prev, ...newFiles]);
+
+    const items = newFilesList.map(file => ({ file }));
+    setFiles((prev) => [...prev, ...items]);
+
+    // Async load thumbnails for videos
+    items.forEach(async (item) => {
+      if (item.file.type.startsWith('video/')) {
+        const thumb = await getVideoThumbnail(item.file);
+        if (thumb) {
+          setFiles(prev => prev.map(p => p.file === item.file ? { ...p, thumbnail: thumb } : p));
+        }
+      }
+    });
   };
 
   const removeFile = (index: number) => {
@@ -56,7 +98,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
         // Игнорируем ошибки
       }
 
-      await createPost(text, files);
+      await createPost(text, files.map(item => item.file));
       routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`);
     } catch (error: any) {
       alert(`Ошибка при сохранении: ${error?.message || String(error)}`);
@@ -104,14 +146,29 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
           <FormItem>
             <HorizontalScroll showArrows getScrollToLeft={(i) => i - 120} getScrollToRight={(i) => i + 120}>
               <div style={{ display: 'flex', gap: 12, padding: '8px 16px' }}>
-                {files.map((file, index) => (
+                {files.map((item, index) => (
                   <div key={index} style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
-                    {file.type.startsWith('image/') ? (
+                    {item.file.type.startsWith('image/') ? (
                       <Image 
-                        src={URL.createObjectURL(file)} 
+                        src={URL.createObjectURL(item.file)} 
                         size={80} 
                         style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
                       />
+                    ) : item.thumbnail ? (
+                      <div style={{ position: 'relative', width: 80, height: 80 }}>
+                        <Image 
+                          src={item.thumbnail} 
+                          size={80} 
+                          style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
+                        />
+                        <div style={{ 
+                          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
+                          backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, 
+                          display: 'flex', alignItems: 'center', justifyContent: 'center' 
+                        }}>
+                          <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />
+                        </div>
+                      </div>
                     ) : (
                       <div style={{ 
                         width: 80, height: 80, backgroundColor: '#f0f0f0', 
@@ -120,24 +177,24 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
                       }}>
                         <Icon28VideoOutline width={32} height={32} style={{ color: '#818c99' }} />
                         <span style={{ fontSize: 10, marginTop: 4, textAlign: 'center', width: '90%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#818c99' }}>
-                          {file.name}
+                          {item.file.name}
                         </span>
                       </div>
                     )}
-                    <IconButton 
-                      onClick={() => removeFile(index)}
+                    <div 
+                      onClick={() => !isSubmitting && removeFile(index)}
                       style={{ 
-                        position: 'absolute', top: -8, right: -8, 
+                        position: 'absolute', top: -6, right: -6, 
                         width: 24, height: 24,
-                        padding: 0,
                         background: 'white', borderRadius: '50%',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: isSubmitting ? 'default' : 'pointer',
+                        zIndex: 2
                       }}
-                      disabled={isSubmitting}
                     >
-                      <Icon28CancelCircleFillRed width={24} height={24} />
-                    </IconButton>
+                      <Icon28CancelCircleFillRed width={28} height={28} />
+                    </div>
                   </div>
                 ))}
               </div>
