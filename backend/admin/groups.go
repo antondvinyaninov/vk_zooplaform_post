@@ -19,7 +19,6 @@ type installedGroupResponse struct {
 	ScreenName   string  `json:"screen_name"`
 	Photo200     string  `json:"photo_200"`
 	IsActive     bool    `json:"is_active"`
-	HasToken     bool    `json:"has_token"`
 	HealthStatus string  `json:"health_status"`
 	LastCheckAt  *string `json:"last_check_at,omitempty"`
 	HealthError  string  `json:"health_error,omitempty"`
@@ -81,7 +80,7 @@ func listInstalledGroups() ([]installedGroupResponse, error) {
 
 	result := make([]installedGroupResponse, 0)
 	for rows.Next() {
-		group, accessToken, err := scanInstalledGroup(rows)
+		group, _, err := scanInstalledGroup(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +92,6 @@ func listInstalledGroups() ([]installedGroupResponse, error) {
 			ScreenName:   group.ScreenName,
 			Photo200:     group.Photo200,
 			IsActive:     group.IsActive,
-			HasToken:     strings.TrimSpace(accessToken) != "",
 			HealthStatus: normalizeHealthStatus(group.HealthStatus),
 			HealthError:  strings.TrimSpace(group.HealthError),
 		}
@@ -163,7 +161,7 @@ func normalizeHealthStatus(status string) string {
 
 func refreshGroupsHealth(groupID int) (int, error) {
 	query := `
-		SELECT id, vk_group_id, access_token
+		SELECT id, vk_group_id
 		FROM groups
 		WHERE is_active = ?
 	`
@@ -179,22 +177,32 @@ func refreshGroupsHealth(groupID int) (int, error) {
 	}
 	defer rows.Close()
 
+	// Получаем токен админа один раз
+	var adminToken string
+	dbErr := database.QueryRow(`
+		SELECT access_token
+		FROM vk_accounts
+		WHERE is_active = ?
+		ORDER BY updated_at DESC LIMIT 1
+	`, true).Scan(&adminToken)
+	if dbErr != nil {
+		adminToken = ""
+	}
+
 	updated := 0
 	for rows.Next() {
 		var (
 			id         int
 			vkGroupID  int
-			accessToken sql.NullString
 		)
-		if err := rows.Scan(&id, &vkGroupID, &accessToken); err != nil {
+		if err := rows.Scan(&id, &vkGroupID); err != nil {
 			return updated, err
 		}
 
 		status := "error"
-		errText := "group token is not connected"
-		token := strings.TrimSpace(accessToken.String)
-		if accessToken.Valid && token != "" {
-			client := vk.NewVKClient(token)
+		errText := "admin VK token is not connected"
+		if adminToken != "" {
+			client := vk.NewVKClient(adminToken)
 			_, checkErr := client.CallMethod("wall.get", map[string]string{
 				"owner_id": "-" + strconv.Itoa(vkGroupID),
 				"count":    "1",

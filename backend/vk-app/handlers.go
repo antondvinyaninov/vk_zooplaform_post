@@ -357,22 +357,17 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			return
 		}
 
-		// Берём активный токен: сначала пробуем токен сообщества, затем токен админа
-		var token string
-		if strings.TrimSpace(group.AccessToken) != "" {
-			token = strings.TrimSpace(group.AccessToken)
-		} else {
-			adminToken, err := getActiveVKToken()
-			if err != nil {
-				utils.RespondError(w, http.StatusInternalServerError, err.Error())
-				return
-			}
-			if adminToken == "" {
-				utils.RespondError(w, http.StatusBadRequest, "community token is missing and VK account is not connected — please connect the community or login at /vk-connect")
-				return
-			}
-			token = adminToken
+		// Берём активный токен админа
+		adminToken, err := getActiveVKToken()
+		if err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err.Error())
+			return
 		}
+		if adminToken == "" {
+			utils.RespondError(w, http.StatusBadRequest, "VK account is not connected — please login at /vk-connect in the admin panel")
+			return
+		}
+		token := adminToken
 
 		client := vk.NewVKClient(token)
 		// from_group=true: постим от имени группы (требует токена сообщества или токена админа с правами)
@@ -417,52 +412,6 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 
 	utils.RespondSuccess(w, response)
-}
-
-func saveGroupTokenHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	ctx, err := parseLaunchContext(r)
-	if err != nil {
-		utils.RespondError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	if !isModerator(ctx.GroupRole) {
-		utils.RespondError(w, http.StatusForbidden, "token can be saved only by community admins")
-		return
-	}
-
-	var req struct {
-		VKGroupID   int    `json:"vk_group_id"`
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
-		return
-	}
-	if req.VKGroupID == 0 || strings.TrimSpace(req.AccessToken) == "" {
-		utils.RespondError(w, http.StatusBadRequest, "vk_group_id and access_token are required")
-		return
-	}
-
-	group, err := ensureGroup(req.VKGroupID)
-	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	group.AccessToken = strings.TrimSpace(req.AccessToken)
-	group.IsActive = true
-	if err := updateGroup(group); err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	utils.RespondSuccess(w, map[string]interface{}{
-		"group": userFacingGroup(group),
-	})
 }
 
 func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {

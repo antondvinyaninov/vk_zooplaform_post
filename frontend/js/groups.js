@@ -48,7 +48,6 @@ function renderGroups(groups) {
                     </div>
                 </td>
                 <td>${group.vk_group_id}</td>
-                <td>Токен ${tokenInfo}</td>
                 <td><span class="status-chip status-chip--${status}">${statusLabel}</span></td>
                 <td>${checkedAt}</td>
                 <td>${errorText}</td>
@@ -63,7 +62,6 @@ function renderGroups(groups) {
                 <tr>
                     <th>Группа</th>
                     <th>ID</th>
-                    <th>Токен</th>
                     <th>Статус</th>
                     <th>Последняя проверка</th>
                     <th>Ошибка</th>

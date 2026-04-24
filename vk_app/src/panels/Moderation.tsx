@@ -13,56 +13,19 @@ import {
   ButtonGroup,
   Div,
 } from '@vkontakte/vkui';
-import { 
-  Icon56NewsfeedOutline,
+import {
   Icon56CheckShieldOutline,
   Icon24CheckCircleOutline, 
   Icon24CancelOutline 
 } from '@vkontakte/icons';
-import { parseURLSearchParamsForGetLaunchParams } from '@vkontakte/vk-bridge';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getFeedPosts, moderatePost, saveGroupToken } from '../shared/api';
+import { getFeedPosts, moderatePost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export const Moderation: FC<NavIdProps> = ({ id }) => {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isGroupLinked, setIsGroupLinked] = useState(false);
   const routeNavigator = useRouteNavigator();
-
-  const handleConnectGroup = async () => {
-    try {
-      const launchParams = parseURLSearchParamsForGetLaunchParams(window.location.search);
-      const appId = launchParams.vk_app_id;
-      const groupId = launchParams.vk_group_id;
-
-      console.log('Attempting to connect community...', { appId, groupId });
-
-      if (!groupId || !appId) {
-        console.error('Приложение запущено не в сообществе или отсутствуют параметры запуска');
-        return;
-      }
-
-      // Используем window.vkBridge для получения токена группы
-      if (!window.vkBridge) {
-        throw new Error('VK Bridge not available');
-      }
-      
-      const data = await window.vkBridge.send('VKWebAppGetGroupToken', {
-        app_id: appId,
-        group_id: groupId,
-        scope: 'manage,wall,photos',
-      }) as any;
-
-      if (data && data.access_token) {
-        await saveGroupToken(Number(groupId), data.access_token);
-        setIsGroupLinked(true);
-        console.log('Group successfully linked!');
-      }
-    } catch (error) {
-      console.error('Failed to get group token:', error);
-    }
-  };
 
   useEffect(() => {
     async function fetchPostsForModeration() {
@@ -110,23 +73,7 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
     <Panel id={id}>
       <PanelHeader style={{ textAlign: 'center' }}>Модерация</PanelHeader>
 
-      {!isGroupLinked && (
-        <Group header={<Header>Настройка публикации</Header>}>
-          <div style={{ padding: '0 16px 16px' }}>
-            <Placeholder
-              icon={<Icon56NewsfeedOutline />}
-              title="Подключите сообщество"
-              action={
-                <Button size="m" onClick={handleConnectGroup}>
-                  Подключить стену сообщества
-                </Button>
-              }
-            >
-              Чтобы приложение могло автоматически публиковать одобренные объявления на стене, нужно выдать разрешение.
-            </Placeholder>
-          </div>
-        </Group>
-      )}
+
 
       <Group header={<Header>Публикации на модерации</Header>}>
         {loading ? (

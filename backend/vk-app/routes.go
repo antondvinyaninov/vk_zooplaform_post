@@ -14,6 +14,6 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/app/posts", middleware.CORSFunc(postsHandler))
 	mux.HandleFunc("/api/app/posts/my", middleware.CORSFunc(myPostsHandler))
 	mux.HandleFunc("/api/app/posts/", middleware.CORSFunc(postByIDHandler))
-	mux.HandleFunc("/api/app/groups/token", middleware.CORSFunc(saveGroupTokenHandler))
+
 	mux.HandleFunc("/api/app/groups/me", middleware.CORSFunc(groupSettingsHandler))
 }
