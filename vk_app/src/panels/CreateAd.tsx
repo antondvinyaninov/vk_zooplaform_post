@@ -27,11 +27,13 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
 
     setIsSubmitting(true);
     try {
-      // Запрашиваем разрешение на отправку сообщений от имени официального сообщества приложения (zooplatforma: 165434330)
-      await bridge.send('VKWebAppAllowMessagesFromGroup', {
-        group_id: 165434330,
-        key: 'post_status_updates'
-      }).catch((e: any) => console.log('User denied messages or already allowed:', e));
+      // Запрашиваем разрешение на отправку сообщений (не ждем окончания, чтобы не блокировать UI)
+      if (bridge.supports('VKWebAppAllowMessagesFromGroup')) {
+        bridge.send('VKWebAppAllowMessagesFromGroup', {
+          group_id: 165434330,
+          key: 'post_status_updates'
+        }).catch((e: any) => console.log('User denied messages or already allowed:', e));
+      }
 
       await createPost(text);
       routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_POSTS}`);
