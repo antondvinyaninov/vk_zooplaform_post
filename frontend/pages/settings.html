@@ -245,6 +245,50 @@
                     </div>
                 </div>
 
+                <!-- Настройки Сниппета -->
+                <div class="card">
+                    <div class="card__header">
+                        <h2 class="card__title">Настройка Сниппета (Превью ссылки)</h2>
+                    </div>
+                    <div class="card__content">
+                        <p class="settings-row__subtitle" style="margin-bottom: 16px;">
+                            Сниппет — это красивая карточка, которая отображается ВКонтакте, когда кто-то делится ссылкой на приложение.
+                        </p>
+                        <div class="settings-row" style="flex-direction: column; align-items: flex-start; gap: 12px;">
+                            <div style="width: 100%;">
+                                <label class="settings-row__title" style="display: block; margin-bottom: 4px;">Заголовок</label>
+                                <input type="text" id="snippetTitle" class="form-control" placeholder="Например: Сервис помощи животным" style="width: 100%; max-width: 400px;">
+                            </div>
+                            <div style="width: 100%;">
+                                <label class="settings-row__title" style="display: block; margin-bottom: 4px;">Краткое описание (до 80 символов)</label>
+                                <input type="text" id="snippetDescription" class="form-control" placeholder="Например: Подать объявление" style="width: 100%; max-width: 400px;" maxlength="80">
+                            </div>
+                            <div style="width: 100%;">
+                                <label class="settings-row__title" style="display: block; margin-bottom: 4px;">Текст на кнопке</label>
+                                <select id="snippetButton" class="form-control" style="width: 100%; max-width: 400px;">
+                                    <option value="open">Открыть</option>
+                                    <option value="go">Перейти</option>
+                                    <option value="fill">Заполнить</option>
+                                    <option value="contact">Связаться</option>
+                                    <option value="create">Создать</option>
+                                    <option value="help">Помочь</option>
+                                </select>
+                            </div>
+                            <div style="width: 100%;">
+                                <label class="settings-row__title" style="display: block; margin-bottom: 4px;">Ссылка на изображение (1120×630 px)</label>
+                                <input type="text" id="snippetImage" class="form-control" placeholder="https://example.com/image.jpg" style="width: 100%; max-width: 400px;">
+                                <p class="settings-row__subtitle" style="margin-top: 4px;">Изображение будет скачано ВКонтакте по этой ссылке.</p>
+                            </div>
+                            <div style="width: 100%; margin-top: 8px;">
+                                <button class="btn btn--primary" onclick="updateSnippet()" id="applySnippetBtn">
+                                    Применить сниппет
+                                </button>
+                                <span id="snippetResult" style="margin-left: 12px; font-size: 13px;"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Настройки безопасности -->
                 <div class="card">
                     <div class="card__header">

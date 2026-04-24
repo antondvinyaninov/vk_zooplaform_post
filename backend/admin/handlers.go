@@ -402,3 +402,52 @@ func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
 }
+
+// snippetHandler обрабатывает сохранение и отправку глобального сниппета в ВКонтакте
+func snippetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Button      string `json:"button"`
+		ImageURL    string `json:"image_url"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON body"})
+		return
+	}
+
+	if req.Title == "" || req.ImageURL == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Title and Image URL are required"})
+		return
+	}
+
+	// Загружаем конфиг, чтобы получить сервисный ключ мини-аппа
+	cfg := config.Load()
+	if cfg.VKMiniAppServiceKey == "" {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "VK Mini App Service Key is not configured"})
+		return
+	}
+
+	// Инициализируем клиент с сервисным ключом
+	client := vk.NewVKClient(cfg.VKMiniAppServiceKey)
+
+	// Добавляем сниппет с хэшем "*" (для всех ссылок приложения)
+	snippetID, err := client.AddSnippet(req.Title, req.Description, req.Button, req.ImageURL, "*")
+	if err != nil {
+		log.Printf("[Snippet] Error adding snippet: %v", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("VK API error: %v", err)})
+		return
+	}
+
+	log.Printf("[Snippet] Successfully added snippet #%d", snippetID)
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"success":    true,
+		"snippet_id": snippetID,
+	})
+}

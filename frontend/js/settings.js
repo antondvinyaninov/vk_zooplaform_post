@@ -386,6 +386,55 @@ window.exportData = exportData;
 window.clearCache = clearCache;
 window.resetSettings = resetSettings;
 
+// Обновление сниппета
+async function updateSnippet() {
+    const title = document.getElementById('snippetTitle').value.trim();
+    const description = document.getElementById('snippetDescription').value.trim();
+    const button = document.getElementById('snippetButton').value;
+    const imageUrl = document.getElementById('snippetImage').value.trim();
+    const resultSpan = document.getElementById('snippetResult');
+
+    if (!title || !imageUrl) {
+        resultSpan.style.color = '#e64646';
+        resultSpan.textContent = 'Заголовок и ссылка на изображение обязательны';
+        return;
+    }
+
+    resultSpan.style.color = '#818c99';
+    resultSpan.textContent = 'Сохранение...';
+
+    try {
+        const response = await fetch(`${API_URL}/settings/snippet`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                description: description,
+                button: button,
+                image_url: imageUrl
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Ошибка сервера');
+        }
+
+        resultSpan.style.color = '#4bb34b';
+        resultSpan.textContent = '✓ Сниппет успешно обновлен!';
+        setTimeout(() => {
+            resultSpan.textContent = '';
+        }, 5000);
+    } catch (error) {
+        console.error('[Settings] Update snippet error:', error);
+        resultSpan.style.color = '#e64646';
+        resultSpan.textContent = `Ошибка: ${error.message}`;
+    }
+}
+window.updateSnippet = updateSnippet;
+
 // Автосохранение при изменении настроек
 document.addEventListener('change', (e) => {
     if (e.target.type === 'checkbox' || e.target.tagName === 'SELECT') {
