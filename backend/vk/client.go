@@ -243,3 +243,71 @@ func (c *VKClient) SetCallbackSettings(groupID int, serverID int) error {
 	_, err := c.CallMethod("groups.setCallbackSettings", params)
 	return err
 }
+
+// VideoSaveResponse ответ метода video.save
+type VideoSaveResponse struct {
+	UploadURL string `json:"upload_url"`
+	VideoID   int    `json:"video_id"`
+	OwnerID   int    `json:"owner_id"`
+	AccessKey string `json:"access_key"`
+}
+
+// UploadVideo загружает видео
+func (c *VKClient) UploadVideo(filePath string, groupID string, fileName string) (string, error) {
+	// 1. Получаем URL для загрузки
+	params := map[string]string{
+		"name": fileName,
+	}
+	if groupID != "" {
+		params["group_id"] = groupID
+	}
+
+	saveResp, err := c.CallMethod("video.save", params)
+	if err != nil {
+		return "", fmt.Errorf("failed to call video.save: %w", err)
+	}
+
+	var videoSave VideoSaveResponse
+	if err := json.Unmarshal(saveResp, &videoSave); err != nil {
+		return "", fmt.Errorf("failed to parse video.save response: %w", err)
+	}
+
+	// 2. Загружаем файл
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open video file: %w", err)
+	}
+	defer file.Close()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("video_file", fileName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create form file for video: %w", err)
+	}
+
+	if _, err := io.Copy(part, file); err != nil {
+		return "", fmt.Errorf("failed to copy video file: %w", err)
+	}
+	writer.Close()
+
+	req, err := http.NewRequest("POST", videoSave.UploadURL, body)
+	if err != nil {
+		return "", fmt.Errorf("failed to create video upload request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload video file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("video upload failed with status: %d", resp.StatusCode)
+	}
+
+	// Формируем attachment строку
+	attachment := fmt.Sprintf("video%d_%d", videoSave.OwnerID, videoSave.VideoID)
+	return attachment, nil
+}

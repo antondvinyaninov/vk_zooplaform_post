@@ -9,10 +9,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -174,15 +176,13 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Message string `json:"message"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
+	if err := r.ParseMultipartForm(50 << 20); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "failed to parse multipart form")
 		return
 	}
-	req.Message = strings.TrimSpace(req.Message)
-	if len(req.Message) < 10 {
+
+	message := strings.TrimSpace(r.FormValue("message"))
+	if len(message) < 10 {
 		utils.RespondError(w, http.StatusBadRequest, "message must contain at least 10 characters")
 		return
 	}
@@ -203,11 +203,63 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var uploadedAttachments []string
+	files := r.MultipartForm.File["media"]
+
+	if len(files) > 0 {
+		adminToken, err := getActiveVKToken()
+		if err != nil || adminToken == "" {
+			utils.RespondError(w, http.StatusInternalServerError, "admin token not found to upload media")
+			return
+		}
+		vkClient := vk.NewVKClient(adminToken)
+		groupIDStr := strconv.Itoa(group.VKGroupID)
+
+		for _, fileHeader := range files {
+			file, err := fileHeader.Open()
+			if err != nil {
+				continue
+			}
+
+			// Create temp file
+			tmpFile, err := os.CreateTemp("", "upload_*"+filepath.Ext(fileHeader.Filename))
+			if err != nil {
+				file.Close()
+				continue
+			}
+
+			io.Copy(tmpFile, file)
+			tmpPath := tmpFile.Name()
+			tmpFile.Close()
+			file.Close()
+
+			// Detect if image or video
+			contentType := fileHeader.Header.Get("Content-Type")
+			if strings.HasPrefix(contentType, "video/") {
+				att, err := vkClient.UploadVideo(tmpPath, groupIDStr, fileHeader.Filename)
+				if err == nil {
+					uploadedAttachments = append(uploadedAttachments, att)
+				} else {
+					log.Printf("Failed to upload video: %v", err)
+				}
+			} else {
+				att, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
+				if err == nil {
+					uploadedAttachments = append(uploadedAttachments, att)
+				} else {
+					log.Printf("Failed to upload photo: %v", err)
+				}
+			}
+			os.Remove(tmpPath)
+		}
+	}
+
 	post := &models.Post{
-		UserID:  user.ID,
-		GroupID: group.ID,
-		Message: req.Message,
-		Status:  "pending",
+		UserID:      user.ID,
+		GroupID:     group.ID,
+		Message:     message,
+		Status:      "pending",
+		Attachments: strings.Join(uploadedAttachments, ","),
 	}
 	if err := createPost(post); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -377,9 +429,14 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 		token := adminToken
 
+		var attachments []string
+		if post.Attachments != "" {
+			attachments = strings.Split(post.Attachments, ",")
+		}
+
 		client := vk.NewVKClient(token)
 		// from_group=true: постим от имени группы (требует токена сообщества или токена админа с правами)
-		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, nil, true, 0)
+		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, attachments, true, 0)
 		if err != nil {
 			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
 			utils.RespondError(w, http.StatusBadRequest, err.Error())

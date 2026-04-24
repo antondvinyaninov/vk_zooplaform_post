@@ -113,11 +113,27 @@ export const syncUserWithBackend = async (user: UserInfo, vkSignature?: string) 
   return response.json() as Promise<{ user: AppUser; viewerRole: string; groupId: number }>;
 };
 
-export const createPost = async (message: string) => {
-  return fetchJSON<AppPost>(`${API_URL}/posts`, {
-    method: 'POST',
-    body: JSON.stringify({ message }),
+export const createPost = async (message: string, files: File[] = []) => {
+  const formData = new FormData();
+  formData.append('message', message);
+  files.forEach((file) => {
+    formData.append('media', file);
   });
+
+  const response = await fetch(`${API_URL}/posts`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${getVKLaunchSignature()}`,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.error || 'Request failed');
+  }
+
+  return response.json() as Promise<AppPost>;
 };
 
 export const getFeedPosts = async (status = 'published') => {
