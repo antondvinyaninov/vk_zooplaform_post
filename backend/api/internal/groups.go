@@ -3,6 +3,7 @@ package internal
 import (
 	"backend/database"
 	"backend/models"
+	"backend/vk"
 	"database/sql"
 	"time"
 )
@@ -33,6 +34,8 @@ func (s *GroupService) Create(group *models.Group) error {
 	}
 	group.CreatedAt = time.Now()
 	group.UpdatedAt = time.Now()
+
+	go vk.EnsureCallbackServer(group)
 
 	return nil
 }
@@ -152,6 +155,9 @@ func (s *GroupService) Update(group *models.Group) error {
 		group.IsActive,
 		group.ID,
 	)
+	if err == nil {
+		go vk.EnsureCallbackServer(group)
+	}
 	return err
 }
 

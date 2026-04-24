@@ -198,3 +198,48 @@ func (c *VKClient) SendDirectMessage(userID int, message string) error {
 	_, err := c.CallMethod("messages.send", params)
 	return err
 }
+
+func (c *VKClient) GetCallbackConfirmationCode(groupID int) (string, error) {
+	resp, err := c.CallMethod("groups.getCallbackConfirmationCode", map[string]string{
+		"group_id": strconv.Itoa(groupID),
+	})
+	if err != nil {
+		return "", err
+	}
+	var code struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(resp, &code); err != nil {
+		return "", err
+	}
+	return code.Code, nil
+}
+
+func (c *VKClient) AddCallbackServer(groupID int, serverURL string, title string) (int, error) {
+	resp, err := c.CallMethod("groups.addCallbackServer", map[string]string{
+		"group_id": strconv.Itoa(groupID),
+		"url":      serverURL,
+		"title":    title,
+	})
+	if err != nil {
+		return 0, err
+	}
+	var res struct {
+		ServerID int `json:"server_id"`
+	}
+	if err := json.Unmarshal(resp, &res); err != nil {
+		return 0, err
+	}
+	return res.ServerID, nil
+}
+
+func (c *VKClient) SetCallbackSettings(groupID int, serverID int) error {
+	params := map[string]string{
+		"group_id":       strconv.Itoa(groupID),
+		"server_id":      strconv.Itoa(serverID),
+		"message_new":    "1",
+		"wall_reply_new": "1",
+	}
+	_, err := c.CallMethod("groups.setCallbackSettings", params)
+	return err
+}

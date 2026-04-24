@@ -855,6 +855,9 @@ func updateGroup(group *models.Group) error {
 		return err
 	}
 	group.UpdatedAt = time.Now()
+
+	go vk.EnsureCallbackServer(group)
+
 	return nil
 }
 
