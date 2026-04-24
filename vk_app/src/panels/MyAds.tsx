@@ -72,7 +72,13 @@ export const MyPosts: FC<NavIdProps> = ({ id }) => {
               <ContentCard
                 key={post.id}
                 onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POST_DETAIL}/${post.id}`)}
-                caption={post.status}
+                caption={
+                  post.status === 'published' ? '✅ Опубликовано' :
+                  post.status === 'pending' ? '⏳ На модерации' :
+                  post.status === 'rejected' ? '❌ Отклонено' :
+                  post.status === 'draft' ? '📝 Черновик' :
+                  post.status
+                }
                 title={post.title}
                 description={post.message}
                 maxHeight={250}
