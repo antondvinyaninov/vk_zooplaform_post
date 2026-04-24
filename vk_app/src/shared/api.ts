@@ -34,6 +34,7 @@ export interface AppPost {
   status: 'pending' | 'scheduled' | 'published' | 'rejected' | 'failed' | 'draft';
   vk_post_id?: number;
   publish_date?: string;
+  attachments?: string;
   created_at: string;
   updated_at: string;
   group?: AppGroup;

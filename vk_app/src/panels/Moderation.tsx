@@ -17,8 +17,11 @@ import {
 import {
   Icon56CheckShieldOutline,
   Icon24CheckCircleOutline, 
-  Icon24CancelOutline 
+  Icon24CancelOutline,
+  Icon28VideoOutline,
+  Icon24Camera
 } from '@vkontakte/icons';
+import { Link } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getFeedPosts, moderatePost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
@@ -107,6 +110,23 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
                 description={
                   <>
                     <Div style={{ padding: 0, marginBottom: 8 }}>{post.message}</Div>
+                    {post.attachments && (
+                      <Div style={{ padding: 0, marginBottom: 12 }}>
+                        <div style={{ fontSize: 13, color: '#818c99', marginBottom: 6 }}>Прикрепленные медиа ({post.attachments.split(',').length}):</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {post.attachments.split(',').map((att: string, i: number) => {
+                            const isVideo = att.startsWith('video');
+                            const url = `https://vk.com/${att}`;
+                            return (
+                              <Link key={i} href={url} target="_blank" style={{ display: 'flex', alignItems: 'center', background: '#f0f0f0', padding: '6px 10px', borderRadius: 8, textDecoration: 'none' }}>
+                                {isVideo ? <Icon28VideoOutline width={16} height={16} style={{ marginRight: 6 }} /> : <Icon24Camera width={16} height={16} style={{ marginRight: 6 }} />}
+                                <span style={{ fontSize: 13, fontWeight: 500 }}>{isVideo ? 'Видео' : 'Фото'} {i + 1}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </Div>
+                    )}
                     <ButtonGroup mode="horizontal" gap="s" stretched>
                       <Button 
                         size="s" 

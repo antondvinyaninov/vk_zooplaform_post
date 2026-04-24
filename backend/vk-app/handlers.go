@@ -35,6 +35,7 @@ type postResponse struct {
 	Group       *groupSummary `json:"group,omitempty"`
 	Author      *userSummary  `json:"author,omitempty"`
 	PublishDate *string       `json:"publish_date,omitempty"`
+	Attachments string        `json:"attachments,omitempty"`
 	CreatedAt   string        `json:"created_at"`
 	UpdatedAt   string        `json:"updated_at"`
 }
@@ -690,11 +691,12 @@ func serializePost(post *models.Post) (postResponse, error) {
 	response := postResponse{
 		ID:        post.ID,
 		Title:     makePostTitle(post.Message),
-		Message:   post.Message,
-		Status:    post.Status,
-		VKPostID:  post.VKPostID,
-		CreatedAt: post.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: post.UpdatedAt.Format(time.RFC3339),
+		Message:     post.Message,
+		Status:      post.Status,
+		VKPostID:    post.VKPostID,
+		Attachments: post.Attachments,
+		CreatedAt:   post.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   post.UpdatedAt.Format(time.RFC3339),
 	}
 	if group != nil {
 		response.Group = userFacingGroup(group)
