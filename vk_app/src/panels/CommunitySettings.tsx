@@ -5,7 +5,6 @@ import {
   PanelHeaderBack,
   Group,
   FormItem,
-  Switch,
   Button,
   Div,
   NavIdProps,
@@ -22,7 +21,6 @@ import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, se
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [settings, setSettings] = useState<AppGroupSettings | null>(null);
-  const [isActive, setIsActive] = useState(true);
   const [notifyUserIds, setNotifyUserIds] = useState<number[]>([]);
   const [cityId, setCityId] = useState<number | undefined>(undefined);
   const [cityTitle, setCityTitle] = useState<string>('');
@@ -41,7 +39,6 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         setLoading(true);
         const data = await getCommunitySettings();
         setSettings(data);
-        setIsActive(data.is_active);
         setNotifyUserIds(data.notify_user_ids || []);
         if (data.city_id && data.city_title) {
           setCityId(data.city_id);
@@ -103,7 +100,6 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         photo_200: settings?.photo_200 || '',
         city_id: cityId,
         city_title: cityTitle,
-        is_active: isActive,
         notify_user_ids: notifyUserIds,
       });
       setSettings(updated);
@@ -173,9 +169,6 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                 emptyText="Ничего не найдено"
                 fetching={citySearchLoading}
               />
-            </FormItem>
-            <FormItem top="Активировать приложение в сообществе">
-              <Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
             </FormItem>
             <FormItem top="Получатели уведомлений">
               <ChipsSelect
