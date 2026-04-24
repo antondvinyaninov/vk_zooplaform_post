@@ -123,7 +123,7 @@ export const createPost = async (message: string, files: File[] = []) => {
   const response = await fetch(`${API_URL}/posts`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${getVKLaunchSignature()}`,
+      'X-VK-Sign': getVKLaunchSignature(),
     },
     body: formData,
   });
