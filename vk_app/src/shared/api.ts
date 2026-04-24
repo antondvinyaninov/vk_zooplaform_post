@@ -27,6 +27,12 @@ export interface AppGroupSettings extends AppGroup {
   city_title?: string;
 }
 
+export interface AppAttachmentURL {
+  id: string;
+  type: string;
+  url: string;
+}
+
 export interface AppPost {
   id: number;
   title: string;
@@ -35,6 +41,7 @@ export interface AppPost {
   vk_post_id?: number;
   publish_date?: string;
   attachments?: string;
+  attachment_urls?: AppAttachmentURL[];
   created_at: string;
   updated_at: string;
   group?: AppGroup;

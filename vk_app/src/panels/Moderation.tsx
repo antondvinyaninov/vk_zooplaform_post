@@ -13,6 +13,7 @@ import {
   NavIdProps,
   ButtonGroup,
   Div,
+  HorizontalScroll,
 } from '@vkontakte/vkui';
 import {
   Icon56CheckShieldOutline,
@@ -23,11 +24,11 @@ import {
 } from '@vkontakte/icons';
 import { Link } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getFeedPosts, moderatePost } from '../shared/api';
+import { getFeedPosts, moderatePost, AppPost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export const Moderation: FC<NavIdProps> = ({ id }) => {
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<AppPost[]>([]);
   const [loading, setLoading] = useState(true);
   const routeNavigator = useRouteNavigator();
 
@@ -110,7 +111,33 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
                 description={
                   <>
                     <Div style={{ padding: 0, marginBottom: 8 }}>{post.message}</Div>
-                    {post.attachments && (
+                    {post.attachment_urls && post.attachment_urls.length > 0 ? (
+                      <Div style={{ padding: 0, marginBottom: 12 }}>
+                        <div style={{ fontSize: 13, color: '#818c99', marginBottom: 6 }}>Прикрепленные медиа:</div>
+                        <HorizontalScroll showArrows getScrollToLeft={(i) => i - 120} getScrollToRight={(i) => i + 120}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            {post.attachment_urls.map((att, i) => (
+                              <a key={i} href={`https://vk.com/${att.id}`} target="_blank" rel="noreferrer" style={{ position: 'relative', width: 80, height: 80, flexShrink: 0, display: 'block' }}>
+                                <img 
+                                  src={att.url} 
+                                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
+                                  alt={`attachment-${i}`}
+                                />
+                                {att.type === 'video' && (
+                                  <div style={{ 
+                                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
+                                    backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, 
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center' 
+                                  }}>
+                                    <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />
+                                  </div>
+                                )}
+                              </a>
+                            ))}
+                          </div>
+                        </HorizontalScroll>
+                      </Div>
+                    ) : post.attachments ? (
                       <Div style={{ padding: 0, marginBottom: 12 }}>
                         <div style={{ fontSize: 13, color: '#818c99', marginBottom: 6 }}>Прикрепленные медиа ({post.attachments.split(',').length}):</div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -126,7 +153,7 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
                           })}
                         </div>
                       </Div>
-                    )}
+                    ) : null}
                     <ButtonGroup mode="horizontal" gap="s" stretched>
                       <Button 
                         size="s" 

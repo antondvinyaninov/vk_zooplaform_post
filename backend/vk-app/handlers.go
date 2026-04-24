@@ -34,10 +34,17 @@ type postResponse struct {
 	VKPostID    int           `json:"vk_post_id,omitempty"`
 	Group       *groupSummary `json:"group,omitempty"`
 	Author      *userSummary  `json:"author,omitempty"`
-	PublishDate *string       `json:"publish_date,omitempty"`
-	Attachments string        `json:"attachments,omitempty"`
-	CreatedAt   string        `json:"created_at"`
-	UpdatedAt   string        `json:"updated_at"`
+	PublishDate    *string         `json:"publish_date,omitempty"`
+	Attachments    string          `json:"attachments,omitempty"`
+	AttachmentURLs []AttachmentURL `json:"attachment_urls,omitempty"`
+	CreatedAt      string          `json:"created_at"`
+	UpdatedAt      string          `json:"updated_at"`
+}
+
+type AttachmentURL struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	URL  string `json:"url"`
 }
 
 type groupSummary struct {
@@ -157,6 +164,10 @@ func listPostsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if status == "pending" {
+		response = populateAttachmentURLs(response)
 	}
 
 	utils.RespondSuccess(w, response)
@@ -723,6 +734,108 @@ func userFacingGroup(group *models.Group) *groupSummary {
 		ScreenName: group.ScreenName,
 		Photo200:   group.Photo200,
 	}
+}
+
+func populateAttachmentURLs(posts []postResponse) []postResponse {
+	postsByGroup := make(map[int][]int)
+	for i, p := range posts {
+		if p.Attachments != "" && p.Group != nil {
+			postsByGroup[p.Group.ID] = append(postsByGroup[p.Group.ID], i)
+		}
+	}
+
+	for _, indices := range postsByGroup {
+		token, err := getActiveVKToken()
+		if err != nil {
+			continue
+		}
+		vkClient := vk.NewVKClient(token)
+
+		var photos []string
+		var videos []string
+		
+		for _, idx := range indices {
+			parts := strings.Split(posts[idx].Attachments, ",")
+			for _, part := range parts {
+				if strings.HasPrefix(part, "photo") {
+					photos = append(photos, strings.TrimPrefix(part, "photo"))
+				} else if strings.HasPrefix(part, "video") {
+					videos = append(videos, strings.TrimPrefix(part, "video"))
+				}
+			}
+		}
+		
+		resolvedPhotos := make(map[string]string)
+		resolvedVideos := make(map[string]string)
+		
+		if len(photos) > 0 {
+			resp, err := vkClient.CallMethod("photos.getById", map[string]string{
+				"photos": strings.Join(photos, ","),
+			})
+			if err == nil {
+				var items []struct {
+					ID      int `json:"id"`
+					OwnerID int `json:"owner_id"`
+					Sizes   []struct {
+						URL  string `json:"url"`
+						Type string `json:"type"`
+					} `json:"sizes"`
+				}
+				if json.Unmarshal(resp, &items) == nil {
+					for _, item := range items {
+						idStr := fmt.Sprintf("photo%d_%d", item.OwnerID, item.ID)
+						if len(item.Sizes) > 0 {
+							resolvedPhotos[idStr] = item.Sizes[len(item.Sizes)-1].URL
+						}
+					}
+				}
+			}
+		}
+		
+		if len(videos) > 0 {
+			resp, err := vkClient.CallMethod("video.get", map[string]string{
+				"videos": strings.Join(videos, ","),
+			})
+			if err == nil {
+				var result struct {
+					Items []struct {
+						ID      int `json:"id"`
+						OwnerID int `json:"owner_id"`
+						Image   []struct {
+							URL string `json:"url"`
+						} `json:"image"`
+					} `json:"items"`
+				}
+				if json.Unmarshal(resp, &result) == nil {
+					for _, item := range result.Items {
+						idStr := fmt.Sprintf("video%d_%d", item.OwnerID, item.ID)
+						if len(item.Image) > 0 {
+							resolvedVideos[idStr] = item.Image[len(item.Image)-1].URL
+						}
+					}
+				}
+			}
+		}
+		
+		for _, idx := range indices {
+			parts := strings.Split(posts[idx].Attachments, ",")
+			var urls []AttachmentURL
+			for _, part := range parts {
+				if strings.HasPrefix(part, "photo") {
+					if url, ok := resolvedPhotos[part]; ok {
+						urls = append(urls, AttachmentURL{ID: part, Type: "photo", URL: url})
+					}
+				} else if strings.HasPrefix(part, "video") {
+					if url, ok := resolvedVideos[part]; ok {
+						urls = append(urls, AttachmentURL{ID: part, Type: "video", URL: url})
+					}
+				}
+			}
+			posts[idx].AttachmentURLs = urls
+		}
+	}
+	
+	return posts
 }
 
 func groupToSettings(group *models.Group) *groupSettingsResponse {
