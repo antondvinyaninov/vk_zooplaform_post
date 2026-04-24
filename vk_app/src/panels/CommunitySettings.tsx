@@ -5,7 +5,6 @@ import {
   PanelHeaderBack,
   Group,
   FormItem,
-  Input,
   Switch,
   Button,
   Div,
@@ -22,9 +21,6 @@ import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, ty
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [settings, setSettings] = useState<AppGroupSettings | null>(null);
-  const [name, setName] = useState('');
-  const [screenName, setScreenName] = useState('');
-  const [photo200, setPhoto200] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [notifyUserIds, setNotifyUserIds] = useState<number[]>([]);
   const [managers, setManagers] = useState<AppManager[]>([]);
@@ -39,9 +35,6 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         setLoading(true);
         const data = await getCommunitySettings();
         setSettings(data);
-        setName(data.name || '');
-        setScreenName(data.screen_name || '');
-        setPhoto200(data.photo_200 || '');
         setIsActive(data.is_active);
         setNotifyUserIds(data.notify_user_ids || []);
 
@@ -67,9 +60,9 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
     setSaving(true);
     try {
       const updated = await updateCommunitySettings({
-        name: name.trim(),
-        screen_name: screenName.trim(),
-        photo_200: photo200.trim(),
+        name: settings?.name || '',
+        screen_name: settings?.screen_name || '',
+        photo_200: settings?.photo_200 || '',
         is_active: isActive,
         notify_user_ids: notifyUserIds,
       });
