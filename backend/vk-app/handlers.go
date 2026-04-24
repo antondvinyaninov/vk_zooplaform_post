@@ -12,7 +12,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -51,8 +50,8 @@ type groupSettingsResponse struct {
 	Name       string `json:"name"`
 	ScreenName string `json:"screen_name"`
 	Photo200   string `json:"photo_200"`
-	CityID     int    `json:"city_id"`
-	CityTitle  string `json:"city_title"`
+	CityID     *int   `json:"city_id"`
+	CityTitle  *string `json:"city_title"`
 	IsActive   bool   `json:"is_active"`
 	HasToken   bool   `json:"has_token"`
 	NotifyUserIDs []int  `json:"notify_user_ids"`
@@ -483,10 +482,11 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 			group.Photo200 = strings.TrimSpace(*req.Photo200)
 		}
 		if req.CityID != nil {
-			group.CityID = *req.CityID
+			group.CityID = req.CityID
 		}
 		if req.CityTitle != nil {
-			group.CityTitle = strings.TrimSpace(*req.CityTitle)
+			title := strings.TrimSpace(*req.CityTitle)
+			group.CityTitle = &title
 		}
 		if req.IsActive != nil {
 			group.IsActive = *req.IsActive
@@ -1212,7 +1212,13 @@ func citiesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := vk.NewVKClient(os.Getenv("VK_SERVICE_KEY"))
+	token, err := getActiveVKToken()
+	if err != nil || token == "" {
+		utils.RespondError(w, http.StatusBadRequest, "no active VK admin token")
+		return
+	}
+
+	client := vk.NewVKClient(token)
 	params := map[string]string{
 		"country_id": "1", // Russia
 		"q":          q,
