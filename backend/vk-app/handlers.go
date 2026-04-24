@@ -659,7 +659,7 @@ func groupToSettings(group *models.Group) *groupSettingsResponse {
 		return nil
 	}
 
-	return &groupSettingsResponse{
+	resp := &groupSettingsResponse{
 		ID:         group.ID,
 		VKGroupID:  group.VKGroupID,
 		Name:       group.Name,
