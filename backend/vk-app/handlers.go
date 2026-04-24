@@ -337,20 +337,26 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			return
 		}
 
-		// Берём активный токен из vk_accounts (подключённый через /vk-connect)
-		token, err := getActiveVKToken()
-		if err != nil {
-			utils.RespondError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		if token == "" {
-			utils.RespondError(w, http.StatusBadRequest, "VK account is not connected — please login at /vk-connect")
-			return
+		// Берём активный токен: сначала пробуем токен сообщества, затем токен админа
+		var token string
+		if strings.TrimSpace(group.AccessToken) != "" {
+			token = strings.TrimSpace(group.AccessToken)
+		} else {
+			adminToken, err := getActiveVKToken()
+			if err != nil {
+				utils.RespondError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			if adminToken == "" {
+				utils.RespondError(w, http.StatusBadRequest, "community token is missing and VK account is not connected — please connect the community or login at /vk-connect")
+				return
+			}
+			token = adminToken
 		}
 
 		client := vk.NewVKClient(token)
-		// from_group=false: постим с пользовательского аккаунта (user token не поддерживает from_group=1)
-		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, nil, false, 0)
+		// from_group=true: постим от имени группы (требует токена сообщества или токена админа с правами)
+		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, nil, true, 0)
 		if err != nil {
 			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
 			utils.RespondError(w, http.StatusBadRequest, err.Error())
