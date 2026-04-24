@@ -12,7 +12,6 @@ import {
 } from '@vkontakte/vkui';
 import {
   Icon28HomeOutline,
-  Icon28ListOutline,
   Icon28AddOutline,
   Icon28UserOutline,
 } from '@vkontakte/icons';
@@ -22,7 +21,6 @@ import { useActiveVkuiLocation, useRouteNavigator } from '@vkontakte/vk-mini-app
 import { syncUserWithBackend } from './shared/api';
 
 const Home = lazy(() => import('./panels/Home').then(m => ({ default: m.Home })));
-const Persik = lazy(() => import('./panels/Persik').then(m => ({ default: m.Persik })));
 const Onboarding = lazy(() => import('./panels/Onboarding').then(m => ({ default: m.Onboarding })));
 const Profile = lazy(() => import('./panels/Profile').then(m => ({ default: m.Profile })));
 const CommunitySettings = lazy(() => import('./panels/CommunitySettings'));
@@ -41,7 +39,6 @@ const STORY_IDS = {
   MODERATION: 'moderation_story',
   ONBOARDING: 'onboarding_story',
   POST_DETAIL: 'post_detail_story',
-  PERSIK: 'persik_story',
 } as const;
 
 const MAIN_PANEL_TO_ROUTE: Record<string, string> = {
@@ -70,8 +67,6 @@ const getActiveStory = (panel: string): string => {
       return STORY_IDS.ONBOARDING;
     case DEFAULT_VIEW_PANELS.POST_DETAIL:
       return STORY_IDS.POST_DETAIL;
-    case DEFAULT_VIEW_PANELS.PERSIK:
-      return STORY_IDS.PERSIK;
     default:
       return STORY_IDS.HOME;
   }
@@ -206,7 +201,6 @@ export const App = () => {
   const shouldShowTabbar =
     activePanel !== DEFAULT_VIEW_PANELS.ONBOARDING &&
     activePanel !== DEFAULT_VIEW_PANELS.POST_DETAIL &&
-    activePanel !== DEFAULT_VIEW_PANELS.PERSIK &&
     activePanel !== DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS;
 
   const modal = (
@@ -246,13 +240,6 @@ export const App = () => {
                       aria-label="Главная"
                     >
                       <Icon28HomeOutline />
-                    </TabbarItem>
-                    <TabbarItem
-                      selected={activePanel === DEFAULT_VIEW_PANELS.MY_POSTS}
-                      onClick={() => openMainPanel(DEFAULT_VIEW_PANELS.MY_POSTS)}
-                      aria-label="Мои посты"
-                    >
-                      <Icon28ListOutline />
                     </TabbarItem>
                     <TabbarItem
                       selected={activePanel === DEFAULT_VIEW_PANELS.CREATE_POST}
@@ -295,9 +282,6 @@ export const App = () => {
               </View>
               <View id={STORY_IDS.POST_DETAIL} activePanel={activePanel}>
                 <AdDetail id="post_detail" />
-              </View>
-              <View id={STORY_IDS.PERSIK} activePanel={activePanel}>
-                <Persik id="persik" />
               </View>
             </Epic>
           </Suspense>

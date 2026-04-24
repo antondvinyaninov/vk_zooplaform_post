@@ -2,6 +2,7 @@ import { FC, useEffect, useState } from 'react';
 import {
   Panel,
   PanelHeader,
+  PanelHeaderBack,
   Placeholder,
   Button,
   Group,
@@ -37,7 +38,16 @@ export const MyPosts: FC<NavIdProps> = ({ id }) => {
 
   return (
     <Panel id={id}>
-      <PanelHeader style={{ textAlign: 'center' }}>
+      <PanelHeader 
+        before={<PanelHeaderBack onClick={() => {
+          if (window.history.length <= 2) {
+            routeNavigator.replace('/');
+          } else {
+            routeNavigator.back();
+          }
+        }} />}
+        style={{ textAlign: 'center' }}
+      >
         Мои публикации
       </PanelHeader>
 
