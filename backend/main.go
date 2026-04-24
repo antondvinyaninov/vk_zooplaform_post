@@ -241,15 +241,7 @@ func main() {
 
 	log.Printf("=== Server is running, waiting for signals ===")
 
-	// Логируем время работы каждые 5 секунд
-	ticker := time.NewTicker(5 * time.Second)
-	go func() {
-		startTime := time.Now()
-		for range ticker.C {
-			uptime := time.Since(startTime)
-			log.Printf("⏰ Server uptime: %v", uptime)
-		}
-	}()
+
 
 	// Ждем сигнал остановки
 	sig := <-quit
