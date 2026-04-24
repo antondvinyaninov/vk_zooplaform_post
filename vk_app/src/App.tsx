@@ -15,7 +15,6 @@ import {
   Icon28ListOutline,
   Icon28AddOutline,
   Icon28UserOutline,
-  Icon28CheckShieldOutline,
 } from '@vkontakte/icons';
 
 import { DEFAULT_VIEW_PANELS } from './routes';
@@ -204,7 +203,6 @@ export const App = () => {
   }, [activePanel, routeNavigator]);
 
   const activeStory = getActiveStory(activePanel);
-  const isAdmin = ['admin', 'editor', 'moder'].includes(role || '');
   const shouldShowTabbar =
     activePanel !== DEFAULT_VIEW_PANELS.ONBOARDING &&
     activePanel !== DEFAULT_VIEW_PANELS.POST_DETAIL &&
@@ -270,15 +268,6 @@ export const App = () => {
                     >
                       <Icon28UserOutline />
                     </TabbarItem>
-                    {isAdmin && (
-                      <TabbarItem
-                        selected={activePanel === DEFAULT_VIEW_PANELS.MODERATION}
-                        onClick={() => openMainPanel(DEFAULT_VIEW_PANELS.MODERATION)}
-                        aria-label="Модерация"
-                      >
-                        <Icon28CheckShieldOutline />
-                      </TabbarItem>
-                    )}
                   </Tabbar>
                 ) : undefined
               }
