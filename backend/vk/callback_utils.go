@@ -2,7 +2,6 @@ package vk
 
 import (
 	"fmt"
-	"backend/config"
 	"backend/models"
 )
 
