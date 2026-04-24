@@ -1159,14 +1159,12 @@ func groupManagersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var vkResp struct {
-		Response struct {
-			Items []struct {
-				ID        int    `json:"id"`
-				FirstName string `json:"first_name"`
-				LastName  string `json:"last_name"`
-				Role      string `json:"role"`
-			} `json:"items"`
-		} `json:"response"`
+		Items []struct {
+			ID        int    `json:"id"`
+			FirstName string `json:"first_name"`
+			LastName  string `json:"last_name"`
+			Role      string `json:"role"`
+		} `json:"items"`
 	}
 
 	if err := json.Unmarshal(resp, &vkResp); err != nil {
@@ -1175,7 +1173,7 @@ func groupManagersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	managers := []managerResponse{}
-	for _, item := range vkResp.Response.Items {
+	for _, item := range vkResp.Items {
 		managers = append(managers, managerResponse{
 			ID:        item.ID,
 			FirstName: item.FirstName,
