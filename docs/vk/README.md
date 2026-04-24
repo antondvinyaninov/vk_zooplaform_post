@@ -22,6 +22,20 @@
 - [VK Media Upload](VK_MEDIA.md) - Загрузка медиа
 - [VK Users](VK_USERS.md) - Работа с пользователями
 
+### События и Callback API
+- [Callback API](callback_api.md) - Работа с Callback API
+- [События в сообществах](community_events_schema.md) - Структура событий (JSON)
+- [Обзор событий](events_overview.md) - Полный список событий
+- [User Long Poll](user_long_poll.md) - Подключение к Long Poll
+
+### Сообщества и Виджеты
+- [Сообщения сообществ](community_messages.md) - Интеграция с сообщениями сообществ
+- [Виджеты сообществ](community_widgets.md) - Добавление виджетов в группу
+
+### Дополнительно
+- [Open API](open_api.md) - Использование Open API
+- [Deprecated API](deprecated_api.md) - Устаревшие методы API
+
 ## 🔑 Основные концепции
 
 ### Access Token
