@@ -77,6 +77,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
       setSnackbar(
         <Snackbar
           onClose={() => setSnackbar(null)}
+          onClosed={() => setSnackbar(null)}
           before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
         >
           Настройки успешно сохранены
@@ -87,6 +88,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
       setSnackbar(
         <Snackbar
           onClose={() => setSnackbar(null)}
+          onClosed={() => setSnackbar(null)}
           before={<Icon24ErrorCircleOutline fill="var(--vkui--color_icon_negative)" />}
         >
           Ошибка сохранения настроек
