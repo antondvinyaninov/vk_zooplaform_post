@@ -13,7 +13,9 @@ import {
   Spinner,
   FormStatus,
   ChipsSelect,
+  Snackbar,
 } from '@vkontakte/vkui';
+import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, type AppGroupSettings, type AppManager } from '../shared/api';
 
@@ -29,7 +31,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<React.ReactNode | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -61,7 +63,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
 
   const handleSave = async () => {
     setError(null);
-    setSuccess(null);
+    setSnackbar(null);
     setSaving(true);
     try {
       const updated = await updateCommunitySettings({
@@ -72,9 +74,24 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         notify_user_ids: notifyUserIds,
       });
       setSettings(updated);
-      setSuccess('Настройки сообщества сохранены');
+      setSnackbar(
+        <Snackbar
+          onClose={() => setSnackbar(null)}
+          before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+        >
+          Настройки успешно сохранены
+        </Snackbar>
+      );
     } catch (e: any) {
       setError(e?.message || 'Не удалось сохранить настройки');
+      setSnackbar(
+        <Snackbar
+          onClose={() => setSnackbar(null)}
+          before={<Icon24ErrorCircleOutline fill="var(--vkui--color_icon_negative)" />}
+        >
+          Ошибка сохранения настроек
+        </Snackbar>
+      );
     } finally {
       setSaving(false);
     }
@@ -98,11 +115,6 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
           {error && (
             <FormStatus mode="error">
               Ошибка: {error}
-            </FormStatus>
-          )}
-          {success && (
-            <FormStatus mode="default">
-              {success}
             </FormStatus>
           )}
 
@@ -143,6 +155,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
           </Div>
         </>
       )}
+      {snackbar}
     </Panel>
   );
 };
