@@ -50,8 +50,9 @@ type groupSettingsResponse struct {
 	Name       string `json:"name"`
 	ScreenName string `json:"screen_name"`
 	Photo200   string `json:"photo_200"`
-	IsActive   bool   `json:"is_active"`
-	HasToken   bool   `json:"has_token"`
+	IsActive      bool   `json:"is_active"`
+	HasToken      bool   `json:"has_token"`
+	NotifyUserIDs []int  `json:"notify_user_ids"`
 }
 
 type userSummary struct {
@@ -211,7 +212,7 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendNotificationToUser(ctx.UserID, "Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.")
-	sendNotificationToAdmins(fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!", group.Name))
+	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!", group.Name))
 
 	response, err := serializePost(post)
 	if err != nil {
@@ -457,9 +458,10 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 
 		var req struct {
 			Name       *string `json:"name"`
-			ScreenName *string `json:"screen_name"`
-			Photo200   *string `json:"photo_200"`
-			IsActive   *bool   `json:"is_active"`
+			ScreenName    *string `json:"screen_name"`
+			Photo200      *string `json:"photo_200"`
+			IsActive      *bool   `json:"is_active"`
+			NotifyUserIDs []int   `json:"notify_user_ids"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -477,6 +479,10 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.IsActive != nil {
 			group.IsActive = *req.IsActive
+		}
+		if req.NotifyUserIDs != nil {
+			b, _ := json.Marshal(req.NotifyUserIDs)
+			group.NotifyUserIDs = string(b)
 		}
 
 		if group.Name == "" {
@@ -660,8 +666,17 @@ func groupToSettings(group *models.Group) *groupSettingsResponse {
 		ScreenName: group.ScreenName,
 		Photo200:   group.Photo200,
 		IsActive:   group.IsActive,
-		HasToken:   strings.TrimSpace(group.AccessToken) != "",
+		HasToken:   group.AccessToken != "",
 	}
+	
+	if group.NotifyUserIDs != "" {
+		json.Unmarshal([]byte(group.NotifyUserIDs), &resp.NotifyUserIDs)
+	}
+	if resp.NotifyUserIDs == nil {
+		resp.NotifyUserIDs = []int{}
+	}
+
+	return resp
 }
 
 func userToSummary(user *models.User) *userSummary {
@@ -818,10 +833,10 @@ func scanUser(row *sql.Row) (*models.User, error) {
 
 func createGroup(group *models.Group) error {
 	if err := database.QueryRow(`
-		INSERT INTO groups (vk_group_id, name, screen_name, photo_200, access_token, is_active)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO groups (vk_group_id, name, screen_name, photo_200, access_token, is_active, notify_user_ids)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, group.VKGroupID, group.Name, group.ScreenName, group.Photo200, group.AccessToken, group.IsActive).Scan(&group.ID); err != nil {
+	`, group.VKGroupID, group.Name, group.ScreenName, group.Photo200, group.AccessToken, group.IsActive, group.NotifyUserIDs).Scan(&group.ID); err != nil {
 		return err
 	}
 	now := time.Now()
@@ -833,9 +848,9 @@ func createGroup(group *models.Group) error {
 func updateGroup(group *models.Group) error {
 	_, err := database.Exec(`
 		UPDATE groups
-		SET name = ?, screen_name = ?, photo_200 = ?, access_token = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+		SET name = ?, screen_name = ?, photo_200 = ?, access_token = ?, is_active = ?, notify_user_ids = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, group.Name, group.ScreenName, group.Photo200, group.AccessToken, group.IsActive, group.ID)
+	`, group.Name, group.ScreenName, group.Photo200, group.AccessToken, group.IsActive, group.NotifyUserIDs, group.ID)
 	if err != nil {
 		return err
 	}
@@ -845,7 +860,7 @@ func updateGroup(group *models.Group) error {
 
 func getGroupByID(id int) (*models.Group, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, created_at, updated_at
+		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, notify_user_ids, created_at, updated_at
 		FROM groups WHERE id = ?
 	`, id)
 	return scanGroup(row)
@@ -853,7 +868,7 @@ func getGroupByID(id int) (*models.Group, error) {
 
 func getGroupByVKGroupID(vkGroupID int) (*models.Group, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, created_at, updated_at
+		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, notify_user_ids, created_at, updated_at
 		FROM groups WHERE vk_group_id = ?
 	`, vkGroupID)
 	return scanGroup(row)
@@ -869,6 +884,7 @@ func scanGroup(row *sql.Row) (*models.Group, error) {
 		&group.Photo200,
 		&group.AccessToken,
 		&group.IsActive,
+		&group.NotifyUserIDs,
 		&group.CreatedAt,
 		&group.UpdatedAt,
 	)
@@ -1058,7 +1074,7 @@ func getActiveVKToken() (string, error) {
 	return strings.TrimSpace(token), nil
 }
 
-func sendNotificationToAdmins(message string) {
+func sendNotificationToAdmins(groupID int, message string) {
 	go func() {
 		cfg := config.Load()
 		if cfg.VKOfficialGroupToken == "" {
@@ -1066,17 +1082,19 @@ func sendNotificationToAdmins(message string) {
 		}
 		client := vk.NewVKClient(cfg.VKOfficialGroupToken)
 
-		rows, err := database.Query("SELECT vk_user_id FROM users WHERE role IN ('admin', 'moderator')")
-		if err != nil {
+		var notifyUserIDsStr string
+		err := database.QueryRow("SELECT notify_user_ids FROM groups WHERE id = ?", groupID).Scan(&notifyUserIDsStr)
+		if err != nil || notifyUserIDsStr == "" || notifyUserIDsStr == "[]" {
 			return
 		}
-		defer rows.Close()
 
-		for rows.Next() {
-			var vkUserID int
-			if err := rows.Scan(&vkUserID); err == nil {
-				_ = client.SendDirectMessage(vkUserID, message)
-			}
+		var notifyUserIDs []int
+		if err := json.Unmarshal([]byte(notifyUserIDsStr), &notifyUserIDs); err != nil {
+			return
+		}
+
+		for _, vkUserID := range notifyUserIDs {
+			_ = client.SendDirectMessage(vkUserID, message)
 		}
 	}()
 }
@@ -1090,4 +1108,78 @@ func sendNotificationToUser(vkUserID int, message string) {
 		client := vk.NewVKClient(cfg.VKOfficialGroupToken)
 		_ = client.SendDirectMessage(vkUserID, message)
 	}()
+}
+
+type managerResponse struct {
+	ID        int    `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Role      string `json:"role"`
+}
+
+func groupManagersHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if ctx.GroupID == 0 {
+		utils.RespondError(w, http.StatusBadRequest, "vk_group_id is required")
+		return
+	}
+
+	if !isModerator(ctx.GroupRole) {
+		utils.RespondError(w, http.StatusForbidden, "allowed only for community admins")
+		return
+	}
+
+	token, err := getActiveVKToken()
+	if err != nil || token == "" {
+		utils.RespondError(w, http.StatusBadRequest, "no active VK admin token")
+		return
+	}
+
+	client := vk.NewVKClient(token)
+	resp, err := client.CallMethod("groups.getMembers", map[string]string{
+		"group_id": strconv.Itoa(ctx.GroupID),
+		"filter":   "managers",
+		"fields":   "first_name,last_name",
+	})
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var vkResp struct {
+		Response struct {
+			Items []struct {
+				ID        int    `json:"id"`
+				FirstName string `json:"first_name"`
+				LastName  string `json:"last_name"`
+				Role      string `json:"role"`
+			} `json:"items"`
+		} `json:"response"`
+	}
+
+	if err := json.Unmarshal(resp, &vkResp); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	managers := []managerResponse{}
+	for _, item := range vkResp.Response.Items {
+		managers = append(managers, managerResponse{
+			ID:        item.ID,
+			FirstName: item.FirstName,
+			LastName:  item.LastName,
+			Role:      item.Role,
+		})
+	}
+
+	utils.RespondSuccess(w, managers)
 }

@@ -12,9 +12,10 @@ import {
   NavIdProps,
   Spinner,
   FormStatus,
+  ChipsSelect,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getCommunitySettings, updateCommunitySettings, type AppGroupSettings } from '../shared/api';
+import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, type AppGroupSettings, type AppManager } from '../shared/api';
 
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -23,6 +24,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [screenName, setScreenName] = useState('');
   const [photo200, setPhoto200] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [notifyUserIds, setNotifyUserIds] = useState<number[]>([]);
+  const [managers, setManagers] = useState<AppManager[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +41,14 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         setScreenName(data.screen_name || '');
         setPhoto200(data.photo_200 || '');
         setIsActive(data.is_active);
+        setNotifyUserIds(data.notify_user_ids || []);
+
+        try {
+          const mgrs = await getCommunityManagers();
+          setManagers(mgrs);
+        } catch (e) {
+          console.error('Failed to load managers', e);
+        }
       } catch (e: any) {
         setError(e?.message || 'Не удалось загрузить настройки сообщества');
       } finally {
@@ -58,6 +69,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         screen_name: screenName.trim(),
         photo_200: photo200.trim(),
         is_active: isActive,
+        notify_user_ids: notifyUserIds,
       });
       setSettings(updated);
       setSuccess('Настройки сообщества сохранены');
@@ -112,6 +124,15 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
             </FormItem>
             <FormItem top="Токен сообщества">
               <Input value={settings?.has_token ? 'Подключен' : 'Не подключен'} disabled />
+            </FormItem>
+            <FormItem top="Получатели уведомлений">
+              <ChipsSelect
+                value={managers.filter(m => notifyUserIds.includes(m.id)).map(m => ({ value: m.id, label: `${m.first_name} ${m.last_name}` }))}
+                onChange={(options) => setNotifyUserIds(options.map(o => Number(o.value)))}
+                options={managers.map(m => ({ value: m.id, label: `${m.first_name} ${m.last_name}` }))}
+                placeholder="Выберите администраторов"
+                emptyText="Администраторы не найдены"
+              />
             </FormItem>
           </Group>
 

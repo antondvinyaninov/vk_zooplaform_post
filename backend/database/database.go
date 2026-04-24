@@ -97,6 +97,8 @@ const sqliteSchema = `
 		health_status TEXT DEFAULT 'unknown',
 		last_check_at DATETIME,
 		health_error TEXT,
+		members_count INTEGER DEFAULT 0,
+		notify_user_ids TEXT DEFAULT '[]',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -184,6 +186,8 @@ const postgresSchema = `
 		health_status TEXT DEFAULT 'unknown',
 		last_check_at TIMESTAMPTZ,
 		health_error TEXT,
+		members_count INTEGER DEFAULT 0,
+		notify_user_ids TEXT DEFAULT '[]',
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
@@ -284,6 +288,10 @@ func migratePostsTable() error {
 	}
 
 	if err := addColumnIfMissing("groups", "members_count", "INTEGER DEFAULT 0"); err != nil {
+		return err
+	}
+
+	if err := addColumnIfMissing("groups", "notify_user_ids", "TEXT DEFAULT '[]'"); err != nil {
 		return err
 	}
 

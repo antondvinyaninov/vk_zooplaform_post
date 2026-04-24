@@ -22,6 +22,7 @@ export interface AppGroup {
 export interface AppGroupSettings extends AppGroup {
   is_active: boolean;
   has_token: boolean;
+  notify_user_ids: number[];
 }
 
 export interface AppPost {
@@ -157,7 +158,18 @@ export const getCommunitySettings = async () => {
   return fetchJSON<AppGroupSettings>(`${API_URL}/groups/me`, { method: 'GET' });
 };
 
-export const updateCommunitySettings = async (payload: Partial<Pick<AppGroupSettings, 'name' | 'screen_name' | 'photo_200' | 'is_active'>>) => {
+export interface AppManager {
+  id: number;
+  first_name: string;
+  last_name: string;
+  role: string;
+}
+
+export const getCommunityManagers = async () => {
+  return fetchJSON<AppManager[]>(`${API_URL}/groups/me/managers`, { method: 'GET' });
+};
+
+export const updateCommunitySettings = async (payload: Partial<Pick<AppGroupSettings, 'name' | 'screen_name' | 'photo_200' | 'is_active' | 'notify_user_ids'>>) => {
   return fetchJSON<AppGroupSettings>(`${API_URL}/groups/me`, {
     method: 'PATCH',
     body: JSON.stringify(payload),

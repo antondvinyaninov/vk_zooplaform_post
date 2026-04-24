@@ -15,6 +15,7 @@ type Group struct {
 	LastCheckAt  time.Time `json:"last_check_at,omitempty"`
 	HealthError  string    `json:"health_error,omitempty"`
 	MembersCount int       `json:"members_count"`
+	NotifyUserIDs string   `json:"notify_user_ids"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
