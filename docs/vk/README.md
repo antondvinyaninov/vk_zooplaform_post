@@ -28,6 +28,14 @@
 - [Обзор событий](events_overview.md) - Полный список событий
 - [User Long Poll](user_long_poll.md) - Подключение к Long Poll
 
+### Запуск мини-приложений
+- [Параметры запуска](launch_params.md) - Основные параметры запуска
+- [Параметр vk_ref](launch_params_vk_ref.md) - Источники перехода (vk_ref)
+- [Подпись параметров](launch_params_sign.md) - Валидация подписи (sign)
+- [IFrame и WebView](iframe_webview.md) - Специфика IFrame и WebView
+- [Кеширование](cache.md) - Работа с кешем
+- [Анимации Lottie](lottie.md) - Экран запуска приложения с Lottie
+
 ### Сообщества и Виджеты
 - [Сообщения сообществ](community_messages.md) - Интеграция с сообщениями сообществ
 - [Виджеты сообществ](community_widgets.md) - Добавление виджетов в группу
