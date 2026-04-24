@@ -8,6 +8,7 @@ import (
 	"backend/vk"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -209,6 +210,9 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sendNotificationToUser(ctx.UserID, "Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.")
+	sendNotificationToAdmins(fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!", group.Name))
+
 	response, err := serializePost(post)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -403,6 +407,17 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	if err := updatePost(post); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if author, err := getUserByID(post.UserID); err == nil && author != nil {
+		switch req.Status {
+		case "published":
+			sendNotificationToUser(author.VKUserID, "Ваш предложенный пост был успешно опубликован!")
+		case "scheduled":
+			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s", post.PublishDate.Format("02.01.2006 15:04")))
+		case "rejected":
+			sendNotificationToUser(author.VKUserID, "К сожалению, ваш предложенный пост был отклонен модератором.")
+		}
 	}
 
 	response, err := serializePost(post)
@@ -1041,4 +1056,38 @@ func getActiveVKToken() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(token), nil
+}
+
+func sendNotificationToAdmins(message string) {
+	go func() {
+		cfg := config.Load()
+		if cfg.VKOfficialGroupToken == "" {
+			return
+		}
+		client := vk.NewVKClient(cfg.VKOfficialGroupToken)
+
+		rows, err := database.Query("SELECT vk_user_id FROM users WHERE role IN ('admin', 'moderator')")
+		if err != nil {
+			return
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var vkUserID int
+			if err := rows.Scan(&vkUserID); err == nil {
+				_ = client.SendDirectMessage(vkUserID, message)
+			}
+		}
+	}()
+}
+
+func sendNotificationToUser(vkUserID int, message string) {
+	go func() {
+		cfg := config.Load()
+		if cfg.VKOfficialGroupToken == "" {
+			return
+		}
+		client := vk.NewVKClient(cfg.VKOfficialGroupToken)
+		_ = client.SendDirectMessage(vkUserID, message)
+	}()
 }

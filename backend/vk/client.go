@@ -187,3 +187,14 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, e
 	photo := savedPhotos[0]
 	return fmt.Sprintf("photo%d_%d", photo.OwnerID, photo.ID), nil
 }
+
+// SendDirectMessage отправляет личное сообщение пользователю от имени группы
+func (c *VKClient) SendDirectMessage(userID int, message string) error {
+	params := map[string]string{
+		"user_id":   strconv.Itoa(userID),
+		"message":   message,
+		"random_id": strconv.FormatInt(time.Now().UnixNano(), 10),
+	}
+	_, err := c.CallMethod("messages.send", params)
+	return err
+}

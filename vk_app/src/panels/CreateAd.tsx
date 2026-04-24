@@ -10,6 +10,7 @@ import {
   NavIdProps,
 } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
+import bridge from '@vkontakte/vk-bridge';
 import { createPost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
@@ -26,6 +27,12 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
 
     setIsSubmitting(true);
     try {
+      // Запрашиваем разрешение на отправку сообщений от имени официального сообщества приложения (zooplatforma: 165434330)
+      await bridge.send('VKWebAppAllowMessagesFromGroup', {
+        group_id: 165434330,
+        key: 'post_status_updates'
+      }).catch((e: any) => console.log('User denied messages or already allowed:', e));
+
       await createPost(text);
       routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_POSTS}`);
     } catch (error: any) {

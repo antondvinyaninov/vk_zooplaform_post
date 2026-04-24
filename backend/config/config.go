@@ -18,6 +18,9 @@ type Config struct {
 	VKMiniAppSecret     string
 	VKMiniAppServiceKey string
 
+	VKOfficialGroupToken string
+	VKOfficialGroupID    int
+
 	DatabasePath string
 	DatabaseURL  string
 }
@@ -36,6 +39,9 @@ func Load() *Config {
 		VKMiniAppID:         getEnv("VK_MINI_APP_ID", "54560047"),
 		VKMiniAppSecret:     getEnv("VK_MINI_APP_SECRET", "kI41QDPyyK87kIopZ2U9"),
 		VKMiniAppServiceKey: getEnv("VK_MINI_APP_SERVICE_KEY", "e59b585ae59b585ae59b585a67e6dbdd75ee59be59b585a8c7299470181bb987c8b3c03"),
+
+		VKOfficialGroupToken: getEnv("VK_OFFICIAL_GROUP_TOKEN", ""),
+		VKOfficialGroupID:    getEnvInt("VK_OFFICIAL_GROUP_ID", 165434330),
 
 		DatabasePath: getEnv("DATABASE_PATH", "./data/app.db"),
 		DatabaseURL:  getEnv("DATABASE_URL", ""),
