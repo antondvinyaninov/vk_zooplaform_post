@@ -1,4 +1,4 @@
-import { UserInfo } from '@vkontakte/vk-bridge';
+import bridge, { UserInfo } from '@vkontakte/vk-bridge';
 
 const API_URL = '/api/app';
 
@@ -171,13 +171,57 @@ export const getCommunityManagers = async () => {
   return fetchJSON<AppManager[]>(`${API_URL}/groups/me/managers`, { method: 'GET' });
 };
 
+let cachedCityToken = '';
+
 export const searchCities = async (query: string): Promise<{id: number, title: string, region?: string}[]> => {
   if (!query) return [];
-  const launchParams = getVKLaunchSignature();
-  const urlParams = new URLSearchParams(launchParams);
-  urlParams.set('q', query);
   
-  return fetchJSON<{id: number, title: string, region?: string}[]>(`${API_URL}/cities?${urlParams.toString()}`, { method: 'GET' });
+  try {
+    if (!cachedCityToken) {
+      // @ts-ignore
+      const launchParams = window.vkLaunchParams || {};
+      const appId = Number(launchParams.vk_app_id);
+      if (appId) {
+        try {
+          const tokenData = await bridge.send('VKWebAppGetAuthToken', { 
+            app_id: appId, 
+            scope: '' 
+          });
+          cachedCityToken = tokenData.access_token;
+        } catch (e) {
+          console.error("Failed to get auth token for cities", e);
+        }
+      }
+    }
+
+    if (!cachedCityToken) {
+      console.warn("No access token available for database.getCities");
+      return [];
+    }
+
+    const data = await bridge.send('VKWebAppCallAPIMethod', {
+      method: 'database.getCities',
+      request_id: 'search_cities_' + Date.now(),
+      params: {
+        country_id: 1,
+        q: query,
+        v: '5.131',
+        need_all: 1,
+        count: 20,
+        access_token: cachedCityToken
+      }
+    });
+    
+    // @ts-ignore
+    if (data.response && data.response.items) {
+      // @ts-ignore
+      return data.response.items;
+    }
+    return [];
+  } catch (error) {
+    console.error("VKWebAppCallAPIMethod database.getCities error:", error);
+    return [];
+  }
 };
 
 export const updateCommunitySettings = async (payload: Partial<Pick<AppGroupSettings, 'name' | 'screen_name' | 'photo_200' | 'is_active' | 'notify_user_ids' | 'city_id' | 'city_title'>>) => {
