@@ -7,6 +7,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 - **Backend**: Added automatic resolution of VK User IDs to Internal DB User IDs in `createPostHandler` and `myPostsHandler` to prevent database foreign key constraints violations.
 - **Frontend / Moderation**: Added `postModerated` event listener in `Moderation.tsx` to instantly update the UI when a post is approved and published.
+- **Backend / Settings**: Added support for selecting and storing Community City (city_id, city_title) integrating with VK `database.getCities` via App tokens.
+- **Frontend / Settings**: Implemented `CustomSelect` city autocomplete with debounce for efficient VK API querying.
 
 ### Changed
 - **Backend / Publishing**: Modified `moderatePostHandler` to prioritize Community Token (`group.AccessToken`) over Admin User Token when publishing to the community wall.

@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -1212,13 +1213,7 @@ func citiesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := getActiveVKToken()
-	if err != nil || token == "" {
-		utils.RespondError(w, http.StatusBadRequest, "no active VK admin token")
-		return
-	}
-
-	client := vk.NewVKClient(token)
+	client := vk.NewVKClient(os.Getenv("VK_SERVICE_KEY"))
 	params := map[string]string{
 		"country_id": "1", // Russia
 		"q":          q,
@@ -1246,6 +1241,14 @@ func citiesHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(resp, &vkResp); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if vkResp.Response.Items == nil {
+		vkResp.Response.Items = make([]struct {
+			ID     int    `json:"id"`
+			Title  string `json:"title"`
+			Region string `json:"region,omitempty"`
+		}, 0)
 	}
 
 	utils.RespondSuccess(w, vkResp.Response.Items)
