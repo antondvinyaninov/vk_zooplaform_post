@@ -1,4 +1,4 @@
-import bridge, { UserInfo } from '@vkontakte/vk-bridge';
+import { UserInfo } from '@vkontakte/vk-bridge';
 
 const API_URL = '/api/app';
 
@@ -183,7 +183,8 @@ export const searchCities = async (query: string): Promise<{id: number, title: s
       const appId = Number(launchParams.vk_app_id);
       if (appId) {
         try {
-          const tokenData = await bridge.send('VKWebAppGetAuthToken', { 
+          // @ts-ignore
+          const tokenData = await window.vkBridge.send('VKWebAppGetAuthToken', { 
             app_id: appId, 
             scope: '' 
           });
@@ -199,7 +200,8 @@ export const searchCities = async (query: string): Promise<{id: number, title: s
       return [];
     }
 
-    const data = await bridge.send('VKWebAppCallAPIMethod', {
+    // @ts-ignore
+    const data = await window.vkBridge.send('VKWebAppCallAPIMethod', {
       method: 'database.getCities',
       request_id: 'search_cities_' + Date.now(),
       params: {
