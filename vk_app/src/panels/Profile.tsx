@@ -12,11 +12,7 @@ import {
 } from '@vkontakte/vkui';
 import {
   Icon28SettingsOutline,
-  Icon28UsersOutline,
-  Icon28StatisticsOutline,
   Icon28ListOutline,
-  Icon28FavoriteOutline,
-  Icon28HelpOutline,
   Icon28CheckShieldOutline,
 } from '@vkontakte/icons';
 import { UserInfo } from '@vkontakte/vk-bridge';
@@ -61,12 +57,7 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, role }) => {
             <SimpleCell before={<Icon28SettingsOutline />} onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS}`)}>
               Настройки сообщества
             </SimpleCell>
-            <SimpleCell before={<Icon28UsersOutline />} onClick={() => console.log('Admin Members')}>
-              Управление участниками
-            </SimpleCell>
-            <SimpleCell before={<Icon28StatisticsOutline />} onClick={() => console.log('Admin Stats')}>
-              Статистика приюта
-            </SimpleCell>
+
             <SimpleCell 
               before={<Icon28CheckShieldOutline />} 
               onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MODERATION}`)}
@@ -85,12 +76,7 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, role }) => {
             >
             Мои публикации
             </SimpleCell>
-          <SimpleCell before={<Icon28FavoriteOutline />} onClick={() => console.log('Favorites')}>
-            Избранное
-          </SimpleCell>
-          <SimpleCell before={<Icon28HelpOutline />} onClick={() => console.log('Support')}>
-            Помощь и поддержка
-          </SimpleCell>
+
         </List>
       </Group>
     </Panel>
