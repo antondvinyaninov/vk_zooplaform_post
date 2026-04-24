@@ -78,6 +78,21 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
     fetchPostsForModeration();
   }, []);
 
+  useEffect(() => {
+    const handlePostModerated = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const postId = customEvent.detail?.postId;
+      if (postId) {
+        setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+      }
+    };
+    
+    window.addEventListener('postModerated', handlePostModerated);
+    return () => {
+      window.removeEventListener('postModerated', handlePostModerated);
+    };
+  }, []);
+
   const handleApprove = (postId: number) => {
     routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MODERATION}/approve_settings/${postId}`);
   };
