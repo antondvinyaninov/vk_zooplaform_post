@@ -27,18 +27,20 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
 
     setIsSubmitting(true);
     try {
-      // Запрашиваем разрешение на отправку сообщений (не ждем окончания, чтобы не блокировать UI)
-      if (bridge.supports('VKWebAppAllowMessagesFromGroup')) {
+      // Запрашиваем разрешение на отправку сообщений (безопасно игнорируем любые ошибки)
+      try {
         bridge.send('VKWebAppAllowMessagesFromGroup', {
           group_id: 165434330,
           key: 'post_status_updates'
-        }).catch((e: any) => console.log('User denied messages or already allowed:', e));
+        }).catch(() => {});
+      } catch (e) {
+        // Игнорируем синхронные ошибки
       }
 
       await createPost(text);
       routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MY_POSTS}`);
     } catch (error: any) {
-      alert(`Ошибка при сохранении: ${error.message}`);
+      alert(`Ошибка при сохранении: ${error?.message || String(error)}`);
     } finally {
       setIsSubmitting(false);
     }
