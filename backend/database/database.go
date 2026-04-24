@@ -92,6 +92,8 @@ const sqliteSchema = `
 		name TEXT NOT NULL,
 		screen_name TEXT,
 		photo_200 TEXT,
+		city_id INTEGER,
+		city_title TEXT,
 		access_token TEXT,
 		is_active BOOLEAN DEFAULT 1,
 		health_status TEXT DEFAULT 'unknown',
@@ -181,6 +183,8 @@ const postgresSchema = `
 		name TEXT NOT NULL,
 		screen_name TEXT,
 		photo_200 TEXT,
+		city_id BIGINT,
+		city_title TEXT,
 		access_token TEXT,
 		is_active BOOLEAN DEFAULT TRUE,
 		health_status TEXT DEFAULT 'unknown',
@@ -292,6 +296,18 @@ func migratePostsTable() error {
 	}
 
 	if err := addColumnIfMissing("groups", "notify_user_ids", "TEXT DEFAULT '[]'"); err != nil {
+		return err
+	}
+
+	cityIDType := "INTEGER"
+	if isPostgres() {
+		cityIDType = "BIGINT"
+	}
+	if err := addColumnIfMissing("groups", "city_id", cityIDType); err != nil {
+		return err
+	}
+
+	if err := addColumnIfMissing("groups", "city_title", "TEXT"); err != nil {
 		return err
 	}
 

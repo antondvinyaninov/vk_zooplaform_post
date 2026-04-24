@@ -50,8 +50,10 @@ type groupSettingsResponse struct {
 	Name       string `json:"name"`
 	ScreenName string `json:"screen_name"`
 	Photo200   string `json:"photo_200"`
-	IsActive      bool   `json:"is_active"`
-	HasToken      bool   `json:"has_token"`
+	CityID     int    `json:"city_id"`
+	CityTitle  string `json:"city_title"`
+	IsActive   bool   `json:"is_active"`
+	HasToken   bool   `json:"has_token"`
 	NotifyUserIDs []int  `json:"notify_user_ids"`
 }
 
@@ -458,10 +460,12 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 
 		var req struct {
 			Name       *string `json:"name"`
-			ScreenName    *string `json:"screen_name"`
-			Photo200      *string `json:"photo_200"`
-			IsActive      *bool   `json:"is_active"`
-			NotifyUserIDs []int   `json:"notify_user_ids"`
+			ScreenName *string `json:"screen_name"`
+			Photo200   *string `json:"photo_200"`
+			CityID     *int    `json:"city_id"`
+			CityTitle  *string `json:"city_title"`
+			IsActive   *bool   `json:"is_active"`
+			NotifyUserIDs []int `json:"notify_user_ids"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -476,6 +480,12 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.Photo200 != nil {
 			group.Photo200 = strings.TrimSpace(*req.Photo200)
+		}
+		if req.CityID != nil {
+			group.CityID = *req.CityID
+		}
+		if req.CityTitle != nil {
+			group.CityTitle = strings.TrimSpace(*req.CityTitle)
 		}
 		if req.IsActive != nil {
 			group.IsActive = *req.IsActive
@@ -665,6 +675,8 @@ func groupToSettings(group *models.Group) *groupSettingsResponse {
 		Name:       group.Name,
 		ScreenName: group.ScreenName,
 		Photo200:   group.Photo200,
+		CityID:     group.CityID,
+		CityTitle:  group.CityTitle,
 		IsActive:   group.IsActive,
 		HasToken:   group.AccessToken != "",
 	}
@@ -833,10 +845,10 @@ func scanUser(row *sql.Row) (*models.User, error) {
 
 func createGroup(group *models.Group) error {
 	if err := database.QueryRow(`
-		INSERT INTO groups (vk_group_id, name, screen_name, photo_200, access_token, is_active, notify_user_ids)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO groups (vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, group.VKGroupID, group.Name, group.ScreenName, group.Photo200, group.AccessToken, group.IsActive, group.NotifyUserIDs).Scan(&group.ID); err != nil {
+	`, group.VKGroupID, group.Name, group.ScreenName, group.Photo200, group.CityID, group.CityTitle, group.AccessToken, group.IsActive, group.NotifyUserIDs).Scan(&group.ID); err != nil {
 		return err
 	}
 	now := time.Now()
@@ -848,9 +860,9 @@ func createGroup(group *models.Group) error {
 func updateGroup(group *models.Group) error {
 	_, err := database.Exec(`
 		UPDATE groups
-		SET name = ?, screen_name = ?, photo_200 = ?, access_token = ?, is_active = ?, notify_user_ids = ?, updated_at = CURRENT_TIMESTAMP
+		SET name = ?, screen_name = ?, photo_200 = ?, city_id = ?, city_title = ?, access_token = ?, is_active = ?, notify_user_ids = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, group.Name, group.ScreenName, group.Photo200, group.AccessToken, group.IsActive, group.NotifyUserIDs, group.ID)
+	`, group.Name, group.ScreenName, group.Photo200, group.CityID, group.CityTitle, group.AccessToken, group.IsActive, group.NotifyUserIDs, group.ID)
 	if err != nil {
 		return err
 	}
@@ -863,7 +875,7 @@ func updateGroup(group *models.Group) error {
 
 func getGroupByID(id int) (*models.Group, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, notify_user_ids, created_at, updated_at
+		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, created_at, updated_at
 		FROM groups WHERE id = ?
 	`, id)
 	return scanGroup(row)
@@ -871,7 +883,7 @@ func getGroupByID(id int) (*models.Group, error) {
 
 func getGroupByVKGroupID(vkGroupID int) (*models.Group, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, access_token, is_active, notify_user_ids, created_at, updated_at
+		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, created_at, updated_at
 		FROM groups WHERE vk_group_id = ?
 	`, vkGroupID)
 	return scanGroup(row)
@@ -885,6 +897,8 @@ func scanGroup(row *sql.Row) (*models.Group, error) {
 		&group.Name,
 		&group.ScreenName,
 		&group.Photo200,
+		&group.CityID,
+		&group.CityTitle,
 		&group.AccessToken,
 		&group.IsActive,
 		&group.NotifyUserIDs,
@@ -1183,4 +1197,49 @@ func groupManagersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	utils.RespondSuccess(w, managers)
+}
+
+func citiesHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		utils.RespondSuccess(w, []interface{}{})
+		return
+	}
+
+	client := vk.NewVKClient(os.Getenv("VK_SERVICE_KEY"))
+	params := map[string]string{
+		"country_id": "1", // Russia
+		"q":          q,
+		"need_all":   "1",
+		"count":      "20",
+	}
+
+	resp, err := client.CallMethod("database.getCities", params)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to get cities: "+err.Error())
+		return
+	}
+
+	var vkResp struct {
+		Response struct {
+			Count int `json:"count"`
+			Items []struct {
+				ID     int    `json:"id"`
+				Title  string `json:"title"`
+				Region string `json:"region,omitempty"`
+			} `json:"items"`
+		} `json:"response"`
+	}
+
+	if err := json.Unmarshal(resp, &vkResp); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.RespondSuccess(w, vkResp.Response.Items)
 }

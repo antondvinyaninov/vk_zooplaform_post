@@ -13,16 +13,22 @@ import {
   FormStatus,
   ChipsSelect,
   Snackbar,
+  CustomSelect,
 } from '@vkontakte/vkui';
 import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, type AppGroupSettings, type AppManager } from '../shared/api';
+import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, type AppGroupSettings, type AppManager } from '../shared/api';
 
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [settings, setSettings] = useState<AppGroupSettings | null>(null);
   const [isActive, setIsActive] = useState(true);
   const [notifyUserIds, setNotifyUserIds] = useState<number[]>([]);
+  const [cityId, setCityId] = useState<number | undefined>(undefined);
+  const [cityTitle, setCityTitle] = useState<string>('');
+  const [cityOptions, setCityOptions] = useState<{value: number, label: string}[]>([]);
+  const [cityQuery, setCityQuery] = useState('');
+  const [citySearchLoading, setCitySearchLoading] = useState(false);
   const [managers, setManagers] = useState<AppManager[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,6 +43,11 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         setSettings(data);
         setIsActive(data.is_active);
         setNotifyUserIds(data.notify_user_ids || []);
+        if (data.city_id && data.city_title) {
+          setCityId(data.city_id);
+          setCityTitle(data.city_title);
+          setCityOptions([{ value: data.city_id, label: data.city_title }]);
+        }
 
         try {
           const mgrs = await getCommunityManagers();
@@ -54,6 +65,33 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
     load();
   }, []);
 
+  useEffect(() => {
+    if (!cityQuery) return;
+    const timer = setTimeout(async () => {
+      setCitySearchLoading(true);
+      try {
+        const cities = await searchCities(cityQuery);
+        const options = cities.map(c => ({
+          value: c.id,
+          label: c.region ? `${c.title} (${c.region})` : c.title
+        }));
+        
+        // Preserve current selected city if it's not in the new results
+        if (cityId && cityTitle && !options.find(o => o.value === cityId)) {
+          options.unshift({ value: cityId, label: cityTitle });
+        }
+        
+        setCityOptions(options);
+      } catch (e) {
+        console.error('Failed to search cities', e);
+      } finally {
+        setCitySearchLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [cityQuery, cityId, cityTitle]);
+
   const handleSave = async () => {
     setError(null);
     setSnackbar(null);
@@ -63,6 +101,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         name: settings?.name || '',
         screen_name: settings?.screen_name || '',
         photo_200: settings?.photo_200 || '',
+        city_id: cityId,
+        city_title: cityTitle,
         is_active: isActive,
         notify_user_ids: notifyUserIds,
       });
@@ -114,6 +154,27 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
           )}
 
           <Group>
+            <FormItem top="Город (где работает группа)">
+              <CustomSelect
+                value={cityId}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setCityId(val);
+                  const selected = cityOptions.find(o => o.value === val);
+                  if (selected) {
+                    setCityTitle(selected.label);
+                  }
+                }}
+                onInputChange={(e) => setCityQuery(e.target.value)}
+                options={cityOptions}
+                searchable
+                allowClearButton
+                placeholder="Введите название населенного пункта"
+                emptyText="Ничего не найдено"
+                fetching={citySearchLoading}
+                clearButtonAriaLabel="Очистить"
+              />
+            </FormItem>
             <FormItem top="Активировать приложение в сообществе">
               <Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
             </FormItem>

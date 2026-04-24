@@ -17,6 +17,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 
 	mux.HandleFunc("/api/app/groups/me", middleware.CORSFunc(groupSettingsHandler))
 	mux.HandleFunc("/api/app/groups/me/managers", middleware.CORSFunc(groupManagersHandler))
+	mux.HandleFunc("/api/app/cities", middleware.CORSFunc(citiesHandler))
 
 	// Webhook для получения событий от ВКонтакте
 	mux.HandleFunc("/api/callback", callbackHandler)
