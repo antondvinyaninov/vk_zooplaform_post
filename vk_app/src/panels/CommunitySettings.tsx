@@ -131,7 +131,13 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   return (
     <Panel id={id}>
       <PanelHeader
-        before={<PanelHeaderBack onClick={() => routeNavigator.back()} />}
+        before={<PanelHeaderBack onClick={() => {
+          if (window.history.length <= 2) {
+            routeNavigator.replace('/');
+          } else {
+            routeNavigator.back();
+          }
+        }} />}
         style={{ textAlign: 'center' }}
       >
         Настройки сообщества
