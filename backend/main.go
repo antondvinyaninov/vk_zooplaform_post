@@ -245,12 +245,9 @@ func main() {
 	ticker := time.NewTicker(5 * time.Second)
 	go func() {
 		startTime := time.Now()
-		for {
-			select {
-			case <-ticker.C:
-				uptime := time.Since(startTime)
-				log.Printf("⏰ Server uptime: %v", uptime)
-			}
+		for range ticker.C {
+			uptime := time.Since(startTime)
+			log.Printf("⏰ Server uptime: %v", uptime)
 		}
 	}()
 
