@@ -44,17 +44,32 @@ export default defineConfig({
 
   build: {
     outDir: 'build',
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            // VKUI компоненты — самый тяжёлый, кешируется отдельно
             if (id.includes('@vkontakte/vkui')) {
               return 'vkui';
             }
+            // Иконки VK — меняются редко, хорошо кешируются
             if (id.includes('@vkontakte/icons')) {
               return 'icons';
             }
+            // VK Bridge — отдельно, т.к. VK его уже может кешировать
+            if (id.includes('@vkontakte/vk-bridge')) {
+              return 'vk-bridge';
+            }
+            // VK Router — отдельно
+            if (id.includes('@vkontakte/vk-mini-apps-router')) {
+              return 'vk-router';
+            }
+            // React + React DOM — самое стабильное, редко обновляется
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'react';
+            }
+            // Остальные зависимости
             return 'vendor';
           }
         },
