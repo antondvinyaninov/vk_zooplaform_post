@@ -166,7 +166,7 @@ func main() {
 
 	// Применяем middleware
 	log.Printf("Applying middleware...")
-	handler := middleware.Logger(middleware.CORS(mux))
+	handler := middleware.Logger(middleware.CORS(middleware.Gzip(mux)))
 
 	// Запускаем сервер
 	log.Printf("=== Starting HTTP Server ===")
