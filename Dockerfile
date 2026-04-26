@@ -23,7 +23,7 @@ ENV CGO_ENABLED=1
 RUN go build -v -o main .
 
 # Сборка Astro админки
-FROM node:20-alpine AS admin-builder
+FROM node:22-alpine AS admin-builder
 
 WORKDIR /app/frontadmin
 COPY frontadmin/package*.json ./
