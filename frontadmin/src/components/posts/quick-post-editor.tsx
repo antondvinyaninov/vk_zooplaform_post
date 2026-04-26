@@ -96,44 +96,44 @@ export function QuickPostEditor() {
             />
             
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger render={
                 <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={handleFileClick}>
                   <IconPhoto className="size-4" />
                   <span className="sr-only">Прикрепить фото</span>
                 </Button>
-              </TooltipTrigger>
+              } />
               <TooltipContent>Добавить фото</TooltipContent>
             </Tooltip>
             
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger render={
                 <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={handleFileClick}>
                   <IconVideo className="size-4" />
                   <span className="sr-only">Прикрепить видео</span>
                 </Button>
-              </TooltipTrigger>
+              } />
               <TooltipContent>Добавить видео</TooltipContent>
             </Tooltip>
 
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger render={
                 <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground hover:bg-muted">
                   <IconPaperclip className="size-4" />
                   <span className="sr-only">Прикрепить файл</span>
                 </Button>
-              </TooltipTrigger>
+              } />
               <TooltipContent>Добавить документ</TooltipContent>
             </Tooltip>
             
             <div className="w-px h-5 bg-border mx-1" />
 
             <Tooltip>
-              <TooltipTrigger asChild>
+              <TooltipTrigger render={
                 <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground hover:bg-muted">
                   <IconCalendarTime className="size-4" />
                   <span className="sr-only">Отложенный постинг</span>
                 </Button>
-              </TooltipTrigger>
+              } />
               <TooltipContent>Запланировать публикацию</TooltipContent>
             </Tooltip>
           </div>
