@@ -123,7 +123,7 @@ export function SectionCards() {
             <IconShieldCheck className="size-4 text-primary" />
             Статус подключений
           </CardDescription>
-          {isLoading ? (
+          {isLoadingGroups ? (
             <Skeleton className="h-8 w-32 mt-2 mb-1" />
           ) : (
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl flex items-center gap-2">
@@ -133,7 +133,7 @@ export function SectionCards() {
           )}
           
           <CardAction>
-            {isLoading ? null : isHealthy || groupsCount === 0 ? (
+            {isLoadingGroups ? null : isHealthy || groupsCount === 0 ? (
               <Badge variant="outline" className="text-emerald-500 border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/20">
                 <IconCircleCheck className="mr-1 size-3" />
                 API OK
@@ -147,7 +147,7 @@ export function SectionCards() {
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          {isLoading ? (
+          {isLoadingGroups ? (
              <Skeleton className="h-4 w-32" />
           ) : isHealthy || groupsCount === 0 ? (
             <>
