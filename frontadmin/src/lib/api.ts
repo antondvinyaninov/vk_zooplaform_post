@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // Используем переменную окружения, если она есть, иначе хардкод порта для локальной разработки
-export const API_BASE_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:80/api";
+export const API_BASE_URL = import.meta.env.PUBLIC_API_URL || "/api";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
