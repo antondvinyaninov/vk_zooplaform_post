@@ -15,8 +15,10 @@ import {
   FieldGroup,
   FieldLabel,
   FieldDescription,
+  FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { IconBrandVk } from "@tabler/icons-react"
 
 export function LoginForm({
   className,
@@ -60,18 +62,32 @@ export function LoginForm({
     }
   }
 
+  const handleVkLogin = () => {
+    alert("Авторизация администратора через ВКонтакте находится в разработке.")
+  }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader className="text-center">
-          <CardTitle className="text-xl">Авторизация</CardTitle>
+          <CardTitle className="text-xl">С возвращением</CardTitle>
           <CardDescription>
-            Войдите в панель управления SMM
+            Войдите в панель управления
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
             <FieldGroup>
+              <Field>
+                <Button variant="outline" type="button" onClick={handleVkLogin}>
+                  <IconBrandVk className="text-[#0077FF] size-5" />
+                  Войти через ВКонтакте
+                </Button>
+              </Field>
+              <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
+                Или продолжить с
+              </FieldSeparator>
+
               {error && (
                 <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md text-center">
                   {error}
@@ -92,6 +108,12 @@ export function LoginForm({
               <Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password">Пароль</FieldLabel>
+                  <a
+                    href="#"
+                    className="ml-auto text-sm underline-offset-4 hover:underline"
+                  >
+                    Забыли пароль?
+                  </a>
                 </div>
                 <Input 
                   id="password" 
@@ -112,7 +134,8 @@ export function LoginForm({
         </CardContent>
       </Card>
       <FieldDescription className="px-6 text-center">
-        Система предназначена только для авторизованных сотрудников.
+        Нажимая продолжить, вы соглашаетесь с нашими <a href="#">Условиями использования</a>{" "}
+        и <a href="#">Политикой конфиденциальности</a>.
       </FieldDescription>
     </div>
   )

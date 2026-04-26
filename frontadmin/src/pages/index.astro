@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import { LoginForm } from '@/components/login-form';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { IconPaw } from '@tabler/icons-react';
 ---
 
 <html lang="ru">
@@ -9,7 +10,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<title>Вход — Админ-панель</title>
+		<title>Вход — ZooPlatforma</title>
 		
 		<!-- Инлайн-скрипт предотвращает мерцание (FOUC) при загрузке страницы -->
 		<script is:inline>
@@ -33,12 +34,18 @@ import { ThemeToggle } from '@/components/theme-toggle';
 		</script>
 	</head>
 
-	<body class="min-h-screen bg-background flex flex-col items-center justify-center p-6 md:p-10">
+	<body class="min-h-screen bg-muted flex flex-col items-center justify-center p-6 md:p-10">
 		<div class="absolute top-4 right-4">
 			<ThemeToggle client:load />
 		</div>
 		
-		<div class="w-full max-w-sm md:max-w-md">
+		<div class="flex w-full max-w-sm flex-col gap-6">
+			<a href="#" className="flex items-center gap-2 self-center font-medium text-lg text-foreground hover:text-foreground/80 transition-colors">
+				<div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+					<IconPaw className="size-5" />
+				</div>
+				ZooPlatforma
+			</a>
 			<LoginForm client:load />
 		</div>
 	</body>
