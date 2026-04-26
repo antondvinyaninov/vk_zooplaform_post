@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetcher } from "@/lib/api"
+import { usePostContext } from "./post-context"
 
 interface InstalledGroup {
   id: number
@@ -27,7 +28,7 @@ interface GroupsResponse {
 
 export function GroupSelector() {
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [selectedGroups, setSelectedGroups] = React.useState<number[]>([])
+  const { selectedGroups, setSelectedGroups } = usePostContext()
 
   const { data, error, isLoading } = useSWR<GroupsResponse>("/admin/groups/installed", fetcher)
   
