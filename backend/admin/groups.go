@@ -250,5 +250,50 @@ func refreshGroupsHealth(groupID int) (int, error) {
 	if err := rows.Err(); err != nil {
 		return updated, err
 	}
+
+	// Записываем снимок аудитории (total groups и total subscribers) за сегодняшний день
+	go saveDailyStatsSnapshot()
+
 	return updated, nil
+}
+
+func saveDailyStatsSnapshot() {
+	var totalGroups int
+	var totalSubscribers int
+
+	// Считаем текущие данные
+	err := database.QueryRow(`
+		SELECT COUNT(1), COALESCE(SUM(members_count), 0) 
+		FROM groups 
+		WHERE is_active = ?
+	`, true).Scan(&totalGroups, &totalSubscribers)
+	
+	if err != nil {
+		return
+	}
+
+	today := time.Now().Format("2006-01-02")
+	
+	// Обновляем или вставляем статистику за сегодняшний день
+	if database.Rebind("?") == "$1" {
+		// Postgres
+		database.Exec(`
+			INSERT INTO group_stats_history (date, total_groups, total_subscribers)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (date) DO UPDATE 
+			SET total_groups = EXCLUDED.total_groups, 
+			    total_subscribers = EXCLUDED.total_subscribers,
+			    created_at = CURRENT_TIMESTAMP
+		`, today, totalGroups, totalSubscribers)
+	} else {
+		// SQLite
+		database.Exec(`
+			INSERT INTO group_stats_history (date, total_groups, total_subscribers)
+			VALUES (?, ?, ?)
+			ON CONFLICT(date) DO UPDATE SET
+			total_groups=excluded.total_groups,
+			total_subscribers=excluded.total_subscribers,
+			created_at=CURRENT_TIMESTAMP
+		`, today, totalGroups, totalSubscribers)
+	}
 }

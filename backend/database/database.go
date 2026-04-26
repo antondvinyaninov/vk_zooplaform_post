@@ -174,6 +174,15 @@ const sqliteSchema = `
 	CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username);
 	CREATE INDEX IF NOT EXISTS idx_vk_accounts_user_id ON vk_accounts(vk_user_id);
 	CREATE INDEX IF NOT EXISTS idx_vk_accounts_active ON vk_accounts(is_active);
+
+	CREATE TABLE IF NOT EXISTS group_stats_history (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		date TEXT NOT NULL,
+		total_groups INTEGER NOT NULL DEFAULT 0,
+		total_subscribers INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(date)
+	);
 `
 
 const postgresSchema = `
@@ -265,6 +274,14 @@ const postgresSchema = `
 	CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username);
 	CREATE INDEX IF NOT EXISTS idx_vk_accounts_user_id ON vk_accounts(vk_user_id);
 	CREATE INDEX IF NOT EXISTS idx_vk_accounts_active ON vk_accounts(is_active);
+
+	CREATE TABLE IF NOT EXISTS group_stats_history (
+		id BIGSERIAL PRIMARY KEY,
+		date TEXT NOT NULL UNIQUE,
+		total_groups INTEGER NOT NULL DEFAULT 0,
+		total_subscribers INTEGER NOT NULL DEFAULT 0,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
 `
 
 func migratePostsTable() error {

@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import useSWR from "swr"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import {
@@ -27,6 +28,8 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group"
+import { fetcher } from "@/lib/api"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export const description = "An interactive area chart"
 
@@ -35,56 +38,23 @@ const chartConfig = {
     label: "Подписчики",
     color: "var(--primary)",
   },
-  reach: {
-    label: "Охват",
+  groups: {
+    label: "Группы",
     color: "var(--muted-foreground)",
   },
 } satisfies ChartConfig
 
-// Генерация случайных реалистичных данных
-const generateDailyData = () => {
-  const data = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  let baseSubscribers = 200;
-  let baseReach = 500;
-
-  for (let i = 30; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    
-    baseSubscribers += Math.floor(Math.random() * 40) - 10;
-    baseReach = baseSubscribers * 2 + Math.floor(Math.random() * 200);
-
-    data.push({
-      date: d.toISOString(),
-      subscribers: Math.max(0, baseSubscribers),
-      reach: Math.max(0, baseReach),
-    });
-  }
-  return data;
+interface DailyStat {
+  date: string
+  total_groups: number
+  total_subscribers: number
 }
 
-const generateHourlyData = () => {
-  const data = [];
-  const today = new Date();
-  today.setMinutes(0, 0, 0);
-  
-  for (let i = 23; i >= 0; i--) {
-    const d = new Date(today);
-    d.setHours(d.getHours() - i);
-    data.push({
-      date: d.toISOString(),
-      subscribers: Math.floor(Math.random() * 15) + 5,
-      reach: Math.floor(Math.random() * 100) + 20,
-    });
-  }
-  return data;
+interface DashboardStatsResponse {
+  total_groups: number
+  total_subscribers: number
+  history: DailyStat[]
 }
-
-const dailyData = generateDailyData();
-const hourlyData = generateHourlyData();
 
 export function ChartAreaInteractive() {
   const isMobile = useIsMobile()
@@ -96,14 +66,23 @@ export function ChartAreaInteractive() {
     }
   }, [isMobile])
 
+  const { data, isLoading } = useSWR<DashboardStatsResponse>("/admin/dashboard/stats", fetcher)
+
+  const chartData = React.useMemo(() => {
+    if (!data?.history) return [];
+    return data.history.map(item => ({
+      date: item.date,
+      subscribers: item.total_subscribers,
+      groups: item.total_groups,
+    }));
+  }, [data])
+
   const filteredData = React.useMemo(() => {
-    if (timeRange === "1d") {
-      return hourlyData;
-    }
-    
     let daysToSubtract = 30;
     if (timeRange === "7d") {
       daysToSubtract = 7;
+    } else if (timeRange === "1d") {
+      daysToSubtract = 1;
     }
     
     const today = new Date();
@@ -111,23 +90,17 @@ export function ChartAreaInteractive() {
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - daysToSubtract);
     
-    return dailyData.filter(item => new Date(item.date) >= startDate);
-  }, [timeRange]);
+    return chartData.filter(item => new Date(item.date) >= startDate);
+  }, [chartData, timeRange]);
 
   const formatDateTick = (value: string) => {
     const date = new Date(value);
-    if (timeRange === "1d") {
-      return date.toLocaleTimeString("ru-RU", { hour: '2-digit', minute: '2-digit' });
-    }
     return date.toLocaleDateString("ru-RU", { month: "short", day: "numeric" });
   }
 
   const formatTooltipLabel = (value: any) => {
     if (!value) return "";
     const date = new Date(value as string);
-    if (timeRange === "1d") {
-      return date.toLocaleString("ru-RU", { month: "short", day: "numeric", hour: '2-digit', minute: '2-digit' });
-    }
     return date.toLocaleDateString("ru-RU", { month: "long", day: "numeric", year: "numeric" });
   }
 
@@ -137,9 +110,9 @@ export function ChartAreaInteractive() {
         <CardTitle>Динамика аудитории</CardTitle>
         <CardDescription>
           <span className="hidden @[540px]/card:block">
-            Прирост подписчиков и охват
+            Рост количества групп и подписчиков
           </span>
-          <span className="@[540px]/card:hidden">Прирост и охват</span>
+          <span className="@[540px]/card:hidden">Аудитория и Группы</span>
         </CardDescription>
         <CardAction>
           <ToggleGroup
@@ -152,7 +125,6 @@ export function ChartAreaInteractive() {
           >
             <ToggleGroupItem value="30d">Месяц</ToggleGroupItem>
             <ToggleGroupItem value="7d">Неделя</ToggleGroupItem>
-            <ToggleGroupItem value="1d">День</ToggleGroupItem>
           </ToggleGroup>
           <Select value={timeRange} onValueChange={(v) => v && setTimeRange(v)}>
             <SelectTrigger
@@ -165,64 +137,69 @@ export function ChartAreaInteractive() {
             <SelectContent className="rounded-xl">
               <SelectItem value="30d" className="rounded-lg">Месяц</SelectItem>
               <SelectItem value="7d" className="rounded-lg">Неделя</SelectItem>
-              <SelectItem value="1d" className="rounded-lg">День</SelectItem>
             </SelectContent>
           </Select>
         </CardAction>
       </CardHeader>
       <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        <ChartContainer
-          config={chartConfig}
-          className="aspect-auto h-[280px] w-full"
-        >
-          <AreaChart data={filteredData}>
-            <defs>
-              <linearGradient id="fillSubscribers" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-subscribers)" stopOpacity={1.0} />
-                <stop offset="95%" stopColor="var(--color-subscribers)" stopOpacity={0.1} />
-              </linearGradient>
-              <linearGradient id="fillReach" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-reach)" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="var(--color-reach)" stopOpacity={0.1} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.5} />
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={12}
-              minTickGap={32}
-              tickFormatter={formatDateTick}
-              className="text-xs text-muted-foreground font-medium"
-            />
-            <ChartTooltip
-              cursor={false}
-              content={
-                <ChartTooltipContent
-                  labelFormatter={formatTooltipLabel}
-                  indicator="dot"
-                />
-              }
-            />
-            <Area
-              dataKey="reach"
-              type="monotone"
-              fill="url(#fillReach)"
-              stroke="var(--color-reach)"
-              strokeWidth={2}
-              stackId="a"
-            />
-            <Area
-              dataKey="subscribers"
-              type="monotone"
-              fill="url(#fillSubscribers)"
-              stroke="var(--color-subscribers)"
-              strokeWidth={2}
-              stackId="a"
-            />
-          </AreaChart>
-        </ChartContainer>
+        {isLoading ? (
+          <div className="aspect-auto h-[280px] w-full flex items-center justify-center">
+            <Skeleton className="w-full h-full rounded-lg" />
+          </div>
+        ) : (
+          <ChartContainer
+            config={chartConfig}
+            className="aspect-auto h-[280px] w-full"
+          >
+            <AreaChart data={filteredData}>
+              <defs>
+                <linearGradient id="fillSubscribers" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-subscribers)" stopOpacity={1.0} />
+                  <stop offset="95%" stopColor="var(--color-subscribers)" stopOpacity={0.1} />
+                </linearGradient>
+                <linearGradient id="fillGroups" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-groups)" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="var(--color-groups)" stopOpacity={0.1} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.5} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={12}
+                minTickGap={32}
+                tickFormatter={formatDateTick}
+                className="text-xs text-muted-foreground font-medium"
+              />
+              <ChartTooltip
+                cursor={false}
+                content={
+                  <ChartTooltipContent
+                    labelFormatter={formatTooltipLabel}
+                    indicator="dot"
+                  />
+                }
+              />
+              <Area
+                dataKey="groups"
+                type="monotone"
+                fill="url(#fillGroups)"
+                stroke="var(--color-groups)"
+                strokeWidth={2}
+                stackId="b"
+              />
+              <Area
+                dataKey="subscribers"
+                type="monotone"
+                fill="url(#fillSubscribers)"
+                stroke="var(--color-subscribers)"
+                strokeWidth={2}
+                stackId="a"
+              />
+            </AreaChart>
+          </ChartContainer>
+        )}
       </CardContent>
     </Card>
   )
