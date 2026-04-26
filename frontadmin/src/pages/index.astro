@@ -1,18 +1,27 @@
 ---
 import '../styles/global.css';
-import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/ThemeToggle';
+import { LoginForm } from '@/components/login-form';
+import { ThemeToggle } from '@/components/theme-toggle';
 ---
 
-<html lang="en">
+<html lang="ru">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<title>Astro + shadcn/ui</title>
+		<title>Вход — Админ-панель</title>
 		
 		<!-- Инлайн-скрипт предотвращает мерцание (FOUC) при загрузке страницы -->
 		<script is:inline>
+			// Проверка авторизации: если уже вошли - сразу редирект в дашборд
+			const checkAuthLogin = () => {
+				if (typeof localStorage !== 'undefined' && localStorage.getItem('admin_user')) {
+					window.location.replace('/dashboard');
+				}
+			};
+			checkAuthLogin();
+			document.addEventListener('astro:after-swap', checkAuthLogin);
+
 			const getThemePreference = () => {
 				if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
 					return localStorage.getItem('theme');
@@ -24,14 +33,13 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 		</script>
 	</head>
 
-	<body>
+	<body class="min-h-screen bg-background flex flex-col items-center justify-center p-6 md:p-10">
 		<div class="absolute top-4 right-4">
 			<ThemeToggle client:load />
 		</div>
 		
-		<div class="grid place-items-center h-screen content-center gap-4">
-			<h1 class="text-3xl font-bold">Hello, shadcn/ui!</h1>
-			<Button client:load className="cursor-pointer">Click me!</Button>
+		<div class="w-full max-w-sm md:max-w-md">
+			<LoginForm client:load />
 		</div>
 	</body>
 </html>

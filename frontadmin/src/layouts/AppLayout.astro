@@ -21,6 +21,17 @@ const defaultOpen = sidebarCookie ? sidebarCookie === "true" : true;
 		<ClientRouter />
 		
 		<script is:inline>
+			// Auth Guard
+			const checkAuth = () => {
+				if (typeof localStorage !== 'undefined') {
+					if (!localStorage.getItem('admin_user')) {
+						window.location.replace('/');
+					}
+				}
+			};
+			checkAuth();
+			document.addEventListener('astro:after-swap', checkAuth);
+
 			const applyTheme = () => {
 				const getThemePreference = () => {
 					if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
