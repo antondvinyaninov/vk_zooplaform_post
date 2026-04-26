@@ -22,6 +22,15 @@ COPY backend/ ./
 ENV CGO_ENABLED=1
 RUN go build -v -o main .
 
+# Сборка Astro админки
+FROM node:20-alpine AS admin-builder
+
+WORKDIR /app/frontadmin
+COPY frontadmin/package*.json ./
+RUN npm install
+COPY frontadmin/ ./
+RUN npm run build
+
 # Финальный образ
 FROM alpine:latest
 
@@ -34,8 +43,8 @@ RUN mkdir -p /app /usr/share/nginx/html
 # Копируем Go бэкенд
 COPY --from=backend-builder /app/main /app/backend/main
 
-# Копируем фронтенд (админка)
-COPY frontend /usr/share/nginx/html/
+# Копируем собранный фронтенд (админка)
+COPY --from=admin-builder /app/frontadmin/dist /usr/share/nginx/html/
 
 # Копируем собранный VK Mini App
 COPY --from=vk-app-builder /app/vk_app/build /usr/share/nginx/html/vk_app/
