@@ -2,9 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] - 2026-04-24
+## [Unreleased] - 2026-04-26
 
 ### Added
+- **Frontend / Core Architecture**: Bootstrapped and migrated the entire legacy admin panel to a modern Astro 4.0 architecture using React 18, Tailwind CSS, and shadcn/ui components (`frontadmin` module).
+- **Frontend / Design System**: Implemented a comprehensive design system featuring light/dark mode theming, CSS variables, and modern accessible UI components.
+- **Frontend / API**: Integrated `swr` data fetching library for caching and real-time UI updates across the Admin Panel.
+- **Frontend / Auth**: Implemented VK OAuth token parsing and connection management flow in `vk-connect-card.tsx` bridging to Go Backend.
 - **Frontend & Backend / Media Attachments**: Added support for uploading up to 10 photos and videos via `multipart/form-data` when creating a post. 
 - **Backend / Media Processing**: Added Go client method `UploadVideo` to handle VK `video.save` two-step upload protocol, and updated `UploadPhotoToWall` to integrate with post creation flow.
 - **Frontend / Moderation**: Implemented real-time media thumbnails fetching via VK API in the backend to display visual photo and video galleries directly in the moderation feed.
@@ -15,6 +19,8 @@ All notable changes to this project will be documented in this file.
 - **Frontend / Settings**: Implemented `CustomSelect` city autocomplete with debounce for efficient VK API querying.
 
 ### Changed
+- **Frontend / Architecture**: Migrated all remaining mocked components (`UsersManagementCard`, `GroupSelector`, `SiteHeader`) to fetch live data from PostgreSQL backend via API endpoints.
+- **Frontend / UI**: Replaced standard Radix UI `DropdownMenuTrigger` configurations with Base UI `render` pattern to resolve TypeScript strict typing errors.
 - **Frontend / UX**: Replaced native file picker UI with VKUI File and `HorizontalScroll` gallery for attached media with custom deletion handlers.
 - **Backend / API**: Changed authentication header expected by `createPostHandler` to use standard `X-VK-Sign` instead of `Authorization: Bearer`.
 - **Backend / Publishing**: Modified `moderatePostHandler` to prioritize Community Token (`group.AccessToken`) over Admin User Token when publishing to the community wall.
