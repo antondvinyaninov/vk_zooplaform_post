@@ -1,0 +1,8 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import { PostsPage } from '@/components/pages/posts-page';
+---
+
+<AppLayout title="Посты">
+	<PostsPage client:load />
+</AppLayout>

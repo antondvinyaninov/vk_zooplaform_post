@@ -1,0 +1,49 @@
+---
+import '../styles/global.css';
+import { DashboardLayout } from '@/components/dashboard-layout';
+import { ClientRouter } from 'astro:transitions';
+
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+const sidebarCookie = Astro.cookies.get("sidebar_state")?.value;
+const defaultOpen = sidebarCookie ? sidebarCookie === "true" : true;
+---
+
+<html lang="ru">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<title>{title} — Admin</title>
+		<ClientRouter />
+		
+		<script is:inline>
+			const applyTheme = () => {
+				const getThemePreference = () => {
+					if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+						return localStorage.getItem('theme');
+					}
+					return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+				};
+				const isDark = getThemePreference() === 'dark';
+				document.documentElement.classList[isDark ? 'add' : 'remove']('dark');
+			};
+			
+			// Apply theme on initial load
+			applyTheme();
+			
+			// Re-apply theme after Astro View Transitions swap the page content
+			document.addEventListener('astro:after-swap', applyTheme);
+		</script>
+	</head>
+
+	<body class="bg-background">
+        <div class="hidden lg:grid-cols-3 lg:col-span-1 lg:col-span-2 lg:max-h-[450px] lg:max-h-full" aria-hidden="true"></div>
+		<DashboardLayout title={title} defaultOpen={defaultOpen} client:load>
+			<slot />
+		</DashboardLayout>
+	</body>
+</html>
