@@ -33,6 +33,37 @@ func dashboardStatsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Статистика по предложке (постам) за последние 7 дней
+	var postsTotal, postsPending, postsPublished, postsRejected int
+	
+	// В зависимости от драйвера БД, используем разный синтаксис для даты
+	var postsQuery string
+	if database.Rebind("?") == "$1" {
+		// Postgres
+		postsQuery = `
+			SELECT 
+				COUNT(1) as total,
+				COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending,
+				COALESCE(SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END), 0) as published,
+				COALESCE(SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END), 0) as rejected
+			FROM posts 
+			WHERE created_at >= NOW() - INTERVAL '7 days'
+		`
+	} else {
+		// SQLite
+		postsQuery = `
+			SELECT 
+				COUNT(1) as total,
+				COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pending,
+				COALESCE(SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END), 0) as published,
+				COALESCE(SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END), 0) as rejected
+			FROM posts 
+			WHERE created_at >= datetime('now', '-7 days')
+		`
+	}
+
+	database.QueryRow(postsQuery).Scan(&postsTotal, &postsPending, &postsPublished, &postsRejected)
+
 	// Исторические данные (за последние 30 дней)
 	history := make([]dailyStat, 0)
 	rows, err := database.Query(`
@@ -83,6 +114,10 @@ func dashboardStatsHandler(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"total_groups":      totalGroups,
 		"total_subscribers": totalSubscribers,
+		"posts_total":       postsTotal,
+		"posts_pending":     postsPending,
+		"posts_published":   postsPublished,
+		"posts_rejected":    postsRejected,
 		"history":           history,
 	})
 }

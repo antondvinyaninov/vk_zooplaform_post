@@ -15,10 +15,21 @@ import {
 } from "@/components/ui/card"
 import { fetcher, type GroupsResponse } from "@/lib/api"
 
-export function SectionCards() {
-  const { data, error, isLoading } = useSWR<GroupsResponse>("/admin/groups/installed", fetcher)
+interface DashboardStatsResponse {
+  total_groups: number
+  total_subscribers: number
+  posts_total: number
+  posts_pending: number
+  posts_published: number
+  posts_rejected: number
+  history: any[]
+}
 
-  const groups = data?.groups || []
+export function SectionCards() {
+  const { data: groupsData, error: groupsError, isLoading: isLoadingGroups } = useSWR<GroupsResponse>("/admin/groups/installed", fetcher)
+  const { data: statsData, isLoading: isLoadingStats } = useSWR<DashboardStatsResponse>("/admin/dashboard/stats", fetcher)
+
+  const groups = groupsData?.groups || []
   const groupsCount = groups.length
   const totalAudience = groups.reduce((sum, g) => sum + g.members_count, 0)
   
@@ -36,7 +47,7 @@ export function SectionCards() {
             <IconUsersGroup className="size-4 text-primary" />
             Подключенные группы
           </CardDescription>
-          {isLoading ? (
+          {isLoadingGroups ? (
             <Skeleton className="h-8 w-16 mt-2 mb-1" />
           ) : (
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -44,15 +55,11 @@ export function SectionCards() {
             </CardTitle>
           )}
           <CardAction>
-            <Badge variant="outline" className="text-emerald-500 border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/20">
-              <IconTrendingUp className="mr-1 size-3" />
-              +2
-            </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="text-muted-foreground">
-            За последнюю неделю
+            Общее количество
           </div>
         </CardFooter>
       </Card>
@@ -64,7 +71,7 @@ export function SectionCards() {
             <IconUsers className="size-4 text-primary" />
             Общая аудитория
           </CardDescription>
-          {isLoading ? (
+          {isLoadingGroups ? (
             <Skeleton className="h-8 w-24 mt-2 mb-1" />
           ) : (
             <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -72,10 +79,6 @@ export function SectionCards() {
             </CardTitle>
           )}
           <CardAction>
-            <Badge variant="outline" className="text-emerald-500 border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/20">
-              <IconTrendingUp className="mr-1 size-3" />
-              +15.2K
-            </Badge>
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
@@ -96,19 +99,19 @@ export function SectionCards() {
         <CardContent className="flex-1 grid grid-cols-2 gap-y-3 gap-x-6 text-sm pb-4">
           <div className="flex flex-col gap-1 border-l-2 border-muted pl-3">
             <span className="text-muted-foreground text-xs uppercase tracking-wider">Предложено</span>
-            <span className="font-semibold text-lg leading-none">124</span>
+            {isLoadingStats ? <Skeleton className="h-6 w-10 mt-1" /> : <span className="font-semibold text-lg leading-none">{statsData?.posts_total || 0}</span>}
           </div>
           <div className="flex flex-col gap-1 border-l-2 border-amber-500/50 pl-3">
             <span className="text-muted-foreground text-xs uppercase tracking-wider">В обработке</span>
-            <span className="font-semibold text-lg leading-none text-amber-600 dark:text-amber-400">32</span>
+            {isLoadingStats ? <Skeleton className="h-6 w-10 mt-1" /> : <span className="font-semibold text-lg leading-none text-amber-600 dark:text-amber-400">{statsData?.posts_pending || 0}</span>}
           </div>
           <div className="flex flex-col gap-1 border-l-2 border-emerald-500/50 pl-3">
             <span className="text-muted-foreground text-xs uppercase tracking-wider">Опубликовано</span>
-            <span className="font-semibold text-lg leading-none text-emerald-600 dark:text-emerald-400">80</span>
+            {isLoadingStats ? <Skeleton className="h-6 w-10 mt-1" /> : <span className="font-semibold text-lg leading-none text-emerald-600 dark:text-emerald-400">{statsData?.posts_published || 0}</span>}
           </div>
           <div className="flex flex-col gap-1 border-l-2 border-destructive/50 pl-3">
             <span className="text-muted-foreground text-xs uppercase tracking-wider">Отклонено</span>
-            <span className="font-semibold text-lg leading-none text-destructive">12</span>
+            {isLoadingStats ? <Skeleton className="h-6 w-10 mt-1" /> : <span className="font-semibold text-lg leading-none text-destructive">{statsData?.posts_rejected || 0}</span>}
           </div>
         </CardContent>
       </Card>
