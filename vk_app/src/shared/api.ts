@@ -1,6 +1,7 @@
 import { UserInfo } from '@vkontakte/vk-bridge';
 
-const API_URL = '/api/app';
+const isVKCDN = window.location.hostname.includes('vk-apps.com');
+const API_URL = isVKCDN ? 'https://vk.zooplatforma.ru/api/app' : '/api/app';
 
 export interface AppUser {
   id: number;
