@@ -1425,3 +1425,59 @@ func citiesHandler(w http.ResponseWriter, r *http.Request) {
 
 	utils.RespondSuccess(w, vkResp.Response.Items)
 }
+
+func saveGroupTokenHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if !isModerator(ctx.GroupRole) {
+		utils.RespondError(w, http.StatusForbidden, "only community admins can set token")
+		return
+	}
+
+	var req struct {
+		VKGroupID   int    `json:"vk_group_id"`
+		AccessToken string `json:"access_token"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+
+	if req.VKGroupID == 0 || req.AccessToken == "" {
+		utils.RespondError(w, http.StatusBadRequest, "vk_group_id and access_token required")
+		return
+	}
+
+	if req.VKGroupID != ctx.GroupID {
+		utils.RespondError(w, http.StatusForbidden, "can only update current group")
+		return
+	}
+
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil || group == nil {
+		utils.RespondError(w, http.StatusNotFound, "group not found")
+		return
+	}
+
+	group.AccessToken = req.AccessToken
+	if err := updateGroup(group); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to save token")
+		return
+	}
+
+	go vk.EnsureCallbackServer(group)
+
+	utils.RespondSuccess(w, map[string]interface{}{
+		"group": groupToSettings(group),
+	})
+}

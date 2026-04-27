@@ -279,24 +279,24 @@ func saveDailyStatsSnapshot() {
 
 // StartHealthCheckCron запускает фоновую проверку статуса всех сообществ раз в 15 минут
 func StartHealthCheckCron() {
-	ticker := time.NewTicker(15 * time.Minute)
-	
-	// Делаем первую проверку сразу при старте (в отдельной горутине, чтобы не блочить)
 	go func() {
+		ticker := time.NewTicker(15 * time.Minute)
+		defer ticker.Stop()
+		
 		log.Printf("🔄 [Cron] Starting initial groups health check...")
 		if _, err := refreshGroupsHealth(0); err != nil {
 			log.Printf("❌ [Cron] Initial health check failed: %v", err)
 		} else {
 			log.Printf("✅ [Cron] Initial health check completed successfully")
 		}
-	}()
 
-	for range ticker.C {
-		log.Printf("🔄 [Cron] Running scheduled groups health check...")
-		if _, err := refreshGroupsHealth(0); err != nil {
-			log.Printf("❌ [Cron] Scheduled health check failed: %v", err)
-		} else {
-			log.Printf("✅ [Cron] Scheduled health check completed successfully")
+		for range ticker.C {
+			log.Printf("🔄 [Cron] Running scheduled groups health check...")
+			if _, err := refreshGroupsHealth(0); err != nil {
+				log.Printf("❌ [Cron] Scheduled health check failed: %v", err)
+			} else {
+				log.Printf("✅ [Cron] Scheduled health check completed successfully")
+			}
 		}
-	}
+	}()
 }

@@ -16,7 +16,7 @@ import {
 } from '@vkontakte/vkui';
 import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, type AppGroupSettings, type AppManager } from '../shared/api';
+import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, type AppGroupSettings, type AppManager } from '../shared/api';
 
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -156,6 +156,58 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
           )}
 
           <Group>
+            {!settings?.has_token && (
+              <FormItem top="Подключение Callback API (обязательно для работы бота)">
+                <Button 
+                  size="l" 
+                  stretched 
+                  mode="secondary"
+                  before={<Icon24CheckCircleOutline />}
+                  onClick={async () => {
+                    try {
+                      // @ts-ignore
+                      const launchParams = window.vkLaunchParams || {};
+                      const appId = Number(launchParams.vk_app_id);
+                      const groupId = Number(launchParams.vk_group_id);
+                      
+                      if (!appId || !groupId) {
+                        throw new Error("Не удалось определить ID приложения или группы");
+                      }
+                      
+                      // @ts-ignore
+                      const result = await window.vkBridge.send('VKWebAppGetCommunityToken', {
+                        app_id: appId,
+                        group_id: groupId,
+                        scope: 'messages,manage,photos,docs'
+                      });
+                      
+                      if (result.access_token) {
+                        setSaving(true);
+                        // @ts-ignore
+                        await saveGroupToken(groupId, result.access_token);
+                        setSettings(prev => prev ? { ...prev, has_token: true } : null);
+                        setSnackbar(
+                          <Snackbar
+                            onClose={() => setSnackbar(null)}
+                            onClosed={() => setSnackbar(null)}
+                            before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+                          >
+                            Сообщество успешно подключено к API
+                          </Snackbar>
+                        );
+                      }
+                    } catch (e: any) {
+                      setError(e?.error_data?.error_reason || e?.message || "Ошибка подключения");
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  Предоставить доступ
+                </Button>
+              </FormItem>
+            )}
+            
             <FormItem top="Город (где работает группа)">
               <CustomSelect
                 value={cityId}
@@ -189,7 +241,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
 
           <Div>
             <Button size="l" stretched loading={saving} onClick={handleSave}>
-              Сохранить
+              Сохранить настройки
             </Button>
           </Div>
         </>
