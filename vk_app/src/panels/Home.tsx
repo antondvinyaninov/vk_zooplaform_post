@@ -65,6 +65,7 @@ export const Home: FC<HomeProps> = ({ id }) => {
           <PanelSpinner size="l" />
         ) : posts.length === 0 ? (
           <Placeholder
+            stretched
             icon={<Icon56AddCircleOutline />}
             title="Вы еще не делали постов"
             action={
