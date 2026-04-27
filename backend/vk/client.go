@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -97,9 +98,15 @@ type PhotoUploadResponse struct {
 
 // SavedPhoto сохраненное фото
 type SavedPhoto struct {
-	ID      int `json:"id"`
-	OwnerID int `json:"owner_id"`
-	Sizes   []struct {
+	ID        int `json:"id"`
+	OwnerID   int `json:"owner_id"`
+	Photo75   string `json:"photo_75"`
+	Photo130  string `json:"photo_130"`
+	Photo604  string `json:"photo_604"`
+	Photo807  string `json:"photo_807"`
+	Photo1280 string `json:"photo_1280"`
+	Photo2560 string `json:"photo_2560"`
+	Sizes     []struct {
 		URL  string `json:"url"`
 		Type string `json:"type"`
 	} `json:"sizes"`
@@ -192,7 +199,24 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 	photoURL := ""
 	if len(photo.Sizes) > 0 {
 		photoURL = photo.Sizes[len(photo.Sizes)-1].URL
+	} else {
+		// Fallback for legacy VK API formats
+		if photo.Photo2560 != "" {
+			photoURL = photo.Photo2560
+		} else if photo.Photo1280 != "" {
+			photoURL = photo.Photo1280
+		} else if photo.Photo807 != "" {
+			photoURL = photo.Photo807
+		} else if photo.Photo604 != "" {
+			photoURL = photo.Photo604
+		} else if photo.Photo130 != "" {
+			photoURL = photo.Photo130
+		} else if photo.Photo75 != "" {
+			photoURL = photo.Photo75
+		}
 	}
+	log.Printf("[UploadPhotoToWall] RAW savedResp: %s", string(savedResp))
+	log.Printf("[UploadPhotoToWall] Extracted photoURL: %s", photoURL)
 	return fmt.Sprintf("photo%d_%d", photo.OwnerID, photo.ID), photoURL, nil
 }
 

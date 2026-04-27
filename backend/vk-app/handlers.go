@@ -777,6 +777,7 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 			}
 		}
 		posts[i].AttachmentURLs = urls
+		log.Printf("[populateAttachmentURLs] Post ID %d attachment parsed: %+v", p.ID, urls)
 	}
 	return posts
 }
