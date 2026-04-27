@@ -24,7 +24,7 @@ COPY backend/ ./
 ENV CGO_ENABLED=0
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    go build -v -o main .
+    go build -ldflags="-s -w" -v -o main .
 
 # Сборка Astro админки
 FROM node:22-alpine AS admin-builder
