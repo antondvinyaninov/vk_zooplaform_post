@@ -212,28 +212,9 @@ func refreshGroupsHealth(groupID int) (int, error) {
 				errText = checkErr.Error()
 			}
 
-			groupsResp, errGroups := client.CallMethod("groups.getById", map[string]string{
-				"group_id": strconv.Itoa(vkGroupID),
-				"fields":   "members_count",
-			})
-			if errGroups == nil {
-				var groupsData []struct {
-					MembersCount int `json:"members_count"`
-				}
-				// VK API response is an array for groups.getById
-				if json.Unmarshal(groupsResp, &groupsData) == nil && len(groupsData) > 0 {
-					membersCount = groupsData[0].MembersCount
-				} else {
-					// Sometimes it might return an object with "groups" array depending on version/endpoint, but usually array
-					var groupsDataObj struct {
-						Groups []struct {
-							MembersCount int `json:"members_count"`
-						} `json:"groups"`
-					}
-					if json.Unmarshal(groupsResp, &groupsDataObj) == nil && len(groupsDataObj.Groups) > 0 {
-						membersCount = groupsDataObj.Groups[0].MembersCount
-					}
-				}
+			groupData, errGroups := client.GroupsGetByID(vkGroupID)
+			if errGroups == nil && groupData != nil {
+				membersCount = groupData.MembersCount
 			}
 		}
 

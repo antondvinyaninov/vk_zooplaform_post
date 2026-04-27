@@ -27,7 +27,7 @@ type Group struct {
 func (c *VKClient) GroupsGetByID(groupID int) (*Group, error) {
 	params := map[string]string{
 		"group_ids": strconv.Itoa(groupID),
-		"fields":    "screen_name,photo_200",
+		"fields":    "screen_name,photo_200,members_count",
 	}
 
 	resp, err := c.CallMethod("groups.getById", params)

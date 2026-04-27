@@ -11,6 +11,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -73,7 +74,9 @@ export function NavMain({
                         sideOffset={8}
                         className="w-48 rounded-lg"
                       >
-                        <DropdownMenuLabel>{item.title}</DropdownMenuLabel>
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>{item.title}</DropdownMenuLabel>
+                        </DropdownMenuGroup>
                         <DropdownMenuSeparator />
                         {item.items.map((subItem) => (
                           <DropdownMenuItem

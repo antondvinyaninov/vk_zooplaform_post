@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -139,7 +140,9 @@ export function UsersManagementCard() {
                           <IconDotsVertical className="size-4 text-muted-foreground" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Изменить роль</DropdownMenuLabel>
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel>Изменить роль</DropdownMenuLabel>
+                          </DropdownMenuGroup>
                           <DropdownMenuSeparator />
                           {["admin", "moderator", "user"].map((role) => (
                             <DropdownMenuItem key={role} onClick={() => handleRoleChange(user.id, role)}>
@@ -188,7 +191,9 @@ export function UsersManagementCard() {
                     <IconDotsVertical className="size-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Изменить роль</DropdownMenuLabel>
+                    <DropdownMenuGroup>
+                      <DropdownMenuLabel>Изменить роль</DropdownMenuLabel>
+                    </DropdownMenuGroup>
                     <DropdownMenuSeparator />
                     {["admin", "moderator", "user"].map((role) => (
                       <DropdownMenuItem key={role} onClick={() => handleRoleChange(user.id, role)}>

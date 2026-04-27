@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -145,7 +146,9 @@ export function GroupsTable() {
                       </Button>
                     } />
                     <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Действия</DropdownMenuLabel>
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>Действия</DropdownMenuLabel>
+                      </DropdownMenuGroup>
                       <DropdownMenuItem className="cursor-pointer" onClick={() => handleRefreshHealth(group.id)}>
                         <IconRefresh className={`mr-2 size-4 text-muted-foreground ${refreshingId === group.id ? 'animate-spin' : ''}`} />
                         Проверить статус
