@@ -4,14 +4,15 @@ import {
   PanelHeader,
   Group,
   NavIdProps,
-  CardGrid,
-  ContentCard,
   PanelSpinner,
   Header,
   Button,
   Placeholder,
+  Card,
+  Div,
+  Text,
 } from '@vkontakte/vkui';
-import { Icon28AddOutline, Icon56AddCircleOutline } from '@vkontakte/icons';
+import { Icon28AddOutline, Icon56AddCircleOutline, Icon28PictureOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getMyPosts } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
@@ -42,8 +43,6 @@ export const Home: FC<HomeProps> = ({ id }) => {
       <PanelHeader style={{ textAlign: 'center' }}>
         Главная
       </PanelHeader>
-
-
 
       <Group header={
         <Header 
@@ -77,25 +76,80 @@ export const Home: FC<HomeProps> = ({ id }) => {
             Здесь будут отображаться публикации, созданные через приложение
           </Placeholder>
         ) : (
-          <CardGrid size="l">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 16px', paddingBottom: 24 }}>
             {posts.map((post) => (
-              <ContentCard
-                key={post.id}
-                onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POST_DETAIL}/${post.id}`)}
-                caption={
-                  post.status === 'published' ? '✅ Опубликовано' :
-                  post.status === 'pending' ? '⏳ На модерации' :
-                  post.status === 'rejected' ? '❌ Отклонено' :
-                  post.status === 'draft' ? '📝 Черновик' :
-                  post.status
-                }
-                title={post.message !== post.title ? post.title : undefined}
-                description={post.message}
-                src={post.attachment_urls?.[0]?.url}
-                maxHeight={250}
-              />
+              <Card key={post.id} mode="shadow">
+                <Div style={{ display: 'flex', gap: 12 }}>
+                  {/* Изображение */}
+                  <div style={{ 
+                    width: 80, 
+                    height: 80, 
+                    flexShrink: 0, 
+                    borderRadius: 8, 
+                    overflow: 'hidden', 
+                    backgroundColor: 'var(--vkui--color_background_secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {post.attachment_urls?.[0]?.url ? (
+                      <img 
+                        src={post.attachment_urls[0].url} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                        alt="Медиа"
+                      />
+                    ) : (
+                      <Icon28PictureOutline style={{ color: 'var(--vkui--color_icon_secondary)' }} />
+                    )}
+                  </div>
+                  
+                  {/* Информация */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, justifyContent: 'center' }}>
+                    <Text weight="2" style={{ color: 'var(--vkui--color_text_subhead)', marginBottom: 4 }}>
+                      {post.status === 'published' ? '✅ Опубликовано' :
+                       post.status === 'pending' ? '⏳ На модерации' :
+                       post.status === 'rejected' ? '❌ Отклонено' :
+                       post.status === 'draft' ? '📝 Черновик' :
+                       post.status}
+                    </Text>
+                    <Text style={{ 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis', 
+                      display: '-webkit-box', 
+                      WebkitLineClamp: 2, 
+                      WebkitBoxOrient: 'vertical',
+                      wordBreak: 'break-word',
+                      color: 'var(--vkui--color_text_primary)'
+                    }}>
+                      {post.title || post.message}
+                    </Text>
+                  </div>
+                </Div>
+
+                <Div style={{ display: 'flex', gap: 8, paddingTop: 0 }}>
+                  <Button 
+                    size="s" 
+                    mode="secondary" 
+                    stretched
+                    onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POST_DETAIL}/${post.id}`)}
+                  >
+                    Подробнее
+                  </Button>
+                  <Button 
+                    size="s" 
+                    mode="outline" 
+                    appearance="negative"
+                    stretched
+                    onClick={() => {
+                      alert('Удаление пока не реализовано');
+                    }}
+                  >
+                    Удалить
+                  </Button>
+                </Div>
+              </Card>
             ))}
-          </CardGrid>
+          </div>
         )}
       </Group>
     </Panel>
