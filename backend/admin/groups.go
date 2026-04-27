@@ -159,7 +159,7 @@ func normalizeHealthStatus(status string) string {
 
 func refreshGroupsHealth(groupID int) (int, error) {
 	query := `
-		SELECT id, vk_group_id
+		SELECT id, vk_group_id, access_token
 		FROM groups
 		WHERE is_active = ?
 	`
@@ -190,28 +190,52 @@ func refreshGroupsHealth(groupID int) (int, error) {
 	updated := 0
 	for rows.Next() {
 		var (
-			id         int
-			vkGroupID  int
+			id             int
+			vkGroupID      int
+			groupTokenRaw  sql.NullString
 		)
-		if err := rows.Scan(&id, &vkGroupID); err != nil {
+		if err := rows.Scan(&id, &vkGroupID, &groupTokenRaw); err != nil {
 			return updated, err
 		}
 
-		status := "error"
-		errText := "admin VK token is not connected"
+		status := "ok"
+		errText := ""
 		membersCount := 0
 
-		if adminToken != "" {
+		groupToken := ""
+		if groupTokenRaw.Valid {
+			groupToken = groupTokenRaw.String
+		}
+
+		// Проверяем токен группы
+		if groupToken == "" {
+			status = "error"
+			errText = "Токен группы не подключен (предоставьте доступ в настройках VK Mini App)"
+		} else {
+			// Проверяем токен группы через метод groups.getById
+			groupClient := vk.NewVKClient(groupToken)
+			_, checkErr := groupClient.CallMethod("groups.getById", map[string]string{
+				"group_id": strconv.Itoa(vkGroupID),
+			})
+			if checkErr != nil {
+				status = "error"
+				errText = "Ошибка токена группы: " + checkErr.Error()
+			}
+		}
+
+		// Если токен группы работает (или его ошибка не перекрыта), проверяем админский токен
+		if adminToken == "" && status == "ok" {
+			status = "error"
+			errText = "Admin VK token is not connected (re-login in dashboard)"
+		} else if adminToken != "" && status == "ok" {
 			client := vk.NewVKClient(adminToken)
 			_, checkErr := client.CallMethod("wall.get", map[string]string{
 				"owner_id": "-" + strconv.Itoa(vkGroupID),
 				"count":    "1",
 			})
-			if checkErr == nil {
-				status = "ok"
-				errText = ""
-			} else {
-				errText = checkErr.Error()
+			if checkErr != nil {
+				status = "error"
+				errText = "Ошибка админского токена (переподключите VK): " + checkErr.Error()
 			}
 		}
 
