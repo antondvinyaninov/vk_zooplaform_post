@@ -95,7 +95,7 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 			if out, err := os.Create(tmpPath); err == nil {
 				io.Copy(out, f)
 				out.Close()
-				if att, err := client.UploadPhotoToWall(tmpPath, groupIDStr); err == nil {
+				if att, _, err := client.UploadPhotoToWall(tmpPath, groupIDStr); err == nil {
 					attachments = append(attachments, att)
 				} else {
 					log.Printf("[vkPost] photo upload error: %v", err)

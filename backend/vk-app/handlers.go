@@ -248,18 +248,26 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 			// Detect if image or video
 			contentType := fileHeader.Header.Get("Content-Type")
 			if strings.HasPrefix(contentType, "video/") {
-				att, err := vkClient.UploadVideo(tmpPath, groupIDStr, fileHeader.Filename)
+				att, attURL, err := vkClient.UploadVideo(tmpPath, groupIDStr, fileHeader.Filename)
 				if err == nil {
-					uploadedAttachments = append(uploadedAttachments, att)
+					if attURL != "" {
+						uploadedAttachments = append(uploadedAttachments, att+"|"+attURL)
+					} else {
+						uploadedAttachments = append(uploadedAttachments, att)
+					}
 				} else {
 					os.Remove(tmpPath)
 					utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Ошибка загрузки видео: %v", err))
 					return
 				}
 			} else {
-				att, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
+				att, attURL, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
 				if err == nil {
-					uploadedAttachments = append(uploadedAttachments, att)
+					if attURL != "" {
+						uploadedAttachments = append(uploadedAttachments, att+"|"+attURL)
+					} else {
+						uploadedAttachments = append(uploadedAttachments, att)
+					}
 				} else {
 					os.Remove(tmpPath)
 					utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Ошибка загрузки фото: %v", err))
@@ -449,7 +457,11 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 		var attachments []string
 		if post.Attachments != "" {
-			attachments = strings.Split(post.Attachments, ",")
+			parts := strings.Split(post.Attachments, ",")
+			for _, p := range parts {
+				idAndUrl := strings.SplitN(p, "|", 2)
+				attachments = append(attachments, idAndUrl[0])
+			}
 		}
 
 		client := vk.NewVKClient(token)

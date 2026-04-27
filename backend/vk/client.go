@@ -99,10 +99,14 @@ type PhotoUploadResponse struct {
 type SavedPhoto struct {
 	ID      int `json:"id"`
 	OwnerID int `json:"owner_id"`
+	Sizes   []struct {
+		URL  string `json:"url"`
+		Type string `json:"type"`
+	} `json:"sizes"`
 }
 
 // UploadPhotoToWall загружает фото на стену
-func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, error) {
+func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, string, error) {
 	// 1. Получаем URL для загрузки
 	params := map[string]string{}
 	if groupID != "" {
@@ -111,18 +115,18 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, e
 
 	uploadServerResp, err := c.CallMethod("photos.getWallUploadServer", params)
 	if err != nil {
-		return "", fmt.Errorf("failed to get upload server: %w", err)
+		return "", "", fmt.Errorf("failed to get upload server: %w", err)
 	}
 
 	var uploadServer UploadServer
 	if err := json.Unmarshal(uploadServerResp, &uploadServer); err != nil {
-		return "", fmt.Errorf("failed to parse upload server: %w", err)
+		return "", "", fmt.Errorf("failed to parse upload server: %w", err)
 	}
 
 	// 2. Загружаем файл
 	file, err := os.Open(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
+		return "", "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
@@ -130,34 +134,34 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, e
 	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("photo", filepath.Base(filePath))
 	if err != nil {
-		return "", fmt.Errorf("failed to create form file: %w", err)
+		return "", "", fmt.Errorf("failed to create form file: %w", err)
 	}
 
 	if _, err := io.Copy(part, file); err != nil {
-		return "", fmt.Errorf("failed to copy file: %w", err)
+		return "", "", fmt.Errorf("failed to copy file: %w", err)
 	}
 	writer.Close()
 
 	req, err := http.NewRequest("POST", uploadServer.UploadURL, body)
 	if err != nil {
-		return "", fmt.Errorf("failed to create upload request: %w", err)
+		return "", "", fmt.Errorf("failed to create upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to upload file: %w", err)
+		return "", "", fmt.Errorf("failed to upload file: %w", err)
 	}
 	defer resp.Body.Close()
 
 	uploadRespBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read upload response: %w", err)
+		return "", "", fmt.Errorf("failed to read upload response: %w", err)
 	}
 
 	var photoUpload PhotoUploadResponse
 	if err := json.Unmarshal(uploadRespBody, &photoUpload); err != nil {
-		return "", fmt.Errorf("failed to parse upload response: %w", err)
+		return "", "", fmt.Errorf("failed to parse upload response: %w", err)
 	}
 
 	// 3. Сохраняем фото
@@ -172,20 +176,24 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, e
 
 	savedResp, err := c.CallMethod("photos.saveWallPhoto", saveParams)
 	if err != nil {
-		return "", fmt.Errorf("failed to save photo: %w", err)
+		return "", "", fmt.Errorf("failed to save photo: %w", err)
 	}
 
 	var savedPhotos []SavedPhoto
 	if err := json.Unmarshal(savedResp, &savedPhotos); err != nil {
-		return "", fmt.Errorf("failed to parse saved photo: %w", err)
+		return "", "", fmt.Errorf("failed to parse saved photo: %w", err)
 	}
 
 	if len(savedPhotos) == 0 {
-		return "", fmt.Errorf("no photos saved")
+		return "", "", fmt.Errorf("no photos saved")
 	}
 
 	photo := savedPhotos[0]
-	return fmt.Sprintf("photo%d_%d", photo.OwnerID, photo.ID), nil
+	photoURL := ""
+	if len(photo.Sizes) > 0 {
+		photoURL = photo.Sizes[len(photo.Sizes)-1].URL
+	}
+	return fmt.Sprintf("photo%d_%d", photo.OwnerID, photo.ID), photoURL, nil
 }
 
 // SendDirectMessage отправляет личное сообщение пользователю от имени группы
@@ -279,7 +287,7 @@ type VideoSaveResponse struct {
 }
 
 // UploadVideo загружает видео
-func (c *VKClient) UploadVideo(filePath string, groupID string, fileName string) (string, error) {
+func (c *VKClient) UploadVideo(filePath string, groupID string, fileName string) (string, string, error) {
 	// 1. Получаем URL для загрузки
 	params := map[string]string{
 		"name": fileName,
@@ -290,18 +298,18 @@ func (c *VKClient) UploadVideo(filePath string, groupID string, fileName string)
 
 	saveResp, err := c.CallMethod("video.save", params)
 	if err != nil {
-		return "", fmt.Errorf("failed to call video.save: %w", err)
+		return "", "", fmt.Errorf("failed to call video.save: %w", err)
 	}
 
 	var videoSave VideoSaveResponse
 	if err := json.Unmarshal(saveResp, &videoSave); err != nil {
-		return "", fmt.Errorf("failed to parse video.save response: %w", err)
+		return "", "", fmt.Errorf("failed to parse video.save response: %w", err)
 	}
 
 	// 2. Загружаем файл
 	file, err := os.Open(filePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to open video file: %w", err)
+		return "", "", fmt.Errorf("failed to open video file: %w", err)
 	}
 	defer file.Close()
 
@@ -309,31 +317,31 @@ func (c *VKClient) UploadVideo(filePath string, groupID string, fileName string)
 	writer := multipart.NewWriter(body)
 	part, err := writer.CreateFormFile("video_file", fileName)
 	if err != nil {
-		return "", fmt.Errorf("failed to create form file for video: %w", err)
+		return "", "", fmt.Errorf("failed to create form file for video: %w", err)
 	}
 
 	if _, err := io.Copy(part, file); err != nil {
-		return "", fmt.Errorf("failed to copy video file: %w", err)
+		return "", "", fmt.Errorf("failed to copy video file: %w", err)
 	}
 	writer.Close()
 
 	req, err := http.NewRequest("POST", videoSave.UploadURL, body)
 	if err != nil {
-		return "", fmt.Errorf("failed to create video upload request: %w", err)
+		return "", "", fmt.Errorf("failed to create video upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to upload video file: %w", err)
+		return "", "", fmt.Errorf("failed to upload video file: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("video upload failed with status: %d", resp.StatusCode)
+		return "", "", fmt.Errorf("video upload failed with status: %d", resp.StatusCode)
 	}
 
 	// Формируем attachment строку
 	attachment := fmt.Sprintf("video%d_%d", videoSave.OwnerID, videoSave.VideoID)
-	return attachment, nil
+	return attachment, "", nil
 }
