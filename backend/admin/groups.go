@@ -221,14 +221,18 @@ func refreshGroupsHealth(groupID int) (int, error) {
 				}
 				
 				if !ourServerFound {
-					status = "error"
-					errText = "Наш Callback сервер не настроен в группе"
-					
-					// Пробуем добавить его автоматически
-					go vk.EnsureCallbackServer(&models.Group{
+					// Пробуем добавить его автоматически синхронно
+					errAdd := vk.EnsureCallbackServer(&models.Group{
 						VKGroupID:   vkGroupID,
 						AccessToken: groupToken,
 					})
+					if errAdd != nil {
+						status = "error"
+						errText = "Не удалось добавить вебхук в ВК (проверьте права токена): " + errAdd.Error()
+					} else {
+						status = "ok"
+						errText = "Сервер был успешно добавлен автоматически! Нажмите Обновить."
+					}
 				}
 			}
 		}
