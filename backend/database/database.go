@@ -1,10 +1,13 @@
 package database
 
 import (
+	"context"
 	"database/sql"
+	"strings"
+
 	"fmt"
 	"log"
-	"strings"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -24,9 +27,12 @@ func Init(dbURL string) error {
 		return err
 	}
 
-	// Проверяем подключение
-	if err := db.Ping(); err != nil {
-		return err
+	// Проверяем подключение с таймаутом
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		return fmt.Errorf("database connection failed: %v", err)
 	}
 
 	DB = db
