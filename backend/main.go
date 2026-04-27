@@ -80,8 +80,6 @@ func main() {
 			prefix = "/vk-app/"
 		}
 
-		log.Printf("📱 VK Mini App request: %s", r.URL.Path)
-
 		// Заголовки для работы в VK iframe
 		w.Header().Set("X-Frame-Options", "ALLOWALL")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -103,7 +101,12 @@ func main() {
 			filePath = "/usr/share/nginx/html/vk_app/index.html"
 		}
 
-		log.Printf("📱 Serving VK Mini App file: %s (requested: %s)", filePath, r.URL.Path)
+		if strings.Contains(filePath, "/assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+		}
+
 		http.ServeFile(w, r, filePath)
 	}
 
@@ -112,8 +115,6 @@ func main() {
 
 	// Альтернативный endpoint для VK Mini App без ограничений
 	mux.HandleFunc("/vk_app_embed/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("📱 VK Mini App embed request: %s", r.URL.Path)
-
 		// Максимально открытые заголовки для VK
 		w.Header().Set("X-Frame-Options", "ALLOWALL")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -121,6 +122,7 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
 
 		// Всегда возвращаем index.html для этого endpoint
+		w.Header().Set("Cache-Control", "public, max-age=3600")
 		http.ServeFile(w, r, "/usr/share/nginx/html/vk_app/index.html")
 	})
 
@@ -130,7 +132,6 @@ func main() {
 	// Главная страница
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
-			log.Printf("🏠 Serving index.html to %s", r.RemoteAddr)
 			http.ServeFile(w, r, "/usr/share/nginx/html/index.html")
 			return
 		}
@@ -139,7 +140,6 @@ func main() {
 		if !strings.Contains(r.URL.Path, ".") && !strings.HasPrefix(r.URL.Path, "/api/") {
 			pagePath := "/usr/share/nginx/html/pages" + r.URL.Path + ".html"
 			if _, err := os.Stat(pagePath); err == nil {
-				log.Printf("📄 Serving page file: %s", pagePath)
 				http.ServeFile(w, r, pagePath)
 				return
 			}
@@ -148,13 +148,17 @@ func main() {
 		// Статические файлы
 		filePath := "/usr/share/nginx/html" + r.URL.Path
 		if _, err := os.Stat(filePath); err == nil {
-			log.Printf("📁 Serving static file: %s", r.URL.Path)
+			// Добавляем кэширование для сбилженных файлов с хешами
+			if strings.HasPrefix(r.URL.Path, "/_astro/") || strings.HasPrefix(r.URL.Path, "/assets/") || strings.HasPrefix(r.URL.Path, "/vk_app/assets/") {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			} else {
+				w.Header().Set("Cache-Control", "public, max-age=3600")
+			}
 			http.ServeFile(w, r, filePath)
 			return
 		}
 
 		// 404
-		log.Printf("❌ 404: %s", r.URL.Path)
 		http.NotFound(w, r)
 	})
 
