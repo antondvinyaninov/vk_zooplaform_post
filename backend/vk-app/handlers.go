@@ -278,12 +278,13 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	attachmentsBytes, _ := json.Marshal(uploadedAttachments)
 	post := &models.Post{
 		UserID:      user.ID,
 		GroupID:     group.ID,
 		Message:     message,
 		Status:      "pending",
-		Attachments: strings.Join(uploadedAttachments, ","),
+		Attachments: string(attachmentsBytes),
 	}
 	if err := createPost(post); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -457,7 +458,12 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 		var attachments []string
 		if post.Attachments != "" {
-			parts := strings.Split(post.Attachments, ",")
+			var parts []string
+			if strings.HasPrefix(post.Attachments, "[") {
+				json.Unmarshal([]byte(post.Attachments), &parts)
+			} else {
+				parts = strings.Split(post.Attachments, ",")
+			}
 			for _, p := range parts {
 				idAndUrl := strings.SplitN(p, "|", 2)
 				attachments = append(attachments, idAndUrl[0])
@@ -759,7 +765,13 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 		if p.Attachments == "" {
 			continue
 		}
-		parts := strings.Split(p.Attachments, ",")
+		var parts []string
+		if strings.HasPrefix(p.Attachments, "[") {
+			json.Unmarshal([]byte(p.Attachments), &parts)
+		} else {
+			parts = strings.Split(p.Attachments, ",")
+		}
+		
 		var urls []AttachmentURL
 		for _, part := range parts {
 			idAndUrl := strings.SplitN(part, "|", 2)
