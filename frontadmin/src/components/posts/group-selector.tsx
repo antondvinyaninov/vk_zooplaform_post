@@ -38,19 +38,19 @@ export function GroupSelector() {
     group.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const toggleAll = () => {
+          const toggleAll = () => {
     if (selectedGroups.length === filteredGroups.length) {
       setSelectedGroups([])
     } else {
-      setSelectedGroups(filteredGroups.map((g) => g.id))
+      setSelectedGroups(filteredGroups.map((g) => g.vk_group_id))
     }
   }
 
-  const toggleGroup = (id: number) => {
-    if (selectedGroups.includes(id)) {
-      setSelectedGroups(selectedGroups.filter((groupId) => groupId !== id))
+  const toggleGroup = (vk_group_id: number) => {
+    if (selectedGroups.includes(vk_group_id)) {
+      setSelectedGroups(selectedGroups.filter((id) => id !== vk_group_id))
     } else {
-      setSelectedGroups([...selectedGroups, id])
+      setSelectedGroups([...selectedGroups, vk_group_id])
     }
   }
 
@@ -109,19 +109,19 @@ export function GroupSelector() {
               Ошибка загрузки сообществ
             </div>
           ) : filteredGroups.map((group) => {
-            const isSelected = selectedGroups.includes(group.id);
+            const isSelected = selectedGroups.includes(group.vk_group_id);
             return (
               <div
                 key={group.id}
                 className={`flex items-center space-x-4 p-4 px-6 border-b border-border/50 last:border-0 transition-colors cursor-pointer ${
                   isSelected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/30"
                 }`}
-                onClick={() => toggleGroup(group.id)}
+                onClick={() => toggleGroup(group.vk_group_id)}
               >
                 <Checkbox 
-                  id={`group-${group.id}`} 
-                  checked={selectedGroups.includes(group.id)}
-                  onCheckedChange={() => toggleGroup(group.id)}
+                  id={`group-${group.vk_group_id}`} 
+                  checked={isSelected}
+                  onCheckedChange={() => toggleGroup(group.vk_group_id)}
                   onClick={(e) => e.stopPropagation()}
                 />
                 <div className="flex items-center gap-3 flex-1 min-w-0">
