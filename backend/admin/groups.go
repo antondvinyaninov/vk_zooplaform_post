@@ -158,7 +158,7 @@ func normalizeHealthStatus(status string) string {
 
 func refreshGroupsHealth(groupID int) (int, error) {
 	query := `
-		SELECT id, vk_group_id, access_token
+		SELECT id, vk_group_id, access_token, city_id, notify_user_ids
 		FROM groups
 		WHERE is_active = ?
 	`
@@ -180,8 +180,10 @@ func refreshGroupsHealth(groupID int) (int, error) {
 			id             int
 			vkGroupID      int
 			groupTokenRaw  sql.NullString
+			cityIDRaw      sql.NullInt64
+			notifyUsersRaw sql.NullString
 		)
-		if err := rows.Scan(&id, &vkGroupID, &groupTokenRaw); err != nil {
+		if err := rows.Scan(&id, &vkGroupID, &groupTokenRaw, &cityIDRaw, &notifyUsersRaw); err != nil {
 			return updated, err
 		}
 
@@ -230,10 +232,22 @@ func refreshGroupsHealth(groupID int) (int, error) {
 						status = "error"
 						errText = "Не удалось добавить вебхук в ВК (проверьте права токена): " + errAdd.Error()
 					} else {
+						// Сервер добавлен, но нужно проверить остальные параметры
 						status = "ok"
 						errText = "Сервер был успешно добавлен автоматически! Нажмите Обновить."
 					}
 				}
+			}
+		}
+
+		// Если вебхук настроен, проверяем дополнительные настройки группы
+		if status == "ok" {
+			if !cityIDRaw.Valid || cityIDRaw.Int64 == 0 {
+				status = "error"
+				errText = "Не указан город для фильтрации постов (укажите в настройках приложения ВК)"
+			} else if !notifyUsersRaw.Valid || notifyUsersRaw.String == "" || notifyUsersRaw.String == "[]" {
+				status = "error"
+				errText = "Не выбраны модераторы для уведомлений (настройте в приложении ВК)"
 			}
 		}
 
