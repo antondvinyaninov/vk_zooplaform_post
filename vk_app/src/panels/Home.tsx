@@ -89,8 +89,9 @@ export const Home: FC<HomeProps> = ({ id }) => {
                   post.status === 'draft' ? '📝 Черновик' :
                   post.status
                 }
-                title={post.title}
+                title={post.message !== post.title ? post.title : undefined}
                 description={post.message}
+                src={post.attachment_urls?.[0]?.url}
                 maxHeight={250}
               />
             ))}

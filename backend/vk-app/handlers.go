@@ -328,6 +328,7 @@ func myPostsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	response = populateAttachmentURLs(response)
 	utils.RespondSuccess(w, response)
 }
 
@@ -384,7 +385,8 @@ func getPostByIDHandler(w http.ResponseWriter, postID int) {
 		return
 	}
 
-	utils.RespondSuccess(w, response)
+	responses := populateAttachmentURLs([]postResponse{response})
+	utils.RespondSuccess(w, responses[0])
 }
 
 func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {

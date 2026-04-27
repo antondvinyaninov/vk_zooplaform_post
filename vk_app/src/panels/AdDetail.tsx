@@ -13,7 +13,6 @@ import {
   NavIdProps,
   Div,
   Text,
-  Title,
   Avatar,
 } from '@vkontakte/vkui';
 import { 
@@ -78,18 +77,31 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
 
       <Group>
         <Div>
-          <Title level="1" weight="2" style={{ marginBottom: 8 }}>
-            {post.title}
-          </Title>
-          <Text weight="3" style={{ color: 'var(--vkui--color_text_accent)' }}>
-            Статус: {post.status}
+          <Text weight="3" style={{ color: 'var(--vkui--color_text_accent)', marginBottom: 12 }}>
+            Статус: {
+              post.status === 'published' ? '✅ Опубликовано' :
+              post.status === 'pending' ? '⏳ На модерации' :
+              post.status === 'rejected' ? '❌ Отклонено' :
+              post.status === 'draft' ? '📝 Черновик' :
+              post.status
+            }
           </Text>
-        </Div>
-
-        <Div>
           <Text style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
             {post.message}
           </Text>
+          
+          {post.attachment_urls && post.attachment_urls.length > 0 && (
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {post.attachment_urls.map((attachment: any, index: number) => (
+                <img 
+                  key={index} 
+                  src={attachment.url} 
+                  alt={`Медиа ${index + 1}`}
+                  style={{ width: '100%', borderRadius: 8, objectFit: 'cover' }} 
+                />
+              ))}
+            </div>
+          )}
         </Div>
       </Group>
 
