@@ -7,6 +7,7 @@ import (
 	"backend/vk"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -253,33 +254,49 @@ func saveDailyStatsSnapshot() {
 		FROM groups 
 		WHERE is_active = ?
 	`, true).Scan(&totalGroups, &totalSubscribers)
-	
+
 	if err != nil {
+		log.Printf("[Cron] Error counting stats for snapshot: %v", err)
 		return
 	}
 
 	today := time.Now().Format("2006-01-02")
 	
-	// Обновляем или вставляем статистику за сегодняшний день
-	if database.Rebind("?") == "$1" {
-		// Postgres
-		database.Exec(`
-			INSERT INTO group_stats_history (date, total_groups, total_subscribers)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (date) DO UPDATE 
-			SET total_groups = EXCLUDED.total_groups, 
-			    total_subscribers = EXCLUDED.total_subscribers,
-			    created_at = CURRENT_TIMESTAMP
-		`, today, totalGroups, totalSubscribers)
-	} else {
-		// SQLite
-		database.Exec(`
-			INSERT INTO group_stats_history (date, total_groups, total_subscribers)
-			VALUES (?, ?, ?)
-			ON CONFLICT(date) DO UPDATE SET
-			total_groups=excluded.total_groups,
-			total_subscribers=excluded.total_subscribers,
-			created_at=CURRENT_TIMESTAMP
-		`, today, totalGroups, totalSubscribers)
+	// Сохраняем снимок с конфликтом ON CONFLICT
+	_, err = database.Exec(`
+		INSERT INTO group_stats_history (date, total_groups, total_subscribers)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (date) DO UPDATE 
+		SET total_groups = EXCLUDED.total_groups, 
+			total_subscribers = EXCLUDED.total_subscribers,
+			created_at = CURRENT_TIMESTAMP
+	`, today, totalGroups, totalSubscribers)
+
+	if err != nil {
+		log.Printf("[Cron] Error saving daily stats snapshot: %v", err)
+	}
+}
+
+// StartHealthCheckCron запускает фоновую проверку статуса всех сообществ раз в 15 минут
+func StartHealthCheckCron() {
+	ticker := time.NewTicker(15 * time.Minute)
+	
+	// Делаем первую проверку сразу при старте (в отдельной горутине, чтобы не блочить)
+	go func() {
+		log.Printf("🔄 [Cron] Starting initial groups health check...")
+		if _, err := refreshGroupsHealth(0); err != nil {
+			log.Printf("❌ [Cron] Initial health check failed: %v", err)
+		} else {
+			log.Printf("✅ [Cron] Initial health check completed successfully")
+		}
+	}()
+
+	for range ticker.C {
+		log.Printf("🔄 [Cron] Running scheduled groups health check...")
+		if _, err := refreshGroupsHealth(0); err != nil {
+			log.Printf("❌ [Cron] Scheduled health check failed: %v", err)
+		} else {
+			log.Printf("✅ [Cron] Scheduled health check completed successfully")
+		}
 	}
 }

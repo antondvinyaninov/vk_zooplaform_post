@@ -175,6 +175,10 @@ func main() {
 	log.Println("✓ API: http://localhost:80/api/")
 	log.Println("✓ VK App API: http://localhost:80/api/app/")
 	log.Println("✓ Site API: http://localhost:80/api/site/")
+
+	// Запускаем фоновую проверку здоровья групп
+	admin.StartHealthCheckCron()
+
 	log.Printf("=== Server Ready ===")
 
 	// Создаем HTTP сервер (принудительно на порту 80)
