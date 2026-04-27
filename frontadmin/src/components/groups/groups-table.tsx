@@ -125,7 +125,7 @@ export function GroupsTable() {
                   <div className="flex flex-col gap-1 items-start">
                     <StatusBadge status={group.health_status} />
                     {group.health_error && (
-                      <span className="text-[10px] text-destructive max-w-[150px] truncate" title={group.health_error}>
+                      <span className={`text-[10px] max-w-[150px] truncate ${group.health_status === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`} title={group.health_error}>
                         {group.health_error}
                       </span>
                     )}
