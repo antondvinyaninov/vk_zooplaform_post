@@ -17,6 +17,7 @@ kill_port() {
 echo "🔍 Проверка портов..."
 kill_port 8000
 kill_port 5173
+kill_port 5174
 
 # Запуск Go бэкенда
 echo "📦 Запуск Go Backend (порт 8000)..."

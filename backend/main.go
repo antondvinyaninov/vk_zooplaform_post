@@ -64,6 +64,13 @@ func main() {
 	mux.HandleFunc("/vk-app", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/vk-app/", http.StatusMovedPermanently)
 	})
+	// Обработка ошибочного пути, если пользователь ввел vk_app находясь на странице /groups
+	mux.HandleFunc("/groups/vk_app", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/vk_app/", http.StatusMovedPermanently)
+	})
+	mux.HandleFunc("/groups/vk_app/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/vk_app/", http.StatusMovedPermanently)
+	})
 
 	// VK Mini App - поддержка обоих вариантов написания (через дефис и через подчеркивание)
 	vkAppHandler := func(w http.ResponseWriter, r *http.Request) {
