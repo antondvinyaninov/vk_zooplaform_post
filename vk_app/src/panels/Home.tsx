@@ -9,8 +9,9 @@ import {
   PanelSpinner,
   Header,
   Button,
+  Placeholder,
 } from '@vkontakte/vkui';
-import { Icon28AddOutline } from '@vkontakte/icons';
+import { Icon28AddOutline, Icon56AddCircleOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getMyPosts } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
@@ -62,6 +63,18 @@ export const Home: FC<HomeProps> = ({ id }) => {
       }>
         {loading ? (
           <PanelSpinner size="l" />
+        ) : posts.length === 0 ? (
+          <Placeholder
+            icon={<Icon56AddCircleOutline />}
+            title="Вы еще не делали постов"
+            action={
+              <Button size="m" onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.CREATE_POST}`)}>
+                Добавить первый
+              </Button>
+            }
+          >
+            Здесь будут отображаться публикации, созданные через приложение
+          </Placeholder>
         ) : (
           <CardGrid size="l">
             {posts.map((post) => (
