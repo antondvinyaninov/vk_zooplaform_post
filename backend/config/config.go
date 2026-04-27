@@ -42,7 +42,7 @@ func Load() *Config {
 		VKOfficialGroupToken: getEnv("VK_OFFICIAL_GROUP_TOKEN", ""),
 		VKOfficialGroupID:    getEnvInt("VK_OFFICIAL_GROUP_ID", 165434330),
 
-		DatabaseURL:  getEnv("DATABASE_URL", ""),
+		DatabaseURL:  getEnv("DATABASE_URL", "postgres://dvinyaninov_pet:ps8uGNxn0uVf0VK23@155.212.168.69:5596/vkpet?sslmode=disable"),
 	}
 }
 

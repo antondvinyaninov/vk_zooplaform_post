@@ -59,7 +59,7 @@ WORKDIR /app
 
 # Переменные окружения (Go backend на порту 80)
 ENV PORT=80
-ENV DATABASE_URL=
+ENV DATABASE_URL=postgres://dvinyaninov_pet:ps8uGNxn0uVf0VK23@155.212.168.69:5596/vkpet?sslmode=disable
 ENV VK_CLIENT_ID=54481712
 ENV VK_CLIENT_SECRET=488uLwXVh0NbUFcrJIvA
 ENV VK_SERVICE_KEY=a5b5b6aaa5b5b6aaa5b5b6aa3ca68ae59aaa5b5a5b5b6aacc52bb65014d8826cb301184
