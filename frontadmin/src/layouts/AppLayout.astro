@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { DashboardLayout } from '@/components/dashboard-layout';
+import { Toaster } from '@/components/ui/sonner';
 import { ClientRouter } from 'astro:transitions';
 
 interface Props {
@@ -56,5 +57,6 @@ const defaultOpen = sidebarCookie ? sidebarCookie === "true" : true;
 		<DashboardLayout title={title} defaultOpen={defaultOpen} client:load>
 			<slot />
 		</DashboardLayout>
+		<Toaster client:load />
 	</body>
 </html>
