@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"backend/config"
 	"backend/database"
 	"backend/models"
 	"backend/vk"
@@ -211,11 +212,15 @@ func refreshGroupsHealth(groupID int) (int, error) {
 			} else {
 				errText = checkErr.Error()
 			}
+		}
 
-			groupData, errGroups := client.GroupsGetByID(vkGroupID)
-			if errGroups == nil && groupData != nil {
-				membersCount = groupData.MembersCount
-			}
+		// Всегда получаем актуальное количество подписчиков через Service Key, 
+		// чтобы оно отображалось даже если токен группы умер (Ошибка 38 и т.д.)
+		cfg := config.Load()
+		serviceClient := vk.NewVKClient(cfg.VKServiceKey)
+		groupData, errGroups := serviceClient.GroupsGetByID(vkGroupID)
+		if errGroups == nil && groupData != nil {
+			membersCount = groupData.MembersCount
 		}
 
 		if _, err := database.Exec(`
