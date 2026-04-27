@@ -21,7 +21,6 @@ type Config struct {
 	VKOfficialGroupToken string
 	VKOfficialGroupID    int
 
-	DatabasePath string
 	DatabaseURL  string
 }
 
@@ -43,7 +42,6 @@ func Load() *Config {
 		VKOfficialGroupToken: getEnv("VK_OFFICIAL_GROUP_TOKEN", ""),
 		VKOfficialGroupID:    getEnvInt("VK_OFFICIAL_GROUP_ID", 165434330),
 
-		DatabasePath: getEnv("DATABASE_PATH", "./data/app.db"),
 		DatabaseURL:  getEnv("DATABASE_URL", ""),
 	}
 }
