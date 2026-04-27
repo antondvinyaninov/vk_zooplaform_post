@@ -3,7 +3,8 @@ FROM node:20-alpine AS vk-app-builder
 
 WORKDIR /app/vk_app
 COPY vk_app/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --legacy-peer-deps
 COPY vk_app/ ./
 RUN npm run build
 
@@ -15,19 +16,23 @@ RUN apk add --no-cache gcc musl-dev sqlite-dev
 
 WORKDIR /app
 COPY backend/go.mod backend/go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 COPY backend/ ./
 
 # Включаем CGO для работы с SQLite
 ENV CGO_ENABLED=1
-RUN go build -v -o main .
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    go build -v -o main .
 
 # Сборка Astro админки
 FROM node:22-alpine AS admin-builder
 
 WORKDIR /app/frontadmin
 COPY frontadmin/package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
 COPY frontadmin/ ./
 RUN npm run build
 
