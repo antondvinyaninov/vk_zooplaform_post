@@ -233,6 +233,32 @@ func (c *VKClient) AddCallbackServer(groupID int, serverURL string, title string
 	return res.ServerID, nil
 }
 
+type CallbackServer struct {
+	ID        int    `json:"id"`
+	Title     string `json:"title"`
+	CreatorID int    `json:"creator_id"`
+	URL       string `json:"url"`
+	SecretKey string `json:"secret_key"`
+	Status    string `json:"status"`
+}
+
+func (c *VKClient) GetCallbackServers(groupID int) ([]CallbackServer, error) {
+	resp, err := c.CallMethod("groups.getCallbackServers", map[string]string{
+		"group_id": strconv.Itoa(groupID),
+	})
+	if err != nil {
+		return nil, err
+	}
+	var res struct {
+		Count int              `json:"count"`
+		Items []CallbackServer `json:"items"`
+	}
+	if err := json.Unmarshal(resp, &res); err != nil {
+		return nil, err
+	}
+	return res.Items, nil
+}
+
 func (c *VKClient) SetCallbackSettings(groupID int, serverID int) error {
 	params := map[string]string{
 		"group_id":       strconv.Itoa(groupID),

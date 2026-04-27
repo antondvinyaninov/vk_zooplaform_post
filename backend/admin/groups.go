@@ -175,18 +175,6 @@ func refreshGroupsHealth(groupID int) (int, error) {
 	}
 	defer rows.Close()
 
-	// Получаем токен админа один раз
-	var adminToken string
-	dbErr := database.QueryRow(`
-		SELECT access_token
-		FROM vk_accounts
-		WHERE is_active = ?
-		ORDER BY updated_at DESC LIMIT 1
-	`, true).Scan(&adminToken)
-	if dbErr != nil {
-		adminToken = ""
-	}
-
 	updated := 0
 	for rows.Next() {
 		var (
@@ -212,30 +200,37 @@ func refreshGroupsHealth(groupID int) (int, error) {
 			status = "error"
 			errText = "Токен группы не подключен (предоставьте доступ в настройках VK Mini App)"
 		} else {
-			// Проверяем токен группы через метод groups.getById
+			// Проверяем наличие нашего сервера в Callback API
 			groupClient := vk.NewVKClient(groupToken)
-			_, checkErr := groupClient.CallMethod("groups.getById", map[string]string{
-				"group_id": strconv.Itoa(vkGroupID),
-			})
+			servers, checkErr := groupClient.GetCallbackServers(vkGroupID)
+			
 			if checkErr != nil {
 				status = "error"
-				errText = "Ошибка токена группы: " + checkErr.Error()
-			}
-		}
-
-		// Если токен группы работает (или его ошибка не перекрыта), проверяем админский токен
-		if adminToken == "" && status == "ok" {
-			status = "error"
-			errText = "Admin VK token is not connected (re-login in dashboard)"
-		} else if adminToken != "" && status == "ok" {
-			client := vk.NewVKClient(adminToken)
-			_, checkErr := client.CallMethod("wall.get", map[string]string{
-				"owner_id": "-" + strconv.Itoa(vkGroupID),
-				"count":    "1",
-			})
-			if checkErr != nil {
-				status = "error"
-				errText = "Ошибка админского токена (переподключите VK): " + checkErr.Error()
+				errText = "Ошибка API ВКонтакте: " + checkErr.Error()
+			} else {
+				// Ищем наш сервер
+				ourServerFound := false
+				for _, srv := range servers {
+					if strings.Contains(srv.URL, "vk.zooplatforma.ru/api/callback") {
+						ourServerFound = true
+						if srv.Status != "ok" {
+							status = "error"
+							errText = "Сервер добавлен, но имеет статус: " + srv.Status
+						}
+						break
+					}
+				}
+				
+				if !ourServerFound {
+					status = "error"
+					errText = "Наш Callback сервер не настроен в группе"
+					
+					// Пробуем добавить его автоматически
+					go vk.EnsureCallbackServer(&models.Group{
+						VKGroupID:   vkGroupID,
+						AccessToken: groupToken,
+					})
+				}
 			}
 		}
 
