@@ -188,7 +188,7 @@ func refreshGroupsHealth(groupID int) (int, error) {
 		}
 
 		status := "ok"
-		errText := ""
+		var report []string
 		membersCount := 0
 
 		groupToken := ""
@@ -196,60 +196,66 @@ func refreshGroupsHealth(groupID int) (int, error) {
 			groupToken = groupTokenRaw.String
 		}
 
-		// Проверяем токен группы
+		// 1. Проверяем токен группы
 		if groupToken == "" {
 			status = "error"
-			errText = "Токен группы не подключен (предоставьте доступ в настройках VK Mini App)"
+			report = append(report, "❌ Токен: не подключен")
 		} else {
-			// Проверяем наличие нашего сервера в Callback API
+			report = append(report, "✅ Токен: подключен")
+			
+			// 2. Проверяем наличие нашего сервера в Callback API
 			groupClient := vk.NewVKClient(groupToken)
 			servers, checkErr := groupClient.GetCallbackServers(vkGroupID)
 			
 			if checkErr != nil {
 				status = "error"
-				errText = "Ошибка API ВКонтакте: " + checkErr.Error()
+				report = append(report, "❌ Вебхук: ошибка API ("+checkErr.Error()+")")
 			} else {
-				// Ищем наш сервер
 				ourServerFound := false
 				for _, srv := range servers {
 					if strings.Contains(srv.URL, "vk.zooplatforma.ru/api/callback") {
 						ourServerFound = true
 						if srv.Status != "ok" {
 							status = "error"
-							errText = "Сервер добавлен, но имеет статус: " + srv.Status
+							report = append(report, "❌ Вебхук: статус сервера '"+srv.Status+"'")
+						} else {
+							report = append(report, "✅ Вебхук: настроен и работает")
 						}
 						break
 					}
 				}
 				
 				if !ourServerFound {
-					// Пробуем добавить его автоматически синхронно
 					errAdd := vk.EnsureCallbackServer(&models.Group{
 						VKGroupID:   vkGroupID,
 						AccessToken: groupToken,
 					})
 					if errAdd != nil {
 						status = "error"
-						errText = "Не удалось добавить вебхук в ВК (проверьте права токена): " + errAdd.Error()
+						report = append(report, "❌ Вебхук: ошибка автонастройки ("+errAdd.Error()+")")
 					} else {
-						// Сервер добавлен, но нужно проверить остальные параметры
-						status = "ok"
-						errText = "Сервер был успешно добавлен автоматически! Нажмите Обновить."
+						report = append(report, "✅ Вебхук: добавлен автоматически")
 					}
 				}
 			}
 		}
 
-		// Если вебхук настроен, проверяем дополнительные настройки группы
-		if status == "ok" {
-			if !cityIDRaw.Valid || cityIDRaw.Int64 == 0 {
-				status = "error"
-				errText = "Не указан город для фильтрации постов (укажите в настройках приложения ВК)"
-			} else if !notifyUsersRaw.Valid || notifyUsersRaw.String == "" || notifyUsersRaw.String == "[]" {
-				status = "error"
-				errText = "Не выбраны модераторы для уведомлений (настройте в приложении ВК)"
-			}
+		// 3. Проверяем дополнительные настройки группы
+		if !cityIDRaw.Valid || cityIDRaw.Int64 == 0 {
+			status = "error"
+			report = append(report, "❌ Город: не выбран")
+		} else {
+			report = append(report, "✅ Город: выбран")
 		}
+
+		if !notifyUsersRaw.Valid || notifyUsersRaw.String == "" || notifyUsersRaw.String == "[]" {
+			status = "error"
+			report = append(report, "❌ Модераторы: не выбраны")
+		} else {
+			report = append(report, "✅ Модераторы: выбраны")
+		}
+
+		errText := strings.Join(report, "\n")
 
 		// Всегда получаем актуальное количество подписчиков через Service Key, 
 		// чтобы оно отображалось даже если токен группы умер (Ошибка 38 и т.д.)
