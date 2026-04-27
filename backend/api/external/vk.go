@@ -42,6 +42,6 @@ func (c *VKAPIClient) Repost(object, groupID string) (*vk.WallRepostResponse, er
 }
 
 // UploadPhoto загружает фото на стену
-func (c *VKAPIClient) UploadPhoto(filePath string, groupID string) (string, error) {
+func (c *VKAPIClient) UploadPhoto(filePath string, groupID string) (string, string, error) {
 	return c.client.UploadPhotoToWall(filePath, groupID)
 }
