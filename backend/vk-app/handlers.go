@@ -252,14 +252,18 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 				if err == nil {
 					uploadedAttachments = append(uploadedAttachments, att)
 				} else {
-					log.Printf("Failed to upload video: %v", err)
+					os.Remove(tmpPath)
+					utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Ошибка загрузки видео: %v", err))
+					return
 				}
 			} else {
 				att, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
 				if err == nil {
 					uploadedAttachments = append(uploadedAttachments, att)
 				} else {
-					log.Printf("Failed to upload photo: %v", err)
+					os.Remove(tmpPath)
+					utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Ошибка загрузки фото: %v", err))
+					return
 				}
 			}
 			os.Remove(tmpPath)
@@ -771,10 +775,14 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 		resolvedVideos := make(map[string]string)
 		
 		if len(photos) > 0 {
+			log.Printf("[populateAttachmentURLs] Fetching photos: %s with token %s...", strings.Join(photos, ","), token[:10])
 			resp, err := vkClient.CallMethod("photos.getById", map[string]string{
 				"photos": strings.Join(photos, ","),
 			})
-			if err == nil {
+			if err != nil {
+				log.Printf("[populateAttachmentURLs] photos.getById error: %v", err)
+			} else {
+				log.Printf("[populateAttachmentURLs] photos.getById response: %s", string(resp))
 				var items []struct {
 					ID      int `json:"id"`
 					OwnerID int `json:"owner_id"`
@@ -783,11 +791,14 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 						Type string `json:"type"`
 					} `json:"sizes"`
 				}
-				if json.Unmarshal(resp, &items) == nil {
+				if err := json.Unmarshal(resp, &items); err != nil {
+					log.Printf("[populateAttachmentURLs] json.Unmarshal error: %v", err)
+				} else {
 					for _, item := range items {
 						idStr := fmt.Sprintf("photo%d_%d", item.OwnerID, item.ID)
 						if len(item.Sizes) > 0 {
 							resolvedPhotos[idStr] = item.Sizes[len(item.Sizes)-1].URL
+							log.Printf("[populateAttachmentURLs] Resolved %s -> %s", idStr, resolvedPhotos[idStr])
 						}
 					}
 				}
