@@ -16,7 +16,7 @@ func EnsureCallbackServer(group *models.Group) error {
 
 	client := NewVKClient(group.AccessToken)
 	
-	serverID, err := client.AddCallbackServer(group.VKGroupID, serverURL, "ZooPlatforma Webhook")
+	serverID, err := client.AddCallbackServer(group.VKGroupID, serverURL, "ZooPlatform")
 	if err != nil {
 		return fmt.Errorf("AddCallbackServer error: %v", err)
 	}
