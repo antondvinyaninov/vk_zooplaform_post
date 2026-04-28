@@ -2,7 +2,7 @@ import vkBridgeModule from '@vkontakte/vk-bridge';
 const vkBridge = (vkBridgeModule as any).send ? vkBridgeModule : (vkBridgeModule as any).default;
 import { UserInfo } from '@vkontakte/vk-bridge';
 
-const isVKCDN = window.location.hostname.includes('vk-apps.com');
+const isVKCDN = window.location.hostname.includes('vk-apps.com') || window.location.hostname.includes('yandexcloud.net');
 const API_URL = isVKCDN ? 'https://vk.zooplatforma.ru/api/app' : '/api/app';
 
 export interface AppUser {
