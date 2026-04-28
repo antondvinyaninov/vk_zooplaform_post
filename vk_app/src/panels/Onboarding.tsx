@@ -1,3 +1,4 @@
+import vkBridge from '@vkontakte/vk-bridge';
 import { FC, useEffect, useState } from 'react';
 import {
   Panel,
@@ -18,7 +19,7 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
     // Проверяем, запущено ли приложение вне VK
     const checkVKEnvironment = () => {
       const hasVKParams = window.vkLaunchParams && Object.keys(window.vkLaunchParams).length > 0;
-      const hasVKBridge = window.vkBridge && typeof window.vkBridge.send === 'function';
+      const hasVKBridge = vkBridge && typeof vkBridge.send === 'function';
       
       // Если нет VK параметров и VK Bridge недоступен, значит запущено вне VK
       if (!hasVKParams && !hasVKBridge) {
@@ -31,8 +32,8 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
   }, []);
 
   const installToCommunity = () => {
-    if (window.vkBridge && window.vkBridge.send) {
-      window.vkBridge.send('VKWebAppAddToCommunity').catch((error) => {
+    if (vkBridge && vkBridge.send) {
+      vkBridge.send('VKWebAppAddToCommunity').catch((error) => {
         console.error('Failed to add to community:', error);
       });
     } else {

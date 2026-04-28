@@ -2,25 +2,27 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vk_app/logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#5181b8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>ZooPlatforma</title>
     
-    <!-- VK Bridge - используем официальную CDN версию -->
-    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
-    <script type="module" crossorigin src="/vk_app/assets/index-oBfet0X2.js"></script>
-    <link rel="modulepreload" crossorigin href="/vk_app/assets/rolldown-runtime-jpDsebLB.js">
-    <link rel="modulepreload" crossorigin href="/vk_app/assets/icons-B72SVGac.js">
-    <link rel="modulepreload" crossorigin href="/vk_app/assets/vk-bridge-nJCEPBky.js">
-    <link rel="modulepreload" crossorigin href="/vk_app/assets/vendor-BId-dEqJ.js">
-    <link rel="modulepreload" crossorigin href="/vk_app/assets/react-B15isLiY.js">
-    <link rel="modulepreload" crossorigin href="/vk_app/assets/vk-router-Bp8GTyOu.js">
-    <link rel="stylesheet" crossorigin href="/vk_app/assets/vk-router-D7zSuEDM.css">
-    <link rel="stylesheet" crossorigin href="/vk_app/assets/vkui-CbR5bxAs.css">
+    <!-- VK Bridge загружается через npm пакет, не используем CDN -->
+    <script type="module" crossorigin src="./assets/index-M97mQBED.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-jpDsebLB.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-fZLUVKav.js">
+    <link rel="modulepreload" crossorigin href="./assets/icons-9yuhmPSw.js">
+    <link rel="modulepreload" crossorigin href="./assets/vk-bridge-BSHai3xv.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-INz6AQCR.js">
+    <link rel="modulepreload" crossorigin href="./assets/vk-router-Clpkrth3.js">
+    <link rel="stylesheet" crossorigin href="./assets/vk-router-0xkgeu8n.css">
+    <link rel="stylesheet" crossorigin href="./assets/vkui-UqPUtTEN.css">
   </head>
   <body>
     <div id="root"></div>

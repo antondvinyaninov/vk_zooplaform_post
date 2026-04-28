@@ -1,3 +1,4 @@
+import vkBridge from '@vkontakte/vk-bridge';
 import { useState, useEffect, ReactNode, lazy, Suspense } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import {
@@ -109,12 +110,12 @@ export const App = () => {
       
       try {
         // Проверяем что VK Bridge доступен
-        if (typeof window.vkBridge === 'undefined' || !window.vkBridge.send) {
+        if (typeof vkBridge === 'undefined' || !vkBridge.send) {
           throw new Error('VK Bridge not available');
         }
         
         console.log('Attempting to get user info...');
-        const user = await window.vkBridge.send('VKWebAppGetUserInfo');
+        const user = await vkBridge.send('VKWebAppGetUserInfo');
         console.log('User info received:', user);
         
         // СНАЧАЛА устанавливаем данные пользователя

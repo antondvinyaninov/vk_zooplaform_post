@@ -1,3 +1,4 @@
+import vkBridge from '@vkontakte/vk-bridge';
 import { FC, useEffect, useState } from 'react';
 import {
   Panel,
@@ -175,7 +176,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                       }
                       
                       // @ts-ignore
-                      const result = await window.vkBridge.send('VKWebAppGetCommunityToken', {
+                      const result = await vkBridge.send('VKWebAppGetCommunityToken', {
                         app_id: appId,
                         group_id: groupId,
                         scope: 'messages,manage,photos,docs'
