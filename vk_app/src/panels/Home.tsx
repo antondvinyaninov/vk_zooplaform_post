@@ -12,7 +12,7 @@ import { Alert,
   Div,
   Text,
 } from '@vkontakte/vkui';
-import { Icon28AddOutline, Icon56AddCircleOutline, Icon28PictureOutline } from '@vkontakte/icons';
+import { Icon28AddOutline, Icon56AddCircleOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getMyPosts, deletePost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
@@ -82,27 +82,25 @@ export const Home: FC<HomeProps> = ({ id }) => {
               <Card key={post.id} mode="shadow">
                 <Div style={{ display: 'flex', gap: 12 }}>
                   {/* Изображение */}
-                  <div style={{ 
-                    width: 80, 
-                    height: 80, 
-                    flexShrink: 0, 
-                    borderRadius: 8, 
-                    overflow: 'hidden', 
-                    backgroundColor: 'var(--vkui--color_background_secondary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    {post.attachment_urls?.[0]?.url ? (
+                  {post.attachment_urls?.[0]?.url && (
+                    <div style={{ 
+                      width: 80, 
+                      height: 80, 
+                      flexShrink: 0, 
+                      borderRadius: 8, 
+                      overflow: 'hidden', 
+                      backgroundColor: 'var(--vkui--color_background_secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
                       <img 
                         src={post.attachment_urls[0].url} 
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                         alt="Медиа"
                       />
-                    ) : (
-                      <Icon28PictureOutline style={{ color: 'var(--vkui--color_icon_secondary)' }} />
-                    )}
-                  </div>
+                    </div>
+                  )}
                   
                   {/* Информация */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, justifyContent: 'center' }}>
