@@ -1460,8 +1460,18 @@ func saveGroupTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 
 func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
-	user, err := getCurrentUser(r)
+	ctx, err := parseLaunchContext(r)
 	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if ctx.UserID == 0 {
+		utils.RespondError(w, http.StatusBadRequest, "vk_user_id is required")
+		return
+	}
+
+	user, err := getUserByVKUserID(ctx.UserID)
+	if err != nil || user == nil {
 		utils.RespondError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
