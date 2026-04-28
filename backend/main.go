@@ -57,21 +57,6 @@ func main() {
 	log.Printf("Registering site routes...")
 	site.RegisterRoutes(mux)
 
-	// Редиректы для путей без слеша в конце (чтобы избежать 403/404)
-	mux.HandleFunc("/vk_app", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/vk_app/", http.StatusMovedPermanently)
-	})
-	mux.HandleFunc("/vk-app", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/vk-app/", http.StatusMovedPermanently)
-	})
-	// Обработка ошибочного пути, если пользователь ввел vk_app находясь на странице /groups
-	mux.HandleFunc("/groups/vk_app", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/vk_app/", http.StatusMovedPermanently)
-	})
-	mux.HandleFunc("/groups/vk_app/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/vk_app/", http.StatusMovedPermanently)
-	})
-
 	// VK Mini App - поддержка обоих вариантов написания (через дефис и через подчеркивание)
 	vkAppHandler := func(w http.ResponseWriter, r *http.Request) {
 		// Определяем какой префикс используется
@@ -110,6 +95,15 @@ func main() {
 		http.ServeFile(w, r, filePath)
 	}
 
+	// Убраны редиректы для путей без слеша в конце
+	// так как Yandex API Gateway обрезает слеши при передаче в /{path+}
+	mux.HandleFunc("/vk_app", vkAppHandler)
+	mux.HandleFunc("/vk-app", vkAppHandler)
+	
+	// Обработка ошибочного пути, если пользователь ввел vk_app находясь на странице /groups
+	mux.HandleFunc("/groups/vk_app", vkAppHandler)
+	mux.HandleFunc("/groups/vk_app/", vkAppHandler)
+	
 	mux.HandleFunc("/vk_app/", vkAppHandler)
 	mux.HandleFunc("/vk-app/", vkAppHandler)
 
