@@ -66,7 +66,6 @@ func main() {
 		}
 
 		// Заголовки для работы в VK iframe
-		w.Header().Set("X-Frame-Options", "ALLOWALL")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
@@ -110,7 +109,6 @@ func main() {
 	// Альтернативный endpoint для VK Mini App без ограничений
 	mux.HandleFunc("/vk_app_embed/", func(w http.ResponseWriter, r *http.Request) {
 		// Максимально открытые заголовки для VK
-		w.Header().Set("X-Frame-Options", "ALLOWALL")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
