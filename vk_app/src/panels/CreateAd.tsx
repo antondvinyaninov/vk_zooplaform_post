@@ -115,7 +115,12 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
 
     // Async load thumbnails for videos
     items.forEach(async (item) => {
-      if (item.file.type.startsWith('video/')) {
+      const isVideo = item.file.type.startsWith('video/') || 
+                     item.file.name.toLowerCase().endsWith('.mp4') || 
+                     item.file.name.toLowerCase().endsWith('.mov') || 
+                     item.file.name.toLowerCase().endsWith('.qt');
+                     
+      if (isVideo) {
         const thumb = await getVideoThumbnail(item.file);
         if (thumb) {
           setFiles(prev => prev.map(p => p.file === item.file ? { ...p, thumbnail: thumb } : p));
@@ -149,8 +154,13 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
       const s3VideoKeys: string[] = [];
 
       for (const item of files) {
-        if (item.file.type.startsWith('video/')) {
-          const { upload_url, key } = await getS3VideoUploadUrl(item.file.name, item.file.type);
+        const isVideo = item.file.type.startsWith('video/') || 
+                       item.file.name.toLowerCase().endsWith('.mp4') || 
+                       item.file.name.toLowerCase().endsWith('.mov') || 
+                       item.file.name.toLowerCase().endsWith('.qt');
+                       
+        if (isVideo) {
+          const { upload_url, key } = await getS3VideoUploadUrl(item.file.name, item.file.type || 'video/mp4');
           await uploadVideoToS3(item.file, upload_url);
           s3VideoKeys.push(key);
         } else {
