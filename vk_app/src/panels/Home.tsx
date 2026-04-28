@@ -142,18 +142,25 @@ export const Home: FC<HomeProps> = ({ id }) => {
                     appearance="negative"
                     stretched
                     loading={deletingId === post.id}
-                    onClick={async () => {
-                      if (window.confirm('Вы уверены, что хотите удалить эту публикацию?')) {
-                        try {
-                          setDeletingId(post.id);
-                          await deletePost(post.id);
-                          setPosts(posts.filter(p => p.id !== post.id));
-                        } catch (e) {
-                          console.error('Failed to delete post:', e);
-                        } finally {
-                          setDeletingId(null);
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('vkui-alert', {
+                        detail: {
+                          title: 'Подтвердите действие',
+                          text: 'Вы уверены, что хотите удалить эту публикацию?',
+                          confirmText: 'Удалить',
+                          onConfirm: async () => {
+                            try {
+                              setDeletingId(post.id);
+                              await deletePost(post.id);
+                              setPosts(prev => prev.filter(p => p.id !== post.id));
+                            } catch (e) {
+                              console.error('Failed to delete post:', e);
+                            } finally {
+                              setDeletingId(null);
+                            }
+                          }
                         }
-                      }
+                      }));
                     }}
                   >
                     Удалить

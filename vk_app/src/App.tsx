@@ -2,7 +2,7 @@ import vkBridgeModule from '@vkontakte/vk-bridge';
 const vkBridge = (vkBridgeModule as any).send ? vkBridgeModule : (vkBridgeModule as any).default;
 import { useState, useEffect, ReactNode, lazy, Suspense } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
-import {
+import { Alert,
   View,
   SplitLayout,
   SplitCol,
@@ -198,6 +198,43 @@ export const App = () => {
     }
   }, [activePanel, routeNavigator]);
 
+  
+  useEffect(() => {
+    const handleAlert = (e: any) => {
+      setPopout(
+        <Alert
+          actions={[
+            {
+              title: e.detail.cancelText || 'Отмена',
+              
+              mode: 'cancel',
+              action: () => {
+                  if (e.detail.onCancel) e.detail.onCancel();
+                  setPopout(null);
+              }
+            },
+            {
+              title: e.detail.confirmText || 'ОК',
+              
+              mode: 'destructive',
+              action: () => {
+                  if (e.detail.onConfirm) e.detail.onConfirm();
+                  setPopout(null);
+              },
+            },
+          ]}
+          actionsLayout="horizontal"
+          onClose={() => setPopout(null)}
+          onClosed={() => {}}
+          title={e.detail.title}
+          description={e.detail.text}
+        />
+      );
+    };
+    window.addEventListener('vkui-alert', handleAlert);
+    return () => window.removeEventListener('vkui-alert', handleAlert);
+  }, []);
+
   const activeStory = getActiveStory(activePanel);
   const shouldShowTabbar =
     activePanel !== DEFAULT_VIEW_PANELS.ONBOARDING &&
@@ -227,7 +264,7 @@ export const App = () => {
 
   return (
     <>
-      <SplitLayout modal={modal}>
+      <SplitLayout modal={modal} popout={popout}>
         <SplitCol>
           <Suspense fallback={popout || <ScreenSpinner />}>
             <Epic
@@ -286,7 +323,6 @@ export const App = () => {
           </Suspense>
         </SplitCol>
       </SplitLayout>
-      {popout}
     </>
   );
 };
