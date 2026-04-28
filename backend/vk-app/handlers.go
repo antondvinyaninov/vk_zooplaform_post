@@ -943,11 +943,16 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 		}
 
 		if p.S3VideoKey != "" {
-			presignedURL, err := s3client.PresignGetURL(p.S3VideoKey, time.Hour*24)
-			if err != nil {
-				log.Printf("[populateAttachmentURLs] failed to presign S3 URL for %s: %v", p.S3VideoKey, err)
+			s3, err := s3client.New()
+			if err == nil {
+				presignedURL, err := s3.PresignGetURL(context.Background(), p.S3VideoKey, time.Hour*24)
+				if err != nil {
+					log.Printf("[populateAttachmentURLs] failed to presign S3 URL for %s: %v", p.S3VideoKey, err)
+				} else {
+					urls = append(urls, AttachmentURL{ID: "s3:" + p.S3VideoKey, Type: "s3_video", URL: presignedURL})
+				}
 			} else {
-				urls = append(urls, AttachmentURL{ID: "s3:" + p.S3VideoKey, Type: "s3_video", URL: presignedURL})
+				log.Printf("[populateAttachmentURLs] S3 not configured: %v", err)
 			}
 		}
 
