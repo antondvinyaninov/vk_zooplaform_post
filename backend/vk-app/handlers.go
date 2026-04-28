@@ -361,11 +361,15 @@ func postByIDHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(parts) == 1 {
-		if r.Method != http.MethodGet {
-			utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		if r.Method == http.MethodGet {
+			getPostByIDHandler(w, postID)
 			return
 		}
-		getPostByIDHandler(w, postID)
+		if r.Method == http.MethodDelete {
+			deletePostHandler(w, r, postID)
+			return
+		}
+		utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -1452,4 +1456,27 @@ func saveGroupTokenHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondSuccess(w, map[string]interface{}{
 		"group": groupToSettings(group),
 	})
+}
+
+
+func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
+	user, err := getCurrentUser(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	res, err := database.Exec("DELETE FROM posts WHERE id = ? AND user_id = ?", postID, user.ID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	
+	rowsAffected, _ := res.RowsAffected()
+	if rowsAffected == 0 {
+		utils.RespondError(w, http.StatusNotFound, "post not found or you are not the author")
+		return
+	}
+
+	utils.RespondSuccess(w, map[string]string{"status": "deleted"})
 }

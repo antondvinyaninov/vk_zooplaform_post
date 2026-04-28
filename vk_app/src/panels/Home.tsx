@@ -14,7 +14,7 @@ import {
 } from '@vkontakte/vkui';
 import { Icon28AddOutline, Icon56AddCircleOutline, Icon28PictureOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getMyPosts } from '../shared/api';
+import { getMyPosts, deletePost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export interface HomeProps extends NavIdProps {}
@@ -23,6 +23,7 @@ export const Home: FC<HomeProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     async function fetchPosts() {
@@ -140,8 +141,19 @@ export const Home: FC<HomeProps> = ({ id }) => {
                     mode="outline" 
                     appearance="negative"
                     stretched
-                    onClick={() => {
-                      alert('Удаление пока не реализовано');
+                    loading={deletingId === post.id}
+                    onClick={async () => {
+                      if (window.confirm('Вы уверены, что хотите удалить эту публикацию?')) {
+                        try {
+                          setDeletingId(post.id);
+                          await deletePost(post.id);
+                          setPosts(posts.filter(p => p.id !== post.id));
+                        } catch (e) {
+                          console.error('Failed to delete post:', e);
+                        } finally {
+                          setDeletingId(null);
+                        }
+                      }
                     }}
                   >
                     Удалить

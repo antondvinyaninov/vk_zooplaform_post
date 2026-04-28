@@ -163,6 +163,13 @@ export const getMyPosts = async () => {
   return fetchJSON<AppPost[]>(`${API_URL}/posts/my`);
 };
 
+
+export const deletePost = async (id: string | number) => {
+  return fetchJSON<void>(`${API_URL}/posts/${id}`, {
+    method: 'DELETE',
+  });
+};
+
 export const getPostById = async (id: string | number) => {
   return fetchJSON<AppPost>(`${API_URL}/posts/${id}`);
 };
