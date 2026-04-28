@@ -130,29 +130,35 @@ export const syncUserWithBackend = async (user: UserInfo, vkSignature?: string) 
   return response.json() as Promise<{ user: AppUser; viewerRole: string; groupId: number }>;
 };
 
-export const getVideoUploadUrl = async (fileName: string) => {
-  return fetchJSON<{ upload_url: string; video_id: string }>(
-    `${API_URL}/posts/video-upload-url?filename=${encodeURIComponent(fileName)}`
+export const getS3VideoUploadUrl = async (fileName: string, fileType: string) => {
+  return fetchJSON<{ upload_url: string; key: string }>(
+    `${API_URL}/upload/video-presign?filename=${encodeURIComponent(fileName)}&type=${encodeURIComponent(fileType || 'video/mp4')}`
   );
 };
 
-export const uploadVideoToVK = async (file: File, uploadUrl: string) => {
-  const formData = new FormData();
-  formData.append('video_file', file);
+export const uploadVideoToS3 = async (file: File, uploadUrl: string) => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl, true);
+    xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
 
-  const response = await fetch(uploadUrl, {
-    method: 'POST',
-    body: formData,
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(true);
+      } else {
+        reject(new Error(`S3 Video upload failed: ${xhr.status} ${xhr.responseText}`));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('S3 Video upload failed due to network error'));
+    };
+
+    xhr.send(file);
   });
-
-  if (!response.ok) {
-    throw new Error(`Video upload failed: ${response.status}`);
-  }
-  
-  return response.json();
 };
 
-export const createPost = async (message: string, files: File[] = [], videoIds: string[] = []) => {
+export const createPost = async (message: string, files: File[] = [], videoIds: string[] = [], s3VideoKeys: string[] = []) => {
   const formData = new FormData();
   formData.append('message', message);
   files.forEach((file) => {
@@ -160,6 +166,9 @@ export const createPost = async (message: string, files: File[] = [], videoIds: 
   });
   if (videoIds.length > 0) {
     formData.append('attachments', videoIds.join(','));
+  }
+  if (s3VideoKeys.length > 0) {
+    formData.append('s3_video_key', s3VideoKeys[0]); // Пока поддерживаем только 1 видео на S3
   }
 
   const vkSignature = getVKLaunchSignature();

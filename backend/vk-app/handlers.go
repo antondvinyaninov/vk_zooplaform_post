@@ -4,8 +4,10 @@ import (
 	"backend/config"
 	"backend/database"
 	"backend/models"
+	s3client "backend/s3"
 	"backend/utils"
 	"backend/vk"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -192,6 +194,9 @@ func videoUploadUrlHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	attachmentStr := fmt.Sprintf("video%d_%d", resp.OwnerID, resp.VideoID)
+	if resp.AccessKey != "" {
+		attachmentStr = fmt.Sprintf("video%d_%d_%s", resp.OwnerID, resp.VideoID, resp.AccessKey)
+	}
 
 	utils.RespondSuccess(w, map[string]interface{}{
 		"upload_url": resp.UploadURL,
@@ -351,6 +356,7 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		Message:     message,
 		Status:      "pending",
 		Attachments: string(attachmentsBytes),
+		S3VideoKey:  r.FormValue("s3_video_key"),
 	}
 	if err := createPost(post); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -541,6 +547,56 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 
 		client := vk.NewVKClient(token)
+
+		// Если есть S3 видео - скачиваем и загружаем в VK
+		if post.S3VideoKey != "" {
+			s3, err := s3client.New()
+			if err == nil {
+				log.Printf("[Moderate] Downloading S3 video: %s", post.S3VideoKey)
+				rc, _, err := s3.GetObject(context.Background(), post.S3VideoKey)
+				if err == nil {
+					tmpFile, err := os.CreateTemp("", "moderation_video_*.mp4")
+					if err == nil {
+						io.Copy(tmpFile, rc)
+						tmpPath := tmpFile.Name()
+						tmpFile.Close()
+						rc.Close()
+
+						// Загружаем в ВК
+						att, attURL, err := client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(post.S3VideoKey))
+						if err == nil {
+							attachments = append(attachments, att)
+							// Обновляем attachments в самом посте (чтобы сохранить URL если надо)
+							var oldParts []string
+							if post.Attachments != "" {
+								if strings.HasPrefix(post.Attachments, "[") {
+									json.Unmarshal([]byte(post.Attachments), &oldParts)
+								} else {
+									oldParts = strings.Split(post.Attachments, ",")
+								}
+							}
+							if attURL != "" {
+								oldParts = append(oldParts, att+"|"+attURL)
+							} else {
+								oldParts = append(oldParts, att)
+							}
+							newAtts, _ := json.Marshal(oldParts)
+							post.Attachments = string(newAtts)
+							
+							// Удаляем из S3 после успешной загрузки
+							go s3DeleteVideoKey(post.S3VideoKey)
+							post.S3VideoKey = "" // Очищаем ключ, он больше не нужен
+						} else {
+							log.Printf("[Moderate] VK UploadVideo error: %v", err)
+						}
+						os.Remove(tmpPath)
+					} else {
+						rc.Close()
+					}
+				}
+			}
+		}
+
 		// from_group=true: постим от имени группы (требует токена сообщества или токена админа с правами)
 		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, attachments, true, 0)
 		if err != nil {
@@ -566,6 +622,11 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	case "rejected":
 		post.Status = "rejected"
 		post.PublishDate = time.Time{}
+		// Удаляем видео из S3 при отклонении
+		if post.S3VideoKey != "" {
+			go s3DeleteVideoKey(post.S3VideoKey)
+			post.S3VideoKey = ""
+		}
 	default:
 		utils.RespondError(w, http.StatusBadRequest, "unsupported status")
 		return
@@ -836,6 +897,9 @@ func userFacingGroup(group *models.Group) *groupSummary {
 }
 
 func populateAttachmentURLs(posts []postResponse) []postResponse {
+	// Получаем токен один раз для всех видео-запросов
+	adminToken, tokenErr := getActiveVKToken()
+
 	for i, p := range posts {
 		if p.Attachments == "" {
 			continue
@@ -846,28 +910,41 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 		} else {
 			parts = strings.Split(p.Attachments, ",")
 		}
-		
+
 		var urls []AttachmentURL
 		for _, part := range parts {
 			idAndUrl := strings.SplitN(part, "|", 2)
-			id := idAndUrl[0]
-			var url string
-			if len(idAndUrl) > 1 {
-				url = idAndUrl[1]
+			id := strings.TrimSpace(idAndUrl[0])
+			if id == "" {
+				continue
 			}
-			
-			// Если URL пустой (старые посты), мы всё равно возвращаем ID
+			var mediaURL string
+			if len(idAndUrl) > 1 {
+				mediaURL = idAndUrl[1]
+			}
+
 			if strings.HasPrefix(id, "photo") {
-				urls = append(urls, AttachmentURL{ID: id, Type: "photo", URL: url})
+				urls = append(urls, AttachmentURL{ID: id, Type: "photo", URL: mediaURL})
 			} else if strings.HasPrefix(id, "video") {
-				urls = append(urls, AttachmentURL{ID: id, Type: "video", URL: url})
+				// Если URL превью ещё не сохранён — запрашиваем из VK
+				if mediaURL == "" && tokenErr == nil && adminToken != "" {
+					vkClient := vk.NewVKClient(adminToken)
+					thumb, err := vkClient.GetVideoThumbnail(id)
+					if err != nil {
+						log.Printf("[populateAttachmentURLs] video.get failed for %s: %v", id, err)
+					} else {
+						mediaURL = thumb
+					}
+				}
+				urls = append(urls, AttachmentURL{ID: id, Type: "video", URL: mediaURL})
 			}
 		}
 		posts[i].AttachmentURLs = urls
-		log.Printf("[populateAttachmentURLs] Post ID %d attachment parsed: %+v", p.ID, urls)
+		log.Printf("[populateAttachmentURLs] Post ID %d attachments: %+v", p.ID, urls)
 	}
 	return posts
 }
+
 
 func groupToSettings(group *models.Group) *groupSettingsResponse {
 	if group == nil {
@@ -1132,10 +1209,10 @@ func scanGroup(row *sql.Row) (*models.Group, error) {
 
 func createPost(post *models.Post) error {
 	if err := database.QueryRow(`
-		INSERT INTO posts (vk_post_id, user_id, group_id, message, attachments, status, publish_date)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO posts (vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.Status, nullableTime(post.PublishDate)).Scan(&post.ID); err != nil {
+	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.S3VideoKey, post.Status, nullableTime(post.PublishDate)).Scan(&post.ID); err != nil {
 		return err
 	}
 	now := time.Now()
@@ -1147,9 +1224,9 @@ func createPost(post *models.Post) error {
 func updatePost(post *models.Post) error {
 	_, err := database.Exec(`
 		UPDATE posts
-		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
+		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, s3_video_key = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.Status, nullableTime(post.PublishDate), post.ID)
+	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.S3VideoKey, post.Status, nullableTime(post.PublishDate), post.ID)
 	if err != nil {
 		return err
 	}
@@ -1159,7 +1236,7 @@ func updatePost(post *models.Post) error {
 
 func getPostByID(id int) (*models.Post, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
 		FROM posts WHERE id = ?
 	`, id)
 	return scanPost(row)
@@ -1167,7 +1244,7 @@ func getPostByID(id int) (*models.Post, error) {
 
 func getPostsByStatus(status string, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE status = ?
 		ORDER BY created_at DESC
@@ -1182,7 +1259,7 @@ func getPostsByStatus(status string, limit, offset int) ([]*models.Post, error) 
 
 func getPostsByUserID(userID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE user_id = ?
 		ORDER BY created_at DESC
@@ -1215,6 +1292,7 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 		publishDate sql.NullTime
 	)
 
+	var s3VideoKey sql.NullString
 	err := row.Scan(
 		&post.ID,
 		&dbVKPostID,
@@ -1222,6 +1300,7 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 		&post.GroupID,
 		&post.Message,
 		&post.Attachments,
+		&s3VideoKey,
 		&post.Status,
 		&publishDate,
 		&post.CreatedAt,
@@ -1232,6 +1311,9 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if s3VideoKey.Valid {
+		post.S3VideoKey = s3VideoKey.String
 	}
 	if dbUserID.Valid {
 		post.UserID = int(dbUserID.Int64)
@@ -1253,6 +1335,7 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 		publishDate sql.NullTime
 	)
 
+	var s3VideoKey sql.NullString
 	if err := rows.Scan(
 		&post.ID,
 		&dbVKPostID,
@@ -1260,6 +1343,7 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 		&post.GroupID,
 		&post.Message,
 		&post.Attachments,
+		&s3VideoKey,
 		&post.Status,
 		&publishDate,
 		&post.CreatedAt,
@@ -1273,6 +1357,9 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 	}
 	if dbVKPostID.Valid {
 		post.VKPostID = int(dbVKPostID.Int64)
+	}
+	if s3VideoKey.Valid {
+		post.S3VideoKey = s3VideoKey.String
 	}
 	if publishDate.Valid {
 		post.PublishDate = publishDate.Time
@@ -1555,4 +1642,71 @@ func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 
 	utils.RespondSuccess(w, map[string]string{"status": "deleted"})
+}
+
+// s3VideoPresignHandler генерирует presigned PUT URL для загрузки видео напрямую в S3.
+// GET /api/app/upload/video-presign?filename=video.mp4
+func s3VideoPresignHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodGet {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	_, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	// Генерируем уникальный ключ для видеофайла
+	filename := r.URL.Query().Get("filename")
+	contentType := r.URL.Query().Get("type")
+	if contentType == "" {
+		contentType = "video/mp4"
+	}
+	
+	key := fmt.Sprintf("pending-videos/%d_%s", time.Now().UnixNano(), filename)
+	if filename == "" {
+		key = fmt.Sprintf("pending-videos/%d.mp4", time.Now().UnixNano())
+	}
+
+	s3, err := s3client.New()
+	if err != nil {
+		log.Printf("[s3VideoPresignHandler] S3 not configured: %v", err)
+		utils.RespondError(w, http.StatusServiceUnavailable, "S3 storage not configured")
+		return
+	}
+
+	presignURL, err := s3.PresignPutURL(context.Background(), key, contentType, 15*time.Minute)
+	if err != nil {
+		log.Printf("[s3VideoPresignHandler] presign error: %v", err)
+		utils.RespondError(w, http.StatusInternalServerError, "failed to generate upload URL")
+		return
+	}
+
+	utils.RespondSuccess(w, map[string]string{
+		"upload_url": presignURL,
+		"key":        key,
+	})
+}
+
+// s3DeleteVideoKey удаляет видео из S3 (silent — ошибка не критична)
+func s3DeleteVideoKey(key string) {
+	if key == "" {
+		return
+	}
+	s3, err := s3client.New()
+	if err != nil {
+		log.Printf("[s3Delete] S3 not configured: %v", err)
+		return
+	}
+	if err := s3.DeleteObject(context.Background(), key); err != nil {
+		log.Printf("[s3Delete] failed to delete %s: %v", key, err)
+	} else {
+		log.Printf("[s3Delete] deleted %s from S3", key)
+	}
 }

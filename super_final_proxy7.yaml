@@ -1,0 +1,231 @@
+openapi: 3.0.0
+info:
+  title: VK Proxy
+  version: 1.0.0
+paths:
+  /vk-app/:
+    get:
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/vk-app/'
+  /{path+}:
+    options:
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-vk-sign
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/{path}'
+        method: OPTIONS
+        query:
+          '*': '*'
+        headers:
+          Origin: '{Origin}'
+          Content-Type: '{Content-Type}'
+          Accept: '{Accept}'
+          x-vk-sign: '{x-vk-sign}'
+          Authorization: '{Authorization}'
+    get:
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-vk-sign
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/{path}'
+        method: GET
+        query:
+          '*': '*'
+        headers:
+          Origin: '{Origin}'
+          Content-Type: '{Content-Type}'
+          Accept: '{Accept}'
+          x-vk-sign: '{x-vk-sign}'
+          Authorization: '{Authorization}'
+    post:
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-vk-sign
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/{path}'
+        method: POST
+        query:
+          '*': '*'
+        headers:
+          Origin: '{Origin}'
+          Content-Type: '{Content-Type}'
+          Accept: '{Accept}'
+          x-vk-sign: '{x-vk-sign}'
+          Authorization: '{Authorization}'
+    patch:
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-vk-sign
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/{path}'
+        method: PATCH
+        query:
+          '*': '*'
+        headers:
+          Origin: '{Origin}'
+          Content-Type: '{Content-Type}'
+          Accept: '{Accept}'
+          x-vk-sign: '{x-vk-sign}'
+          Authorization: '{Authorization}'
+    delete:
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-vk-sign
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Origin
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/{path}'
+        method: DELETE
+        query:
+          '*': '*'
+        headers:
+          Origin: '{Origin}'
+          Content-Type: '{Content-Type}'
+          Accept: '{Accept}'
+          x-vk-sign: '{x-vk-sign}'
+          Authorization: '{Authorization}'

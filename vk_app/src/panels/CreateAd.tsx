@@ -15,7 +15,7 @@ import {
 import { Icon24Camera, Icon28CancelCircleFillRed, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import bridge from '@vkontakte/vk-bridge';
-import { createPost, getVideoUploadUrl, uploadVideoToVK } from '../shared/api';
+import { createPost, getS3VideoUploadUrl, uploadVideoToS3 } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export const CreatePost: FC<NavIdProps> = ({ id }) => {
@@ -146,19 +146,19 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
       }
 
       const imagesToUpload: File[] = [];
-      const videoIds: string[] = [];
+      const s3VideoKeys: string[] = [];
 
       for (const item of files) {
         if (item.file.type.startsWith('video/')) {
-          const { upload_url, video_id } = await getVideoUploadUrl(item.file.name);
-          await uploadVideoToVK(item.file, upload_url);
-          videoIds.push(video_id);
+          const { upload_url, key } = await getS3VideoUploadUrl(item.file.name, item.file.type);
+          await uploadVideoToS3(item.file, upload_url);
+          s3VideoKeys.push(key);
         } else {
           imagesToUpload.push(await compressImage(item.file));
         }
       }
 
-      await createPost(text, imagesToUpload, videoIds);
+      await createPost(text, imagesToUpload, [], s3VideoKeys);
       routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`);
     } catch (error: any) {
       alert(`Ошибка при сохранении: ${error?.message || String(error)}`);

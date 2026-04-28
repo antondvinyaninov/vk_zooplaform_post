@@ -1,0 +1,368 @@
+# 🔍 Аудит проекта ZooPlatform (`vk_zooplatforma_post`)
+
+> **Репозиторий:** `antondvinyaninov/vk_zooplaform_post`  
+> **Дата аудита:** 2026-04-28  
+> **Продакшен:** `https://vk.zooplatforma.ru`  
+
+---
+
+## 1. Общая архитектура
+
+```
+  VK Mini App             Yandex API Gateway            Go Backend (port 80)
+  (vk_app/build)   ───── (super_final_proxy7.yaml) ──▶  vk.zooplatforma.ru
+                          proxy → vk.zooplatforma.ru
+                                                        ┌─────────────────────┐
+  Admin Panel        ──────────────────────────────────▶│ /api/admin/*        │
+  (frontadmin/dist)                                     │ /api/app/*          │
+                                                        │ /api/vk/*           │
+                                                        │ /api/callback       │
+                                                        │ /* (static files)   │
+                                                        └────────┬────────────┘
+                                                                 │
+                                                        PostgreSQL (удалённый)
+                                                        155.212.168.69:5596
+```
+
+**Ключевой нюанс со стороны VK:** Mini App хостится не напрямую на сервере, а через **Yandex API Gateway** (OpenAPI proxy). Это нужно для обхода ограничений VK на размер payload и для корректной передачи заголовков (`x-vk-sign`, `Authorization`).
+
+---
+
+## 2. Стек технологий
+
+| Слой | Технология | Версия |
+|------|-----------|--------|
+| **Backend** | Go | 1.24 (в Docker) |
+| **HTTP Router** | `net/http` (stdlib) | — |
+| **База данных** | PostgreSQL (pgx) | remote |
+| **VK Mini App** | React + VKUI | 18 + VKUI 8 |
+| **Admin Panel** | Astro + React + shadcn/ui | Astro 4 |
+| **VK Bridge** | `@vkontakte/vk-bridge` | 2.x |
+| **Routing (app)** | `@vkontakte/vk-mini-apps-router` | — |
+| **API Gateway** | Yandex Cloud API Gateway | OpenAPI 3.0 |
+| **Deploy** | Docker + Easypanel | Alpine Linux |
+| **CSS** | Tailwind CSS + shadcn (admin), VKUI токены (app) | — |
+
+---
+
+## 3. Структура модулей
+
+### 3.1 `backend/` — Go-сервер (монолит)
+
+```
+backend/
+├── main.go              # Точка входа, регистрация роутов, graceful shutdown
+├── admin/               # API для Admin Panel
+│   ├── routes.go        # /api/admin/* + /api/vk/*
+│   ├── handlers.go      # Основная логика (auth, посты, статистика)
+│   ├── groups.go        # Управление группами (подключение/отключение)
+│   ├── users.go         # Управление пользователями admin_users
+│   ├── vk_connection.go # Привязка VK-аккаунта (OAuth, токены)
+│   └── dashboard.go     # Статистика для дашборда
+├── vk-app/              # API для VK Mini App
+│   ├── routes.go        # /api/app/*
+│   ├── handlers.go      # Логика постов, групп, модерации (~1562 строк)
+│   └── callback.go      # Webhook для событий VK (messages, wall)
+├── vk/                  # Клиент VK API
+│   ├── client.go        # CallMethod, UploadPhotoToWall, UploadVideo, GetVideoUploadUrl
+│   ├── wall.go          # WallPost (публикация на стену)
+│   ├── groups.go        # GroupsGetByID
+│   ├── snippets.go      # GetSnippet
+│   └── callback_utils.go
+├── database/
+│   └── database.go      # Init (pgx), createTables, миграции, Exec/Query/QueryRow
+├── models/              # Go-структуры
+│   ├── post.go          # Post{ID, VKPostID, UserID, GroupID, Message, Attachments, Status, PublishDate}
+│   ├── group.go         # Group{VKGroupID, Name, ScreenName, AccessToken, IsActive, HealthStatus, ...}
+│   ├── user.go          # User{VKUserID, FirstName, LastName, Photo200, Role}
+│   └── admin_user.go    # AdminUser{Username, Password, DisplayName, Role, Status}
+├── middleware/          # Logger, CORS, Gzip
+├── config/              # Загрузка .env
+├── services/            # (пока минимален)
+├── site/                # /api/site/* (публичный API)
+└── utils/               # RespondSuccess, RespondError
+```
+
+**Ключевые особенности backend:**
+
+- **Один процесс Go** обслуживает всё: API + статику (frontadmin + vk_app).
+- **Статика** лежит в `/usr/share/nginx/html/` внутри Docker-контейнера.
+- VK Mini App доступен по `/vk-app/` и `/vk_app/` (оба варианта).
+- **Graceful shutdown** с игнорированием SIGQUIT (нужно для Easypanel).
+- **Фоновый cron** `admin.StartHealthCheckCron()` — периодически проверяет здоровье групп.
+
+---
+
+### 3.2 База данных (PostgreSQL)
+
+**Таблицы:**
+
+| Таблица | Назначение |
+|---------|-----------|
+| `groups` | Подключённые VK-группы (токены, статус, город, subscribers) |
+| `users` | VK-пользователи Mini App (vk_user_id, роль) |
+| `posts` | Посты (статусы: draft/pending/scheduled/published/rejected/failed) |
+| `admin_users` | Администраторы панели управления (login/password plaintext!) |
+| `vk_connection` | Legacy-таблица для хранения одного VK-токена |
+| `vk_accounts` | Актуальная таблица Standalone-токенов администраторов |
+| `group_stats_history` | История статистики групп (по дате) |
+
+**Важные паттерны:**
+- `getActiveVKToken()` — извлекает активный Standalone-токен из `vk_accounts`.
+- Attachments хранятся как JSON-массив строк в поле `posts.attachments`. Формат: `["photo-12345_67890|https://...", "video-12345_67890"]`.
+- Миграции выполняются при старте через `addColumnIfMissing`.
+
+---
+
+### 3.3 `vk_app/` — VK Mini App (React + VKUI 8)
+
+```
+vk_app/src/
+├── main.tsx             # Инициализация VK Bridge, парсинг launch params → window.vkLaunchParams
+├── App.tsx              # Root: SplitLayout + Epic + Tabbar + ModalRoot
+├── routes.ts            # DEFAULT_VIEW_PANELS enum
+├── AppConfig.tsx        # Конфигурация router
+├── panels/
+│   ├── Home.tsx         # Лента своих постов (getMyPosts)
+│   ├── CreateAd.tsx     # Создание поста (текст + медиа: фото/видео)
+│   ├── Moderation.tsx   # Очередь постов на модерацию (для admins/moderators)
+│   ├── ModerationModal.tsx  # Модал: одобрить/запланировать/отклонить
+│   ├── AdDetail.tsx     # Детальный просмотр поста
+│   ├── Profile.tsx      # Профиль пользователя
+│   ├── CommunitySettings.tsx  # Настройки группы (название, город, уведомления)
+│   └── Onboarding.tsx   # Экран при запуске без group_id
+└── shared/
+    └── api.ts           # Все API-запросы к backend
+```
+
+**Навигация:**
+
+```
+/ (нет group_id) → /onboarding
+/home            → Лента своих постов
+/create_post     → Форма создания поста
+/profile         → Профиль
+/moderation      → Модерация (для admins)
+/community_settings → Настройки сообщества
+/post_detail/:id → Детали поста
+```
+
+**Авторизация:** VK Bridge `VKWebAppGetUserInfo` + launch params (`vk_user_id`, `vk_group_id`, `vk_viewer_group_role`). Все API-запросы несут `x-vk-sign` (строка VK-параметров) и `Authorization: Bearer {vkSign}`.
+
+**API URL:** При запуске внутри VK (`vk-apps.com`) использует Yandex API Gateway URL, иначе — относительный `/api/app`.
+
+---
+
+### 3.4 `frontadmin/` — Admin Panel (Astro + React + shadcn/ui)
+
+```
+frontadmin/src/
+├── pages/
+│   ├── index.astro       # Главная / Login
+│   ├── dashboard.astro   # Дашборд
+│   ├── groups.astro      # Управление группами
+│   ├── posts.astro       # Посты
+│   └── settings.astro    # Настройки
+├── components/
+│   ├── app-sidebar.tsx   # Боковое меню (shadcn Sidebar)
+│   ├── classic-dashboard.tsx  # Дашборд-компонент
+│   ├── vk-connect-card.tsx    # Привязка VK-аккаунта
+│   ├── users-management-card.tsx  # Управление пользователями
+│   ├── section-cards.tsx      # Карточки статистики
+│   ├── data-table.tsx         # Таблица постов (shadcn)
+│   ├── groups/
+│   │   ├── groups-table.tsx   # Таблица подключённых групп
+│   │   └── groups-stats-chart.tsx  # График статистики групп
+│   └── ui/               # shadcn компоненты
+├── layouts/              # Astro layouts
+├── hooks/                # React hooks
+├── lib/                  # Утилиты
+└── styles/               # CSS переменные
+```
+
+**Технологический стек:** Astro 4.0 (SSG/SSR) + React 18 (islands) + Tailwind CSS + shadcn/ui + SWR для data fetching.
+
+---
+
+### 3.5 `super_final_proxy7.yaml` — Yandex API Gateway
+
+OpenAPI 3.0 proxy-конфигурация, которая перенаправляет все HTTP-методы (GET, POST, PATCH, DELETE, OPTIONS) с Yandex Cloud endpoint (`d5dm8lfd2hhhn5plloht.p8361f8z.apigw.yandexcloud.net`) на продакшен-сервер (`vk.zooplatforma.ru`).
+
+**Зачем:** VK Mini Apps работают внутри iframe VK, который требует HTTPS и блокирует прямые запросы к серверу. API Gateway обеспечивает:
+1. HTTPS терминацию от Yandex
+2. Пробрасывание заголовков `x-vk-sign`, `Authorization`
+3. Wildcard `/{path+}` для всех маршрутов backend
+
+---
+
+## 4. Ключевые потоки данных
+
+### 4.1 Создание поста
+```
+User → CreateAd.tsx
+  ├─ Если видео: getVideoUploadUrl() → /api/app/posts/video-upload-url
+  │              uploadVideoToVK() → прямо на VK upload URL
+  │              → возвращает video_id (attachment string)
+  └─ createPost(message, files, videoIds) → POST /api/app/posts
+     ├─ Backend: parseLaunchContext (vk_user_id, vk_group_id)
+     ├─ Backend: ensureGroup (upsert в БД)
+     ├─ Backend: getUserByVKUserID
+     ├─ Backend: UploadPhotoToWall (для фото)
+     ├─ Backend: POST в БД (status=pending)
+     ├─ Backend: VK callback-уведомление юзеру + модераторам
+     └─ Response → Home.tsx (список постов)
+```
+
+### 4.2 Модерация
+```
+Moderation.tsx → getFeedPosts('pending')
+  → Модератор выбирает действие (ModerationModal)
+  → moderatePost(id, 'published'|'rejected'|'scheduled')
+  → PATCH /api/app/posts/:id/moderate
+     ├─ Backend: isModerator(GroupRole) check
+     ├─ Если published: getActiveVKToken()
+     │                  client.WallPost(group, message, attachments, fromGroup=true)
+     │                  → VK wall.post
+     ├─ Backend: updatePost (status, vk_post_id)
+     └─ VK notifications
+```
+
+### 4.3 Авторизация Admin Panel
+```
+Admin → POST /api/admin/auth/login (username/password)
+→ Backend: SELECT FROM admin_users
+→ Plaintext compare (⚠️ нет хеширования)
+→ Ответ с user данными
+```
+
+---
+
+## 5. API Endpoints (сводка)
+
+### VK Mini App API (`/api/app/`)
+
+| Method | Path | Описание |
+|--------|------|----------|
+| GET | `/api/app/health` | Health check |
+| GET | `/api/app/config` | VK app IDs |
+| GET | `/api/app/users/me` | Sync/upsert пользователя |
+| GET/POST | `/api/app/posts` | Список постов / создание поста |
+| GET | `/api/app/posts/video-upload-url` | URL для прямой загрузки видео в VK |
+| GET | `/api/app/posts/my` | Посты текущего пользователя |
+| GET/DELETE/PATCH | `/api/app/posts/:id` | Пост по ID, удалить, модерировать |
+| GET/PATCH | `/api/app/groups/me` | Настройки группы |
+| GET | `/api/app/groups/me/managers` | Менеджеры группы |
+| POST | `/api/app/groups/token` | Сохранить токен группы |
+| POST | `/api/callback` | VK Callback Webhook |
+
+### Admin API (`/api/admin/`)
+
+| Method | Path | Описание |
+|--------|------|----------|
+| POST | `/api/admin/auth/login` | Вход |
+| GET/POST | `/api/admin/users` | Список пользователей |
+| GET | `/api/admin/groups/installed` | Установленные группы |
+| POST | `/api/admin/groups/disconnect` | Отключить группу |
+| GET | `/api/admin/groups/all` | Все группы |
+| POST | `/api/admin/groups/health/refresh` | Обновить health статус |
+| GET | `/api/admin/dashboard/stats` | Статистика дашборда |
+| GET/POST | `/api/admin/vk/connection` | VK аккаунт |
+| GET/POST | `/api/settings/snippet` | Сниппеты |
+
+### Legacy VK API (`/api/vk/`)
+
+| Method | Path | Описание |
+|--------|------|----------|
+| POST | `/api/vk/post` | Публикация поста |
+| POST | `/api/vk/groups` | Группы пользователя |
+| GET | `/api/vk/oauth/callback` | OAuth callback |
+| POST | `/api/vk/oauth/token` | OAuth token exchange |
+
+---
+
+## 6. Деплой и инфраструктура
+
+### Docker (multi-stage build)
+1. `node:20-alpine` → сборка `vk_app/` → `build/`
+2. `golang:1.24-alpine` → сборка `backend/` → `main`
+3. `node:22-alpine` → сборка `frontadmin/` → `dist/`
+4. `alpine:latest` — финальный образ:
+   - `/app/backend/main` — бинарник Go
+   - `/usr/share/nginx/html/` — frontadmin статика
+   - `/usr/share/nginx/html/vk_app/` — VK Mini App статика
+
+### Переменные окружения (в Dockerfile — **хардкод!**)
+```
+DATABASE_URL=postgres://...@155.212.168.69:5596/vkpet
+VK_CLIENT_ID=54481712          # Standalone App (для постинга)
+VK_MINI_APP_ID=54560047        # Mini App ID
+PORT=80                         # Хардкод в main.go тоже
+```
+
+> ⚠️ **Секреты захардкожены прямо в Dockerfile** — потенциальная проблема безопасности.
+
+---
+
+## 7. Правила и соглашения проекта (`.agent/AGENT_RULES.md`)
+
+- **Токены групп запрещены** для VK API вызовов. Только Standalone-токен из `vk_accounts`.
+- **`getActiveVKToken()`** — единственный способ получить токен для API.
+- **Документацию `docs/`** обновлять при изменении схемы, роутов, переменных.
+- **Инициатива без одобрения** — запрещена.
+- **VKUI токены** (`var(--vkui--...)`) — для стилизации в Mini App.
+
+---
+
+## 8. Текущее состояние и известные особенности
+
+### ✅ Что работает
+- Полный цикл: создание поста → модерация → публикация в VK
+- Загрузка фото (через backend) и видео (прямая загрузка из браузера)
+- Admin Panel: реальные данные из БД (группы, пользователи, статистика)
+- VK notifications через Callback API
+- Health check cron для групп
+- CI/CD через GitHub → Easypanel
+
+### ⚠️ Известные ограничения
+| Проблема | Описание |
+|----------|----------|
+| **Пароли в plaintext** | `admin_users` хранит пароли без хеширования |
+| **Секреты в Dockerfile** | DATABASE_URL, токены — хардкод в image |
+| **`docs/` устарела** | DEVELOPMENT.md упоминает SQLite, хотя БД давно PostgreSQL |
+| **`docs/ROUTES.md` устарел** | Описывает Python Flask сервис, которого нет |
+| **Legacy `vk_connection`** | Дублирует функционал `vk_accounts` |
+| **handlers.go (~1562 строк)** | Слишком большой файл, нужна декомпозиция |
+| **No tests** | Нет тестов ни на Go, ни на TypeScript |
+| **Attachments формат** | Хранится как JSON-строка в TEXT поле, не нормализовано |
+
+### 🚀 Roadmap (из ARCHITECTURE.md)
+- Миграция кэширования на Redis
+- Очереди для отложенной публикации
+- Горизонтальное масштабирование
+- Метрики времени ответа API
+
+---
+
+## 9. VK App — Workflows / Панели
+
+| Панель | URL | Доступ | Описание |
+|--------|-----|--------|----------|
+| Home | `/home` | Все | Лента своих постов с превью медиа |
+| CreateAd | `/create_post` | Все | Форма с медиа-галереей |
+| Moderation | `/moderation` | admin/moderator | Очередь pending постов |
+| Profile | `/profile` | Все | Данные пользователя + роль |
+| CommunitySettings | `/community_settings` | admin | Имя, город, уведомления |
+| Onboarding | `/onboarding` | Все (без group_id) | Инструкция по добавлению |
+| AdDetail | `/post_detail/:id` | Все | Детали поста |
+
+---
+
+## 10. Сводка файлов по открытым вкладкам
+
+| Файл | Роль |
+|------|------|
+| `vk_app/src/shared/api.ts` | Все API-функции Mini App |
+| `backend/vk/client.go` | VK API клиент (фото, видео, wall, callback) |
+| `vk_app/src/panels/Home.tsx` | Главный экран Mini App |
+| `frontadmin/src/components/groups/groups-table.tsx` | Таблица групп в Admin Panel |
+| `backend/vk-app/handlers.go` | Весь backend VK Mini App |

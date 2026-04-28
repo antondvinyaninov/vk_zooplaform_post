@@ -111,6 +111,7 @@ const postgresSchema = `
 		group_id BIGINT,
 		message TEXT,
 		attachments TEXT,
+		s3_video_key TEXT,
 		status TEXT DEFAULT 'draft',
 		publish_date TIMESTAMPTZ,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -198,6 +199,10 @@ func migratePostsTable() error {
 		return err
 	}
 	if _, err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id)`); err != nil {
+		return err
+	}
+	// S3 pre-moderation video storage
+	if err := addColumnIfMissing("posts", "s3_video_key", "TEXT"); err != nil {
 		return err
 	}
 	return nil

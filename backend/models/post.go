@@ -10,6 +10,7 @@ type Post struct {
 	GroupID     int       `json:"group_id"`
 	Message     string    `json:"message"`
 	Attachments string    `json:"attachments,omitempty"`
+	S3VideoKey  string    `json:"s3_video_key,omitempty"`
 	Status      string    `json:"status"` // pending, scheduled, published, rejected, failed
 	PublishDate time.Time `json:"publish_date,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`

@@ -18,8 +18,8 @@ func NewPostService() *PostService {
 // Create создает новый пост в БД
 func (s *PostService) Create(post *models.Post) error {
 	query := `
-		INSERT INTO posts (vk_post_id, user_id, group_id, message, attachments, status, publish_date)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO posts (vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	if err := database.QueryRow(query+` RETURNING id`,
 		post.VKPostID,
@@ -27,6 +27,7 @@ func (s *PostService) Create(post *models.Post) error {
 		post.GroupID,
 		post.Message,
 		post.Attachments,
+		post.S3VideoKey,
 		post.Status,
 		post.PublishDate,
 	).Scan(&post.ID); err != nil {
@@ -41,7 +42,7 @@ func (s *PostService) Create(post *models.Post) error {
 // GetByID получает пост по ID
 func (s *PostService) GetByID(id int) (*models.Post, error) {
 	query := `
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE id = ?
 	`
@@ -50,6 +51,8 @@ func (s *PostService) GetByID(id int) (*models.Post, error) {
 	var userID sql.NullInt64
 	var publishDate sql.NullTime
 
+	var s3VideoKey sql.NullString
+
 	err := database.QueryRow(query, id).Scan(
 		&post.ID,
 		&post.VKPostID,
@@ -57,6 +60,7 @@ func (s *PostService) GetByID(id int) (*models.Post, error) {
 		&post.GroupID,
 		&post.Message,
 		&post.Attachments,
+		&s3VideoKey,
 		&post.Status,
 		&publishDate,
 		&post.CreatedAt,
@@ -76,6 +80,9 @@ func (s *PostService) GetByID(id int) (*models.Post, error) {
 	if userID.Valid {
 		post.UserID = int(userID.Int64)
 	}
+	if s3VideoKey.Valid {
+		post.S3VideoKey = s3VideoKey.String
+	}
 
 	return post, nil
 }
@@ -83,7 +90,7 @@ func (s *PostService) GetByID(id int) (*models.Post, error) {
 // GetByGroupID получает посты группы
 func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Post, error) {
 	query := `
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE group_id = ?
 		ORDER BY created_at DESC
@@ -102,6 +109,8 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 		var userID sql.NullInt64
 		var publishDate sql.NullTime
 
+		var s3VideoKey sql.NullString
+
 		err := rows.Scan(
 			&post.ID,
 			&post.VKPostID,
@@ -109,6 +118,7 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 			&post.GroupID,
 			&post.Message,
 			&post.Attachments,
+			&s3VideoKey,
 			&post.Status,
 			&publishDate,
 			&post.CreatedAt,
@@ -124,6 +134,9 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 		if userID.Valid {
 			post.UserID = int(userID.Int64)
 		}
+		if s3VideoKey.Valid {
+			post.S3VideoKey = s3VideoKey.String
+		}
 
 		posts = append(posts, post)
 	}
@@ -134,7 +147,7 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 // GetByStatus получает посты по статусу
 func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.Post, error) {
 	query := `
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE status = ?
 		ORDER BY created_at DESC
@@ -153,6 +166,8 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 		var userID sql.NullInt64
 		var publishDate sql.NullTime
 
+		var s3VideoKey sql.NullString
+
 		err := rows.Scan(
 			&post.ID,
 			&post.VKPostID,
@@ -160,6 +175,7 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 			&post.GroupID,
 			&post.Message,
 			&post.Attachments,
+			&s3VideoKey,
 			&post.Status,
 			&publishDate,
 			&post.CreatedAt,
@@ -175,6 +191,9 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 		if userID.Valid {
 			post.UserID = int(userID.Int64)
 		}
+		if s3VideoKey.Valid {
+			post.S3VideoKey = s3VideoKey.String
+		}
 
 		posts = append(posts, post)
 	}
@@ -185,7 +204,7 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 // GetByUserID получает посты пользователя
 func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post, error) {
 	query := `
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
 		FROM posts
 		WHERE user_id = ?
 		ORDER BY created_at DESC
@@ -204,6 +223,8 @@ func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post
 		var dbUserID sql.NullInt64
 		var publishDate sql.NullTime
 
+		var s3VideoKey sql.NullString
+
 		err := rows.Scan(
 			&post.ID,
 			&post.VKPostID,
@@ -211,6 +232,7 @@ func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post
 			&post.GroupID,
 			&post.Message,
 			&post.Attachments,
+			&s3VideoKey,
 			&post.Status,
 			&publishDate,
 			&post.CreatedAt,
@@ -226,6 +248,9 @@ func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post
 		if publishDate.Valid {
 			post.PublishDate = publishDate.Time
 		}
+		if s3VideoKey.Valid {
+			post.S3VideoKey = s3VideoKey.String
+		}
 
 		posts = append(posts, post)
 	}
@@ -237,7 +262,7 @@ func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post
 func (s *PostService) Update(post *models.Post) error {
 	query := `
 		UPDATE posts
-		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
+		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, s3_video_key = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
 	_, err := database.Exec(query,
@@ -246,6 +271,7 @@ func (s *PostService) Update(post *models.Post) error {
 		post.GroupID,
 		post.Message,
 		post.Attachments,
+		post.S3VideoKey,
 		post.Status,
 		post.PublishDate,
 		post.ID,

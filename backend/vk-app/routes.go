@@ -20,6 +20,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/app/groups/me/managers", middleware.CORSFunc(groupManagersHandler))
 	mux.HandleFunc("/api/app/groups/token", middleware.CORSFunc(saveGroupTokenHandler))
 	mux.HandleFunc("/api/app/cities", middleware.CORSFunc(citiesHandler))
+	mux.HandleFunc("/api/app/upload/video-presign", middleware.CORSFunc(s3VideoPresignHandler))
 
 	// Webhook для получения событий от ВКонтакте
 	mux.HandleFunc("/api/callback", callbackHandler)
