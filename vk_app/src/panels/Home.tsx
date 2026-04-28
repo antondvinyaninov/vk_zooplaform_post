@@ -84,27 +84,48 @@ export const Home: FC<HomeProps> = ({ id }) => {
                   {/* Изображение */}
                   {post.attachment_urls?.[0]?.url && (() => {
                     const firstAtt = post.attachment_urls[0];
-                    const isVideo = firstAtt.type === 'video' || firstAtt.url.includes('.mp4') || firstAtt.url.includes('.mov');
+                    const isS3Video = firstAtt.type === 's3_video' || firstAtt.url.includes('.mp4') || firstAtt.url.includes('.mov');
+                    const isVKVideo = firstAtt.type === 'vk_video' || firstAtt.type === 'video';
+                    
                     return (
-                    <div style={{ 
-                      width: 80, 
-                      height: 80, 
-                      flexShrink: 0, 
-                      borderRadius: 8, 
-                      overflow: 'hidden', 
-                      backgroundColor: 'var(--vkui--color_background_secondary)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative'
-                    }}>
-                      {isVideo ? (
+                    <div 
+                      onClick={() => {
+                        if (isVKVideo) {
+                           window.open(`https://vk.com/${firstAtt.id}`, '_blank');
+                        }
+                      }}
+                      style={{ 
+                        width: 80, 
+                        height: 80, 
+                        flexShrink: 0, 
+                        borderRadius: 8, 
+                        overflow: 'hidden', 
+                        backgroundColor: 'var(--vkui--color_background_secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        cursor: isVKVideo ? 'pointer' : 'default'
+                      }}
+                    >
+                      {isS3Video ? (
                         <>
                           <video 
                             src={firstAtt.url} 
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                             muted
                             playsInline
+                          />
+                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />
+                          </div>
+                        </>
+                      ) : isVKVideo ? (
+                        <>
+                          <img 
+                            src={firstAtt.url} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            alt="VK Видео"
                           />
                           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />

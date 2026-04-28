@@ -116,14 +116,28 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
                         <div style={{ fontSize: 13, color: '#818c99', marginBottom: 6 }}>Прикрепленные медиа:</div>
                         <HorizontalScroll showArrows getScrollToLeft={(i) => i - 120} getScrollToRight={(i) => i + 120}>
                           <div style={{ display: 'flex', gap: 8 }}>
-                            {post.attachment_urls.map((att, i) => (
-                              <a key={i} href={`https://vk.com/${att.id}`} target="_blank" rel="noreferrer" style={{ position: 'relative', width: 80, height: 80, flexShrink: 0, display: 'block' }}>
-                                <img 
-                                  src={att.url} 
-                                  style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
-                                  alt={`attachment-${i}`}
-                                />
-                                {att.type === 'video' && (
+                            {post.attachment_urls.map((att, i) => {
+                              const isS3Video = att.type === 's3_video' || att.url.includes('.mp4') || att.url.includes('.mov');
+                              const isVKVideo = att.type === 'vk_video' || att.type === 'video';
+                              const href = att.id.startsWith('s3:') ? att.url : `https://vk.com/${att.id}`;
+                              
+                              return (
+                              <a key={i} href={href} target="_blank" rel="noreferrer" style={{ position: 'relative', width: 80, height: 80, flexShrink: 0, display: 'block' }}>
+                                {isS3Video ? (
+                                  <video 
+                                    src={att.url} 
+                                    style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
+                                    muted
+                                    playsInline
+                                  />
+                                ) : (
+                                  <img 
+                                    src={att.url} 
+                                    style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
+                                    alt={`attachment-${i}`}
+                                  />
+                                )}
+                                {(isS3Video || isVKVideo) && (
                                   <div style={{ 
                                     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
                                     backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, 
@@ -133,7 +147,8 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
                                   </div>
                                 )}
                               </a>
-                            ))}
+                              );
+                            })}
                           </div>
                         </HorizontalScroll>
                       </Div>

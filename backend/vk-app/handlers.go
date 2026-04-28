@@ -38,6 +38,7 @@ type postResponse struct {
 	Author      *userSummary  `json:"author,omitempty"`
 	PublishDate    *string         `json:"publish_date,omitempty"`
 	Attachments    string          `json:"attachments,omitempty"`
+	S3VideoKey     string          `json:"s3_video_key,omitempty"`
 	AttachmentURLs []AttachmentURL `json:"attachment_urls,omitempty"`
 	CreatedAt      string          `json:"created_at"`
 	UpdatedAt      string          `json:"updated_at"`
@@ -866,6 +867,7 @@ func serializePost(post *models.Post) (postResponse, error) {
 		Status:      post.Status,
 		VKPostID:    post.VKPostID,
 		Attachments: post.Attachments,
+		S3VideoKey:  post.S3VideoKey,
 		CreatedAt:   post.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   post.UpdatedAt.Format(time.RFC3339),
 	}
@@ -901,44 +903,54 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 	adminToken, tokenErr := getActiveVKToken()
 
 	for i, p := range posts {
-		if p.Attachments == "" {
-			continue
-		}
-		var parts []string
-		if strings.HasPrefix(p.Attachments, "[") {
-			json.Unmarshal([]byte(p.Attachments), &parts)
-		} else {
-			parts = strings.Split(p.Attachments, ",")
-		}
-
 		var urls []AttachmentURL
-		for _, part := range parts {
-			idAndUrl := strings.SplitN(part, "|", 2)
-			id := strings.TrimSpace(idAndUrl[0])
-			if id == "" {
-				continue
-			}
-			var mediaURL string
-			if len(idAndUrl) > 1 {
-				mediaURL = idAndUrl[1]
+
+		if p.Attachments != "" {
+			var parts []string
+			if strings.HasPrefix(p.Attachments, "[") {
+				json.Unmarshal([]byte(p.Attachments), &parts)
+			} else {
+				parts = strings.Split(p.Attachments, ",")
 			}
 
-			if strings.HasPrefix(id, "photo") {
-				urls = append(urls, AttachmentURL{ID: id, Type: "photo", URL: mediaURL})
-			} else if strings.HasPrefix(id, "video") {
-				// Если URL превью ещё не сохранён — запрашиваем из VK
-				if mediaURL == "" && tokenErr == nil && adminToken != "" {
-					vkClient := vk.NewVKClient(adminToken)
-					thumb, err := vkClient.GetVideoThumbnail(id)
-					if err != nil {
-						log.Printf("[populateAttachmentURLs] video.get failed for %s: %v", id, err)
-					} else {
-						mediaURL = thumb
-					}
+			for _, part := range parts {
+				idAndUrl := strings.SplitN(part, "|", 2)
+				id := strings.TrimSpace(idAndUrl[0])
+				if id == "" {
+					continue
 				}
-				urls = append(urls, AttachmentURL{ID: id, Type: "video", URL: mediaURL})
+				var mediaURL string
+				if len(idAndUrl) > 1 {
+					mediaURL = idAndUrl[1]
+				}
+
+				if strings.HasPrefix(id, "photo") {
+					urls = append(urls, AttachmentURL{ID: id, Type: "photo", URL: mediaURL})
+				} else if strings.HasPrefix(id, "video") {
+					// Если URL превью ещё не сохранён — запрашиваем из VK
+					if mediaURL == "" && tokenErr == nil && adminToken != "" {
+						vkClient := vk.NewVKClient(adminToken)
+						thumb, err := vkClient.GetVideoThumbnail(id)
+						if err != nil {
+							log.Printf("[populateAttachmentURLs] video.get failed for %s: %v", id, err)
+						} else {
+							mediaURL = thumb
+						}
+					}
+					urls = append(urls, AttachmentURL{ID: id, Type: "vk_video", URL: mediaURL})
+				}
 			}
 		}
+
+		if p.S3VideoKey != "" {
+			presignedURL, err := s3client.PresignGetURL(p.S3VideoKey, time.Hour*24)
+			if err != nil {
+				log.Printf("[populateAttachmentURLs] failed to presign S3 URL for %s: %v", p.S3VideoKey, err)
+			} else {
+				urls = append(urls, AttachmentURL{ID: "s3:" + p.S3VideoKey, Type: "s3_video", URL: presignedURL})
+			}
+		}
+
 		posts[i].AttachmentURLs = urls
 		log.Printf("[populateAttachmentURLs] Post ID %d attachments: %+v", p.ID, urls)
 	}

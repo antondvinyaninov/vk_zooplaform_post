@@ -18,7 +18,8 @@ import {
 import { 
   Icon28CalendarOutline,
   Icon28NewsfeedOutline,
-  Icon56ErrorOutline
+  Icon56ErrorOutline,
+  Icon28VideoOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { getPostById } from '../shared/api';
@@ -93,23 +94,42 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
           {post.attachment_urls && post.attachment_urls.length > 0 && (
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {post.attachment_urls.map((attachment: any, index: number) => {
-                const isVideo = attachment.type === 'video' || attachment.url.includes('.mp4') || attachment.url.includes('.mov');
-                return isVideo ? (
-                  <video 
-                    key={index} 
-                    src={attachment.url} 
-                    controls 
-                    playsInline
-                    style={{ width: '100%', borderRadius: 8, objectFit: 'cover' }} 
-                  />
-                ) : (
-                  <img 
-                    key={index} 
-                    src={attachment.url} 
-                    alt={`Медиа ${index + 1}`}
-                    style={{ width: '100%', borderRadius: 8, objectFit: 'cover' }} 
-                  />
-                );
+                const isS3Video = attachment.type === 's3_video' || attachment.url.includes('.mp4') || attachment.url.includes('.mov');
+                const isVKVideo = attachment.type === 'vk_video' || attachment.type === 'video';
+
+                if (isS3Video) {
+                  return (
+                    <video 
+                      key={index} 
+                      src={attachment.url} 
+                      controls 
+                      playsInline
+                      style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid #e1e3e6' }} 
+                    />
+                  );
+                } else if (isVKVideo) {
+                  return (
+                    <div key={index} style={{ position: 'relative', width: '100%', cursor: 'pointer' }} onClick={() => window.open(`https://vk.com/${attachment.id}`, '_blank')}>
+                      <img 
+                        src={attachment.url} 
+                        alt={`Видео ${index + 1}`}
+                        style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid #e1e3e6', display: 'block' }} 
+                      />
+                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon28VideoOutline width={48} height={48} style={{ color: 'white' }} />
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <img 
+                      key={index} 
+                      src={attachment.url} 
+                      alt={`Фото ${index + 1}`}
+                      style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid #e1e3e6' }} 
+                    />
+                  );
+                }
               })}
             </div>
           )}
