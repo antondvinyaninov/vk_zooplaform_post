@@ -276,7 +276,7 @@ func vkGetGroupsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		var filteredItems []vk.GroupItem
+		var filteredItems []vk.Group
 		for _, g := range groups.Items {
 			if installedGroups[g.ID] {
 				filteredItems = append(filteredItems, g)
