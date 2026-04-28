@@ -22,7 +22,7 @@ function handleModuleDirectivesPlugin() {
  * The details are here: https://dev.vk.ru/mini-apps/development/on-demand-resources.
  */
 export default defineConfig({
-  base: '/vk_app/',
+  base: './',
 
   plugins: [
     react(),
