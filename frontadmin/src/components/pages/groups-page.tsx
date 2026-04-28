@@ -1,6 +1,5 @@
 import { IconHeartbeat, IconRefresh } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
-import { GroupsStatsChart } from "@/components/groups/groups-stats-chart"
 import { GroupsTable } from "@/components/groups/groups-table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -28,9 +27,6 @@ export function GroupsPage() {
             </Button>
           </div>
         </div>
-
-        {/* Interactive Stats Chart */}
-        <GroupsStatsChart />
 
         {/* Groups Data Table */}
         <div className="mt-4">
