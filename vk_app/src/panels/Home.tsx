@@ -153,8 +153,15 @@ export const Home: FC<HomeProps> = ({ id }) => {
                               setDeletingId(post.id);
                               await deletePost(post.id);
                               setPosts(prev => prev.filter(p => p.id !== post.id));
-                            } catch (e) {
+                            } catch (e: any) {
                               console.error('Failed to delete post:', e);
+                              window.dispatchEvent(new CustomEvent('vkui-alert', {
+                                detail: {
+                                  title: 'Ошибка',
+                                  text: e.message || 'Не удалось удалить пост',
+                                  confirmText: 'ОК'
+                                }
+                              }));
                             } finally {
                               setDeletingId(null);
                             }
