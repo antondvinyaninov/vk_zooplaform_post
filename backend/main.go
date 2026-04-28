@@ -88,7 +88,10 @@ func main() {
 		if strings.Contains(filePath, "/assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		} else {
-			w.Header().Set("Cache-Control", "public, max-age=3600")
+			// Отключаем кэширование для index.html, чтобы всегда отдавать актуальную версию бандла
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
 		}
 
 		http.ServeFile(w, r, filePath)
@@ -114,7 +117,9 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
 
 		// Всегда возвращаем index.html для этого endpoint
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
 		http.ServeFile(w, r, "/usr/share/nginx/html/vk_app/index.html")
 	})
 
@@ -124,6 +129,9 @@ func main() {
 	// Главная страница
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
 			http.ServeFile(w, r, "/usr/share/nginx/html/index.html")
 			return
 		}
@@ -132,6 +140,7 @@ func main() {
 		if !strings.Contains(r.URL.Path, ".") && !strings.HasPrefix(r.URL.Path, "/api/") {
 			pagePath := "/usr/share/nginx/html/pages" + r.URL.Path + ".html"
 			if _, err := os.Stat(pagePath); err == nil {
+				w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 				http.ServeFile(w, r, pagePath)
 				return
 			}
@@ -144,7 +153,7 @@ func main() {
 			if strings.HasPrefix(r.URL.Path, "/_astro/") || strings.HasPrefix(r.URL.Path, "/assets/") || strings.HasPrefix(r.URL.Path, "/vk_app/assets/") {
 				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 			} else {
-				w.Header().Set("Cache-Control", "public, max-age=3600")
+				w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			}
 			http.ServeFile(w, r, filePath)
 			return
