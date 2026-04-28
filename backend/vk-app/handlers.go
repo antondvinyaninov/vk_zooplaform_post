@@ -846,6 +846,13 @@ func makePostTitle(message string) string {
 func parseLaunchContext(r *http.Request) (*vkLaunchContext, error) {
 	signature := r.Header.Get("x-vk-sign")
 	if signature == "" {
+		// Fallback to Authorization header if x-vk-sign is stripped by API Gateway
+		authHeader := r.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			signature = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+	if signature == "" {
 		return &vkLaunchContext{}, nil
 	}
 	values, err := url.ParseQuery(signature)
