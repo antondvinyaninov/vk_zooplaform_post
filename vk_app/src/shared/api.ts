@@ -1,4 +1,5 @@
-import vkBridge from '@vkontakte/vk-bridge';
+import vkBridgeModule from '@vkontakte/vk-bridge';
+const vkBridge = (vkBridgeModule as any).send ? vkBridgeModule : (vkBridgeModule as any).default;
 import { UserInfo } from '@vkontakte/vk-bridge';
 
 const isVKCDN = window.location.hostname.includes('vk-apps.com');

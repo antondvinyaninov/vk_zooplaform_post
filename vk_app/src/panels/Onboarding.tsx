@@ -1,4 +1,5 @@
-import vkBridge from '@vkontakte/vk-bridge';
+import vkBridgeModule from '@vkontakte/vk-bridge';
+const vkBridge = (vkBridgeModule as any).send ? vkBridgeModule : (vkBridgeModule as any).default;
 import { FC, useEffect, useState } from 'react';
 import {
   Panel,
@@ -33,7 +34,7 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
 
   const installToCommunity = () => {
     if (vkBridge && vkBridge.send) {
-      vkBridge.send('VKWebAppAddToCommunity').catch((error) => {
+      vkBridge.send('VKWebAppAddToCommunity').catch((error: any) => {
         console.error('Failed to add to community:', error);
       });
     } else {
