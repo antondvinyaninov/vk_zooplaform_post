@@ -58,7 +58,7 @@ export const Home: FC<HomeProps> = ({ id }) => {
             </Button>
           }
         >
-          Лента публикаций
+          Лента публикаций (v5.1)
         </Header>
       }>
         {loading ? (
