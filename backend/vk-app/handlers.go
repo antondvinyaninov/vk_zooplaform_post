@@ -148,6 +148,57 @@ func postsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func videoUploadUrlHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if ctx.GroupID == 0 {
+		utils.RespondError(w, http.StatusBadRequest, "vk_group_id is required")
+		return
+	}
+
+	fileName := r.URL.Query().Get("filename")
+	if fileName == "" {
+		fileName = "video.mp4"
+	}
+
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	adminToken, err := getActiveVKToken()
+	if err != nil || adminToken == "" {
+		utils.RespondError(w, http.StatusInternalServerError, "admin token not found")
+		return
+	}
+
+	vkClient := vk.NewVKClient(adminToken)
+	groupIDStr := strconv.Itoa(group.VKGroupID)
+
+	resp, err := vkClient.GetVideoUploadUrl(groupIDStr, fileName)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get video upload url: %v", err))
+		return
+	}
+
+	attachmentStr := fmt.Sprintf("video%d_%d", resp.OwnerID, resp.VideoID)
+
+	utils.RespondSuccess(w, map[string]interface{}{
+		"upload_url": resp.UploadURL,
+		"video_id":   attachmentStr,
+	})
+}
+
 func listPostsHandler(w http.ResponseWriter, r *http.Request) {
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	if status == "" {
@@ -216,6 +267,21 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var uploadedAttachments []string
+	
+	if r.MultipartForm != nil {
+		if atts, ok := r.MultipartForm.Value["attachments"]; ok {
+			for _, att := range atts {
+				parts := strings.Split(att, ",")
+				for _, part := range parts {
+					cleaned := strings.TrimSpace(part)
+					if cleaned != "" {
+						uploadedAttachments = append(uploadedAttachments, cleaned)
+					}
+				}
+			}
+		}
+	}
+
 	files := r.MultipartForm.File["media"]
 
 	if len(files) > 0 {

@@ -12,6 +12,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/app/config", middleware.CORSFunc(configHandler))
 	mux.HandleFunc("/api/app/users/me", middleware.CORSFunc(syncUserHandler))
 	mux.HandleFunc("/api/app/posts", middleware.CORSFunc(postsHandler))
+	mux.HandleFunc("/api/app/posts/video-upload-url", middleware.CORSFunc(videoUploadUrlHandler))
 	mux.HandleFunc("/api/app/posts/my", middleware.CORSFunc(myPostsHandler))
 	mux.HandleFunc("/api/app/posts/", middleware.CORSFunc(postByIDHandler))
 

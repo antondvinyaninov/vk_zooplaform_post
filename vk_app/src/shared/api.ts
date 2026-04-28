@@ -130,12 +130,37 @@ export const syncUserWithBackend = async (user: UserInfo, vkSignature?: string) 
   return response.json() as Promise<{ user: AppUser; viewerRole: string; groupId: number }>;
 };
 
-export const createPost = async (message: string, files: File[] = []) => {
+export const getVideoUploadUrl = async (fileName: string) => {
+  return fetchJSON<{ upload_url: string; video_id: string }>(
+    `${API_URL}/posts/video-upload-url?filename=${encodeURIComponent(fileName)}`
+  );
+};
+
+export const uploadVideoToVK = async (file: File, uploadUrl: string) => {
+  const formData = new FormData();
+  formData.append('video_file', file);
+
+  const response = await fetch(uploadUrl, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Video upload failed: ${response.status}`);
+  }
+  
+  return response.json();
+};
+
+export const createPost = async (message: string, files: File[] = [], videoIds: string[] = []) => {
   const formData = new FormData();
   formData.append('message', message);
   files.forEach((file) => {
     formData.append('media', file);
   });
+  if (videoIds.length > 0) {
+    formData.append('attachments', videoIds.join(','));
+  }
 
   const vkSignature = getVKLaunchSignature();
   const response = await fetch(`${API_URL}/posts?x-vk-sign=${encodeURIComponent(vkSignature)}`, {

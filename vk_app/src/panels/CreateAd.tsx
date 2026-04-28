@@ -15,7 +15,7 @@ import {
 import { Icon24Camera, Icon28CancelCircleFillRed, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import bridge from '@vkontakte/vk-bridge';
-import { createPost } from '../shared/api';
+import { createPost, getVideoUploadUrl, uploadVideoToVK } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export const CreatePost: FC<NavIdProps> = ({ id }) => {
@@ -145,8 +145,20 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
         // Игнорируем ошибки
       }
 
-      const compressedFiles = await Promise.all(files.map(item => compressImage(item.file)));
-      await createPost(text, compressedFiles);
+      const imagesToUpload: File[] = [];
+      const videoIds: string[] = [];
+
+      for (const item of files) {
+        if (item.file.type.startsWith('video/')) {
+          const { upload_url, video_id } = await getVideoUploadUrl(item.file.name);
+          await uploadVideoToVK(item.file, upload_url);
+          videoIds.push(video_id);
+        } else {
+          imagesToUpload.push(await compressImage(item.file));
+        }
+      }
+
+      await createPost(text, imagesToUpload, videoIds);
       routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`);
     } catch (error: any) {
       alert(`Ошибка при сохранении: ${error?.message || String(error)}`);

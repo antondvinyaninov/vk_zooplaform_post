@@ -310,6 +310,28 @@ type VideoSaveResponse struct {
 	AccessKey string `json:"access_key"`
 }
 
+// GetVideoUploadUrl запрашивает ссылку для прямой загрузки видео
+func (c *VKClient) GetVideoUploadUrl(groupID string, fileName string) (*VideoSaveResponse, error) {
+	params := map[string]string{
+		"name": fileName,
+	}
+	if groupID != "" {
+		params["group_id"] = groupID
+	}
+
+	saveResp, err := c.CallMethod("video.save", params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call video.save: %w", err)
+	}
+
+	var videoSave VideoSaveResponse
+	if err := json.Unmarshal(saveResp, &videoSave); err != nil {
+		return nil, fmt.Errorf("failed to parse video.save response: %w", err)
+	}
+
+	return &videoSave, nil
+}
+
 // UploadVideo загружает видео
 func (c *VKClient) UploadVideo(filePath string, groupID string, fileName string) (string, string, error) {
 	// 1. Получаем URL для загрузки
