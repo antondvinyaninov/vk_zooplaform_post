@@ -12,7 +12,7 @@ import { Alert,
   Div,
   Text,
 } from '@vkontakte/vkui';
-import { Icon28AddOutline, Icon56AddCircleOutline } from '@vkontakte/icons';
+import { Icon28AddOutline, Icon56AddCircleOutline, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getMyPosts, deletePost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
@@ -82,7 +82,10 @@ export const Home: FC<HomeProps> = ({ id }) => {
               <Card key={post.id} mode="shadow">
                 <Div style={{ display: 'flex', gap: 12 }}>
                   {/* Изображение */}
-                  {post.attachment_urls?.[0]?.url && (
+                  {post.attachment_urls?.[0]?.url && (() => {
+                    const firstAtt = post.attachment_urls[0];
+                    const isVideo = firstAtt.type === 'video' || firstAtt.url.includes('.mp4') || firstAtt.url.includes('.mov');
+                    return (
                     <div style={{ 
                       width: 80, 
                       height: 80, 
@@ -92,15 +95,31 @@ export const Home: FC<HomeProps> = ({ id }) => {
                       backgroundColor: 'var(--vkui--color_background_secondary)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      position: 'relative'
                     }}>
-                      <img 
-                        src={post.attachment_urls[0].url} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                        alt="Медиа"
-                      />
+                      {isVideo ? (
+                        <>
+                          <video 
+                            src={firstAtt.url} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            muted
+                            playsInline
+                          />
+                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />
+                          </div>
+                        </>
+                      ) : (
+                        <img 
+                          src={firstAtt.url} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          alt="Медиа"
+                        />
+                      )}
                     </div>
-                  )}
+                    );
+                  })()}
                   
                   {/* Информация */}
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, justifyContent: 'center' }}>

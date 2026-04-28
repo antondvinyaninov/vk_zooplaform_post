@@ -92,14 +92,25 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
           
           {post.attachment_urls && post.attachment_urls.length > 0 && (
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {post.attachment_urls.map((attachment: any, index: number) => (
-                <img 
-                  key={index} 
-                  src={attachment.url} 
-                  alt={`Медиа ${index + 1}`}
-                  style={{ width: '100%', borderRadius: 8, objectFit: 'cover' }} 
-                />
-              ))}
+              {post.attachment_urls.map((attachment: any, index: number) => {
+                const isVideo = attachment.type === 'video' || attachment.url.includes('.mp4') || attachment.url.includes('.mov');
+                return isVideo ? (
+                  <video 
+                    key={index} 
+                    src={attachment.url} 
+                    controls 
+                    playsInline
+                    style={{ width: '100%', borderRadius: 8, objectFit: 'cover' }} 
+                  />
+                ) : (
+                  <img 
+                    key={index} 
+                    src={attachment.url} 
+                    alt={`Медиа ${index + 1}`}
+                    style={{ width: '100%', borderRadius: 8, objectFit: 'cover' }} 
+                  />
+                );
+              })}
             </div>
           )}
         </Div>
