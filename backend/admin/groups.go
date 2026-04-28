@@ -32,6 +32,57 @@ func installedGroupsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 1. Получаем все установленные группы из базы
+	dbGroups, err := listInstalledGroups()
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load groups"})
+		return
+	}
+
+	// 2. Получаем токен пользователя
+	token, err := getActiveAccountToken()
+	if err != nil || token == "" {
+		// Если токена нет, не можем фильтровать. Отдаем пустой список для безопасности.
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"groups": []installedGroupResponse{},
+		})
+		return
+	}
+
+	// 3. Запрашиваем группы пользователя в ВК
+	vkClient := vk.NewVKClient(token)
+	vkGroups, err := vkClient.GroupsGet(false, "")
+	if err != nil {
+		// Если ВК упал, отдаем ошибку
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	// 4. Оставляем только те группы, которые есть и в базе, и в ВК
+	vkGroupsMap := make(map[int]bool)
+	for _, vg := range vkGroups.Items {
+		vkGroupsMap[vg.ID] = true
+	}
+
+	var filteredGroups []installedGroupResponse
+	for _, dg := range dbGroups {
+		if vkGroupsMap[dg.VKGroupID] {
+			filteredGroups = append(filteredGroups, dg)
+		}
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"groups": filteredGroups,
+	})
+}
+
+
+func allInstalledGroupsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+		return
+	}
+
 	groups, err := listInstalledGroups()
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load groups"})

@@ -37,8 +37,8 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant="secondary">Не проверено</Badge>
 }
 
-export function GroupsTable() {
-  const { data, error, isLoading, mutate } = useSWR<GroupsResponse>("/admin/groups/installed", fetcher)
+export function GroupsTable({ endpoint = "/admin/groups/installed" }: { endpoint?: string }) {
+  const { data, error, isLoading, mutate } = useSWR<GroupsResponse>(endpoint, fetcher)
   const [refreshingId, setRefreshingId] = React.useState<number | null>(null)
 
   const groups = data?.groups || []

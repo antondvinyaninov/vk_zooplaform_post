@@ -2,6 +2,7 @@ import { IconHeartbeat, IconRefresh } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import { GroupsStatsChart } from "@/components/groups/groups-stats-chart"
 import { GroupsTable } from "@/components/groups/groups-table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export function GroupsPage() {
   return (
@@ -33,7 +34,18 @@ export function GroupsPage() {
 
         {/* Groups Data Table */}
         <div className="mt-4">
-          <GroupsTable />
+          <Tabs defaultValue="my" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="my">Мои группы</TabsTrigger>
+              <TabsTrigger value="all">Все группы (Суперадмин)</TabsTrigger>
+            </TabsList>
+            <TabsContent value="my" className="m-0">
+              <GroupsTable endpoint="/admin/groups/installed" />
+            </TabsContent>
+            <TabsContent value="all" className="m-0">
+              <GroupsTable endpoint="/admin/groups/all" />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
