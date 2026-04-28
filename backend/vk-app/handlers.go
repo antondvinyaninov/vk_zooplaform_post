@@ -853,6 +853,10 @@ func parseLaunchContext(r *http.Request) (*vkLaunchContext, error) {
 		}
 	}
 	if signature == "" {
+		// Fallback to URL Query parameter
+		signature = r.URL.Query().Get("x-vk-sign")
+	}
+	if signature == "" {
 		return &vkLaunchContext{}, nil
 	}
 	values, err := url.ParseQuery(signature)

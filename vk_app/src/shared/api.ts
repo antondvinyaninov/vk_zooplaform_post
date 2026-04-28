@@ -65,7 +65,10 @@ const getVKLaunchSignature = () => {
 
 const fetchJSON = async <T>(input: string, init: RequestInit = {}): Promise<T> => {
   const vkSignature = getVKLaunchSignature();
-  const response = await fetch(input, {
+  const separator = input.includes('?') ? '&' : '?';
+  const urlWithSignature = `${input}${separator}x-vk-sign=${encodeURIComponent(vkSignature)}`;
+
+  const response = await fetch(urlWithSignature, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -103,6 +106,7 @@ export const syncUserWithBackend = async (user: UserInfo, vkSignature?: string) 
   if (finalSignature) {
     headers['x-vk-sign'] = finalSignature;
     headers['Authorization'] = `Bearer ${finalSignature}`;
+    params.append('x-vk-sign', finalSignature);
   }
 
   const response = await fetch(`${API_URL}/users/me?${params.toString()}`, {
@@ -132,7 +136,7 @@ export const createPost = async (message: string, files: File[] = []) => {
   });
 
   const vkSignature = getVKLaunchSignature();
-  const response = await fetch(`${API_URL}/posts`, {
+  const response = await fetch(`${API_URL}/posts?x-vk-sign=${encodeURIComponent(vkSignature)}`, {
     method: 'POST',
     headers: {
       'X-VK-Sign': vkSignature,
