@@ -319,32 +319,30 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 
 			// Detect if image or video
 			contentType := fileHeader.Header.Get("Content-Type")
-			if strings.HasPrefix(contentType, "video/") {
-				att, attURL, err := vkClient.UploadVideo(tmpPath, groupIDStr, fileHeader.Filename)
-				if err == nil {
-					if attURL != "" {
-						uploadedAttachments = append(uploadedAttachments, att+"|"+attURL)
-					} else {
-						uploadedAttachments = append(uploadedAttachments, att)
-					}
+			filenameLower := strings.ToLower(fileHeader.Filename)
+			
+			// Если фронтенд по ошибке прислал видео в поле media (из-за старого кэша или бага)
+			if strings.HasPrefix(contentType, "video/") || 
+			   strings.HasSuffix(filenameLower, ".mp4") || 
+			   strings.HasSuffix(filenameLower, ".mov") || 
+			   strings.HasSuffix(filenameLower, ".qt") {
+				os.Remove(tmpPath)
+				utils.RespondError(w, http.StatusBadRequest, "Видео нужно загружать через S3, обновите приложение (очистите кэш ВКонтакте).")
+				return
+			}
+
+			// Грузим только фото
+			att, attURL, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
+			if err == nil {
+				if attURL != "" {
+					uploadedAttachments = append(uploadedAttachments, att+"|"+attURL)
 				} else {
-					os.Remove(tmpPath)
-					utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Ошибка загрузки видео: %v", err))
-					return
+					uploadedAttachments = append(uploadedAttachments, att)
 				}
 			} else {
-				att, attURL, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
-				if err == nil {
-					if attURL != "" {
-						uploadedAttachments = append(uploadedAttachments, att+"|"+attURL)
-					} else {
-						uploadedAttachments = append(uploadedAttachments, att)
-					}
-				} else {
-					os.Remove(tmpPath)
-					utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Ошибка загрузки фото: %v", err))
-					return
-				}
+				os.Remove(tmpPath)
+				utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Ошибка загрузки фото: %v", err))
+				return
 			}
 			os.Remove(tmpPath)
 		}
