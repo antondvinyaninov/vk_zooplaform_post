@@ -51,7 +51,7 @@ func installedGroupsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Запрашиваем группы пользователя в ВК
 	vkClient := vk.NewVKClient(token)
-	vkGroups, err := vkClient.GroupsGet(false, "")
+	vkGroups, err := vkClient.GroupsGet(true, "")
 	if err != nil {
 		// Если ВК упал, отдаем ошибку
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
