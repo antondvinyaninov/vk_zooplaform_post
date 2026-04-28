@@ -147,10 +147,11 @@ export const Home: FC<HomeProps> = ({ id }) => {
                       (window as any).setGlobalPopout(
                         <Alert
                           actions={[
-                            { title: 'Отмена', mode: 'cancel', action: closePopout },
+                            { title: 'Отмена', mode: 'cancel', autoCloseDisabled: true, action: () => { closePopout(); } },
                             { 
                               title: 'Удалить', 
-                              mode: 'destructive', 
+                              mode: 'destructive',
+                              autoCloseDisabled: true,
                               action: async () => {
                                 closePopout();
                                 try {
