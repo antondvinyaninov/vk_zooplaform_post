@@ -614,6 +614,11 @@ func ensureGroup(vkGroupID int) (*models.Group, error) {
 		return nil, err
 	}
 	if group != nil {
+		// Если группа была отключена, включаем её обратно
+		if !group.IsActive {
+			group.IsActive = true
+			_ = updateGroup(group)
+		}
 		// Если запись была создана с дефолтными данными, пробуем обогатить ее из VK.
 		if groupNeedsVKSync(group) {
 			if vkData, err := fetchVKGroupData(vkGroupID); err == nil && vkData != nil {

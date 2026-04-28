@@ -55,6 +55,18 @@ export function GroupsTable({ endpoint = "/admin/groups/installed" }: { endpoint
     }
   }
 
+  const handleDisconnect = async (groupId: number) => {
+    try {
+      setRefreshingId(groupId)
+      await api.post("/admin/groups/disconnect", { group_id: groupId })
+      mutate() // Refresh the list
+    } catch (err) {
+      console.error("Failed to disconnect group", err)
+    } finally {
+      setRefreshingId(null)
+    }
+  }
+
   return (
     <div className="rounded-xl border bg-card">
       <Table>
@@ -158,7 +170,7 @@ export function GroupsTable({ endpoint = "/admin/groups/installed" }: { endpoint
                         Настройки группы
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">
+                      <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive" onClick={() => handleDisconnect(group.id)}>
                         <IconTrash className="mr-2 size-4" />
                         Отключить
                       </DropdownMenuItem>

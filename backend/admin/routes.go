@@ -16,6 +16,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/users", middleware.CORSFunc(usersHandler))
 	mux.HandleFunc("/api/admin/users/", middleware.CORSFunc(userByIDHandler))
 	mux.HandleFunc("/api/admin/groups/installed", middleware.CORSFunc(installedGroupsHandler))
+	mux.HandleFunc("/api/admin/groups/disconnect", middleware.CORSFunc(disconnectGroupHandler))
 	mux.HandleFunc("/api/admin/groups/all", middleware.CORSFunc(allInstalledGroupsHandler))
 	mux.HandleFunc("/api/admin/groups/health/refresh", middleware.CORSFunc(refreshGroupHealthHandler))
 	mux.HandleFunc("/api/admin/dashboard/stats", middleware.CORSFunc(dashboardStatsHandler))
