@@ -70,6 +70,12 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
 
+		// Если это OPTIONS (preflight запрос), просто возвращаем 200 OK
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		// Убираем префикс из пути для поиска файла
 		// Сами файлы всегда лежат в папке vk_app (с подчеркиванием)
 		filePath := "/usr/share/nginx/html/vk_app/" + strings.TrimPrefix(r.URL.Path, prefix)
@@ -116,6 +122,11 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
 
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		// Всегда возвращаем index.html для этого endpoint
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Pragma", "no-cache")
@@ -128,6 +139,16 @@ func main() {
 
 	// Главная страница
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Добавляем CORS заголовки для всех статических файлов
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, x-vk-sign")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		if r.URL.Path == "/" {
 			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 			w.Header().Set("Pragma", "no-cache")
