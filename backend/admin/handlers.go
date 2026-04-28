@@ -2,6 +2,7 @@ package admin
 
 import (
 	"backend/config"
+	"backend/database"
 	"backend/vk"
 	"encoding/json"
 	"fmt"
@@ -261,6 +262,30 @@ func vkGetGroupsHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
+	}
+
+	// Фильтруем группы: оставляем только те, которые есть в нашей БД (установили приложение)
+	rows, err := database.Query("SELECT vk_group_id FROM groups")
+	if err == nil {
+		defer rows.Close()
+		installedGroups := make(map[int]bool)
+		for rows.Next() {
+			var id int
+			if err := rows.Scan(&id); err == nil {
+				installedGroups[id] = true
+			}
+		}
+
+		var filteredItems []vk.GroupItem
+		for _, g := range groups.Items {
+			if installedGroups[g.ID] {
+				filteredItems = append(filteredItems, g)
+			}
+		}
+		groups.Items = filteredItems
+		groups.Count = len(filteredItems)
+	} else {
+		log.Printf("[vkGetGroupsHandler] Error fetching installed groups from DB: %v", err)
 	}
 
 	// Добавляем отладочную информацию
