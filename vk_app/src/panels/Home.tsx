@@ -1,5 +1,5 @@
 import { FC, useEffect, useState } from 'react';
-import {
+import { Alert,
   Panel,
   PanelHeader,
   Group,
@@ -143,31 +143,44 @@ export const Home: FC<HomeProps> = ({ id }) => {
                     stretched
                     loading={deletingId === post.id}
                     onClick={() => {
-                      window.dispatchEvent(new CustomEvent('vkui-alert', {
-                        detail: {
-                          title: 'Подтвердите действие',
-                          text: 'Вы уверены, что хотите удалить эту публикацию?',
-                          confirmText: 'Удалить',
-                          onConfirm: async () => {
-                            try {
-                              setDeletingId(post.id);
-                              await deletePost(post.id);
-                              setPosts(prev => prev.filter(p => p.id !== post.id));
-                            } catch (e: any) {
-                              console.error('Failed to delete post:', e);
-                              window.dispatchEvent(new CustomEvent('vkui-alert', {
-                                detail: {
-                                  title: 'Ошибка',
-                                  text: e.message || 'Не удалось удалить пост',
-                                  confirmText: 'ОК'
+                      const closePopout = () => (window as any).setGlobalPopout(null);
+                      (window as any).setGlobalPopout(
+                        <Alert
+                          actions={[
+                            { title: 'Отмена', mode: 'cancel', action: closePopout },
+                            { 
+                              title: 'Удалить', 
+                              mode: 'destructive', 
+                              action: async () => {
+                                closePopout();
+                                try {
+                                  setDeletingId(post.id);
+                                  await deletePost(post.id);
+                                  setPosts(prev => prev.filter(p => p.id !== post.id));
+                                } catch (e: any) {
+                                  console.error('Failed to delete post:', e);
+                                  (window as any).setGlobalPopout(
+                                    <Alert
+                                      actions={[{ title: 'ОК', mode: 'cancel', action: closePopout }]}
+                                      onClose={closePopout}
+                          onClosed={() => {}}
+                                      title="Ошибка"
+                                      description={e.message || 'Не удалось удалить пост'}
+                                    />
+                                  );
+                                } finally {
+                                  setDeletingId(null);
                                 }
-                              }));
-                            } finally {
-                              setDeletingId(null);
+                              }
                             }
-                          }
-                        }
-                      }));
+                          ]}
+                          actionsLayout="horizontal"
+                          onClose={closePopout}
+                          onClosed={() => {}}
+                          title="Подтвердите действие"
+                          description="Вы уверены, что хотите удалить эту публикацию?"
+                        />
+                      );
                     }}
                   >
                     Удалить

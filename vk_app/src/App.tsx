@@ -2,7 +2,7 @@ import vkBridgeModule from '@vkontakte/vk-bridge';
 const vkBridge = (vkBridgeModule as any).send ? vkBridgeModule : (vkBridgeModule as any).default;
 import { useState, useEffect, ReactNode, lazy, Suspense } from 'react';
 import { UserInfo } from '@vkontakte/vk-bridge';
-import { Alert,
+import {
   View,
   SplitLayout,
   SplitCol,
@@ -200,39 +200,7 @@ export const App = () => {
 
   
   useEffect(() => {
-    const handleAlert = (e: any) => {
-      setPopout(
-        <Alert
-          actions={[
-            {
-              title: e.detail.cancelText || 'Отмена',
-              
-              mode: 'cancel',
-              action: () => {
-                  if (e.detail.onCancel) e.detail.onCancel();
-                  setPopout(null);
-              }
-            },
-            {
-              title: e.detail.confirmText || 'ОК',
-              
-              mode: 'destructive',
-              action: () => {
-                  if (e.detail.onConfirm) e.detail.onConfirm();
-                  setPopout(null);
-              },
-            },
-          ]}
-          actionsLayout="horizontal"
-          onClose={() => setPopout(null)}
-          onClosed={() => {}}
-          title={e.detail.title}
-          description={e.detail.text}
-        />
-      );
-    };
-    window.addEventListener('vkui-alert', handleAlert);
-    return () => window.removeEventListener('vkui-alert', handleAlert);
+    (window as any).setGlobalPopout = setPopout;
   }, []);
 
   const activeStory = getActiveStory(activePanel);
