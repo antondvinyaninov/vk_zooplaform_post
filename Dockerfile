@@ -11,9 +11,6 @@ RUN npm run build
 # Сборка Go бэкенда
 FROM golang:1.24-alpine AS backend-builder
 
-# Force sequential build to save RAM
-COPY --from=vk-app-builder /app/vk_app/package.json /tmp/dummy1
-
 # Устанавливаем необходимые пакеты
 RUN apk add --no-cache gcc musl-dev
 
@@ -31,9 +28,6 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 # Сборка Astro админки
 FROM node:22-alpine AS admin-builder
-
-# Force sequential build to save RAM
-COPY --from=backend-builder /app/go.mod /tmp/dummy2
 
 WORKDIR /app/frontadmin
 COPY frontadmin/package*.json ./
