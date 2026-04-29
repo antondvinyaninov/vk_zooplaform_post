@@ -108,17 +108,25 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                     />
                   );
                 } else if (isVKVideo) {
+                  let iframeSrc = '';
+                  if (attachment.url.startsWith('video')) {
+                    const parts = attachment.url.replace('video', '').split('_');
+                    const oid = parts[0];
+                    const vid = parts[1];
+                    const hash = parts[2] ? `&hash=${parts[2]}` : '';
+                    iframeSrc = `https://vk.com/video_ext.php?oid=${oid}&id=${vid}${hash}&hd=2`;
+                  }
+                  
                   return (
-                    <div key={index} style={{ position: 'relative', width: '100%', cursor: 'pointer' }} onClick={() => window.open(`https://vk.com/${attachment.id}`, '_blank')}>
-                      <img 
-                        src={attachment.url} 
-                        alt={`Видео ${index + 1}`}
-                        style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid #e1e3e6', display: 'block' }} 
-                      />
-                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon28VideoOutline width={48} height={48} style={{ color: 'white' }} />
-                      </div>
-                    </div>
+                    <iframe 
+                      key={index} 
+                      src={iframeSrc} 
+                      width="100%" 
+                      height="250" 
+                      frameBorder="0" 
+                      allowFullScreen 
+                      style={{borderRadius: 8, border: '1px solid #e1e3e6', display: 'block'}}
+                    ></iframe>
                   );
                 } else {
                   return (

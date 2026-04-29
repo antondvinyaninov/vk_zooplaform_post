@@ -19,6 +19,9 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { IconBrandVk } from "@tabler/icons-react"
+import { API_BASE_URL } from "@/lib/api"
+
+const AUTH_LOGIN_URL = `${API_BASE_URL.replace(/\/$/, "")}/admin/auth/login`
 
 export function LoginForm({
   className,
@@ -35,7 +38,7 @@ export function LoginForm({
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/admin/auth/login", {
+      const response = await fetch(AUTH_LOGIN_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -43,20 +46,20 @@ export function LoginForm({
         body: JSON.stringify({ username, password }),
       })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => null)
 
       if (!response.ok) {
-        setError(data.error || "Ошибка авторизации")
+        setError(data?.error || `API вернул ошибку ${response.status}`)
         return
       }
 
       // Успешный вход: сохраняем данные и редиректим
-      if (typeof window !== "undefined" && data.user) {
+      if (typeof window !== "undefined" && data?.user) {
         localStorage.setItem("admin_user", JSON.stringify(data.user))
         window.location.replace("/dashboard")
       }
     } catch (err) {
-      setError("Ошибка сети при попытке входа")
+      setError("API недоступен. Запустите backend и повторите вход.")
     } finally {
       setIsLoading(false)
     }

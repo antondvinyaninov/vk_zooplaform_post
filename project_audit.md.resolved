@@ -328,7 +328,6 @@ PORT=80                         # Хардкод в main.go тоже
 |----------|----------|
 | **Пароли в plaintext** | `admin_users` хранит пароли без хеширования |
 | **Секреты в Dockerfile** | DATABASE_URL, токены — хардкод в image |
-| **`docs/` устарела** | DEVELOPMENT.md упоминает SQLite, хотя БД давно PostgreSQL |
 | **`docs/ROUTES.md` устарел** | Описывает Python Flask сервис, которого нет |
 | **Legacy `vk_connection`** | Дублирует функционал `vk_accounts` |
 | **handlers.go (~1562 строк)** | Слишком большой файл, нужна декомпозиция |

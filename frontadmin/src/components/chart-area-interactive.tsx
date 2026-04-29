@@ -66,7 +66,10 @@ export function ChartAreaInteractive() {
     }
   }, [isMobile])
 
-  const { data, isLoading } = useSWR<DashboardStatsResponse>("/admin/dashboard/stats", fetcher)
+  const { data, error, isLoading } = useSWR<DashboardStatsResponse>("/admin/dashboard/stats", fetcher, {
+    refreshInterval: 30000,
+    revalidateOnFocus: true,
+  })
 
   const chartData = React.useMemo(() => {
     if (!data?.history) return [];
@@ -98,9 +101,9 @@ export function ChartAreaInteractive() {
     return date.toLocaleDateString("ru-RU", { month: "short", day: "numeric" });
   }
 
-  const formatTooltipLabel = (value: any) => {
+  const formatTooltipLabel = (value: string | number) => {
     if (!value) return "";
-    const date = new Date(value as string);
+    const date = new Date(value);
     return date.toLocaleDateString("ru-RU", { month: "long", day: "numeric", year: "numeric" });
   }
 
@@ -145,6 +148,14 @@ export function ChartAreaInteractive() {
         {isLoading ? (
           <div className="aspect-auto h-[280px] w-full flex items-center justify-center">
             <Skeleton className="w-full h-full rounded-lg" />
+          </div>
+        ) : error ? (
+          <div className="flex h-[280px] w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+            Не удалось загрузить динамику аудитории
+          </div>
+        ) : filteredData.length === 0 ? (
+          <div className="flex h-[280px] w-full items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+            Недостаточно данных для графика
           </div>
         ) : (
           <ChartContainer

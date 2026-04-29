@@ -21,7 +21,7 @@ smm/
 │   │   ├── external/    # Внешние API (VK, Telegram)
 │   │   └── internal/    # Внутренние API (БД, бизнес-логика)
 │   ├── vk/              # VK API клиент
-│   ├── database/        # SQLite подключение и схема
+│   ├── database/        # PostgreSQL подключение и схема
 │   ├── models/          # Модели данных (Group, Post, User)
 │   ├── middleware/      # Middleware (CORS, Logger)
 │   ├── config/          # Конфигурация
@@ -29,7 +29,7 @@ smm/
 │   ├── utils/           # Вспомогательные функции
 │   └── main.go          # Главный файл
 ├── vk_app/              # VK Mini App (React + VKUI + VK Bridge)
-├── frontend/            # Админка (HTML + JS)
+├── frontadmin/          # Админка (Astro + React)
 └── Old/                 # Архив старого кода
 ```
 
@@ -44,9 +44,9 @@ smm/
   - Загрузка фото и видео
   - Предпросмотр постов
 
-### 2. Админка (`frontend/`)
+### 2. Админка (`frontadmin/`)
 - **Назначение**: Управление группами и настройками
-- **Технологии**: HTML, JavaScript, CSS
+- **Технологии**: Astro, React, Tailwind CSS, shadcn/ui
 - **Функционал**:
   - Подключение групп ВКонтакте
   - Управление токенами доступа
@@ -55,11 +55,11 @@ smm/
 
 ### 3. Backend (`backend/`)
 - **Назначение**: Единый API сервер
-- **Технологии**: Go, SQLite
+- **Технологии**: Go, PostgreSQL
 - **Функционал**:
   - REST API для всех компонентов
   - Работа с VK API
-  - Хранение данных в SQLite
+  - Хранение данных в PostgreSQL
   - Управление публикациями
 
 ## 🚀 Запуск проекта
@@ -85,7 +85,7 @@ docker build -t vk-post-platform .
 docker run -p 80:80 vk-post-platform
 ```
 
-## 📊 База данных (SQLite)
+## 📊 База данных (PostgreSQL)
 
 ### Таблицы:
 
@@ -151,7 +151,7 @@ VK_MINI_APP_ID=54560047         # ID VK Mini App
 VK_MINI_APP_SECRET=kI41QDPyyK87kIopZ2U9    # Защищённый ключ VK Mini App
 VK_MINI_APP_SERVICE_KEY=e59b585ae59b585ae59b585a67e6dbdd75ee59be59b585a8c7299470181bb987c8b3c03  # Сервисный ключ VK Mini App
 
-DATABASE_PATH=./data/app.db     # Путь к БД SQLite
+DATABASE_URL=postgres://user:password@host:5432/database?sslmode=disable
 ```
 
 ## 📝 Workflow
@@ -176,8 +176,8 @@ DATABASE_PATH=./data/app.db     # Путь к БД SQLite
 ## �️ Технологии
 
 ### Backend:
-- **Go 1.21** - основной язык
-- **SQLite** - база данных
+- **Go 1.24** - основной язык
+- **PostgreSQL** - база данных
 - **VK API** - интеграция с ВКонтакте
 
 ### Frontend:
@@ -200,7 +200,7 @@ DATABASE_PATH=./data/app.db     # Путь к БД SQLite
 - Токены доступа хранятся в БД
 - CORS настроен для всех endpoints
 - Service key используется для fallback запросов
-- SQLite БД с правильными индексами
+- PostgreSQL-схема создает нужные таблицы и индексы при запуске
 
 ## 📈 Планы развития
 
@@ -209,7 +209,7 @@ DATABASE_PATH=./data/app.db     # Путь к БД SQLite
 - [ ] Шаблоны постов
 - [ ] Массовая публикация
 - [ ] Интеграция с Telegram
-- [ ] Миграция на PostgreSQL
+- [ ] Версионированные миграции базы данных
 
 ## 👥 Команда
 

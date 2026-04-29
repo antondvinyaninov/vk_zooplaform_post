@@ -21,7 +21,7 @@ func main() {
 	// Загружаем конфигурацию
 	cfg := config.Load()
 
-	// Принудительно устанавливаем порт 80 для продакшена
+	// По умолчанию используем production port, но позволяем локально переопределить PORT.
 	if os.Getenv("PORT") == "" {
 		cfg.Port = "80"
 	}
@@ -107,11 +107,11 @@ func main() {
 	// так как Yandex API Gateway обрезает слеши при передаче в /{path+}
 	mux.HandleFunc("/vk_app", vkAppHandler)
 	mux.HandleFunc("/vk-app", vkAppHandler)
-	
+
 	// Обработка ошибочного пути, если пользователь ввел vk_app находясь на странице /groups
 	mux.HandleFunc("/groups/vk_app", vkAppHandler)
 	mux.HandleFunc("/groups/vk_app/", vkAppHandler)
-	
+
 	mux.HandleFunc("/vk_app/", vkAppHandler)
 	mux.HandleFunc("/vk-app/", vkAppHandler)
 
@@ -203,11 +203,12 @@ func main() {
 	handler := middleware.Logger(middleware.CORS(middleware.Gzip(mux)))
 
 	// Запускаем сервер
+	addr := ":" + cfg.Port
 	log.Printf("=== Starting HTTP Server ===")
-	log.Printf("API Server listening on :80 (hardcoded)")
-	log.Println("✓ API: http://localhost:80/api/")
-	log.Println("✓ VK App API: http://localhost:80/api/app/")
-	log.Println("✓ Site API: http://localhost:80/api/site/")
+	log.Printf("API Server listening on %s", addr)
+	log.Printf("✓ API: http://localhost:%s/api/", cfg.Port)
+	log.Printf("✓ VK App API: http://localhost:%s/api/app/", cfg.Port)
+	log.Printf("✓ Site API: http://localhost:%s/api/site/", cfg.Port)
 
 	// Запускаем фоновую проверку здоровья групп
 	admin.StartHealthCheckCron()
@@ -216,11 +217,11 @@ func main() {
 
 	// Создаем HTTP сервер (принудительно на порту 80)
 	server := &http.Server{
-		Addr:    ":80", // Хардкод порт 80 для продакшена
+		Addr:    addr,
 		Handler: handler,
 	}
 
-	log.Printf("🌐 Server HARDCODED to bind to: :80")
+	log.Printf("🌐 Server bind address: %s", addr)
 
 	// Канал для отслеживания ВСЕХ сигналов (включая SIGQUIT)
 	allSignals := make(chan os.Signal, 1)
@@ -278,8 +279,6 @@ func main() {
 	}()
 
 	log.Printf("=== Server is running, waiting for signals ===")
-
-
 
 	// Ждем сигнал остановки
 	sig := <-quit

@@ -47,4 +47,4 @@
 - [VKUI Components](https://vkui.io/)
 - [VK Bridge](https://dev.vk.com/ru/bridge/overview)
 - [Go Documentation](https://go.dev/doc/)
-- [SQLite Documentation](https://www.sqlite.org/docs.html)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)

@@ -45,14 +45,14 @@ fi
 # Запуск с hot reload или обычный запуск
 if [ -f ~/go/bin/air ]; then
     echo "   ✓ Используется Air (hot reload)"
-    ~/go/bin/air &
+    PORT=8000 ~/go/bin/air &
 elif command -v air &> /dev/null; then
     echo "   ✓ Используется Air (hot reload)"
-    air &
+    PORT=8000 air &
 else
     echo "   ℹ️  Air не найден, используется go run"
     echo "   💡 Установите Air для hot reload: go install github.com/air-verse/air@latest"
-    go run main.go &
+    PORT=8000 go run main.go &
     BACKEND_PID=$!
 fi
 cd ..

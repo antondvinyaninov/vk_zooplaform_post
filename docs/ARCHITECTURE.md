@@ -9,7 +9,7 @@
 
 ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
 │  VK Mini App │    │   Админка    │    │ Основной сайт│
-│  (vk_app/)   │    │ (frontend/)  │    │   (site/)    │
+│  (vk_app/)   │    │(frontadmin/) │    │   (site/)    │
 └──────┬───────┘    └──────┬───────┘    └──────┬───────┘
        │                   │                   │
        └───────────────────┼───────────────────┘
@@ -22,8 +22,8 @@
         ┌──────────────────┼──────────────────┐
         │                  │                  │
    ┌────▼────┐      ┌──────▼──────┐    ┌─────▼─────┐
-   │ SQLite  │      │   VK API    │    │  External │
-   │   DB    │      │   Client    │    │    APIs   │
+   │PostgreSQL│     │   VK API    │    │  External │
+   │   DB     │     │   Client    │    │    APIs   │
    └─────────┘      └─────────────┘    └───────────┘
 ```
 
@@ -41,8 +41,8 @@
   - Предпросмотр постов
   - Публикация в группы
 
-#### Админка (`frontend/`)
-- **Технологии**: HTML, JavaScript, CSS
+#### Админка (`frontadmin/`)
+- **Технологии**: Astro, React, Tailwind CSS, shadcn/ui
 - **Назначение**: Управление системой
 - **Функционал**:
   - Подключение групп ВКонтакте
@@ -64,7 +64,7 @@ backend/
 │   ├── external/   # Внешние API (VK, Telegram)
 │   └── internal/   # Внутренние API (БД)
 ├── vk/             # VK API клиент
-├── database/       # Работа с SQLite
+├── database/       # Работа с PostgreSQL
 ├── models/         # Модели данных
 ├── middleware/     # Middleware
 ├── config/         # Конфигурация
@@ -103,10 +103,10 @@ backend/
 
 ### 3. Слой данных
 
-#### SQLite Database
-- **Таблицы**: groups, posts, users
+#### PostgreSQL Database
+- **Таблицы**: groups, posts, users, admin_users, vk_connection, vk_accounts, group_stats_history
 - **Индексы**: Оптимизированы для частых запросов
-- **Миграции**: Автоматические при запуске
+- **Схема**: Создается и дополняется автоматически при запуске
 
 #### Модели данных
 - `Group` - Группы ВКонтакте
@@ -182,11 +182,11 @@ backend/
 
 ### Текущая архитектура
 - Один Go процесс
-- SQLite база данных
+- PostgreSQL база данных
 - Подходит для малых и средних нагрузок
 
 ### Будущее масштабирование
-- Миграция на PostgreSQL
+- Версионированные миграции базы данных
 - Горизонтальное масштабирование backend
 - Redis для кэширования
 - Очереди для отложенной публикации
@@ -225,9 +225,9 @@ docker run -p 80:80 vk-post-platform
 ## Зависимости
 
 ### Backend
-- Go 1.21+
-- SQLite 3
-- github.com/mattn/go-sqlite3
+- Go 1.24+
+- PostgreSQL
+- github.com/jackc/pgx/v5
 
 ### Frontend
 - Node.js 20+
@@ -243,7 +243,7 @@ PORT=80
 VK_SERVICE_KEY=...
 VK_CLIENT_ID=54555042
 VK_CLIENT_SECRET=...
-DATABASE_PATH=./data/app.db
+DATABASE_URL=postgres://user:password@host:5432/database?sslmode=disable
 ```
 
 См. [ENV.md](ENV.md) для полного списка.

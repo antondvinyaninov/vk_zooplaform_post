@@ -3,8 +3,9 @@
 ## Требования
 
 ### Обязательно
-- **Go 1.21+** - для backend
+- **Go 1.24+** - для backend
 - **Node.js 20+** - для VK Mini App
+- **Node.js 22.12+** - для админки `frontadmin`
 - **Git** - для контроля версий
 
 ### Опционально
@@ -49,7 +50,15 @@ npm start
 
 ### 4. Настройка Админки
 
-Админка работает на статических файлах, настройка не требуется.
+```bash
+cd frontadmin
+
+# Установка зависимостей
+npm install
+
+# Запуск dev сервера
+npm run dev
+```
 
 ## Запуск проекта
 
@@ -89,7 +98,7 @@ smm/
 │   ├── site/            # Основной сайт API
 │   ├── api/             # API слой
 │   ├── vk/              # VK API клиент
-│   ├── database/        # SQLite
+│   ├── database/        # PostgreSQL
 │   ├── models/          # Модели
 │   ├── middleware/      # Middleware
 │   ├── config/          # Конфигурация
@@ -102,26 +111,24 @@ smm/
 │   │   ├── shared/      # Общие компоненты
 │   │   └── utils/       # Утилиты
 │   └── package.json
-├── frontend/            # Админка
-│   ├── css/
-│   ├── js/
-│   └── index.html
+├── frontadmin/          # Админка
+│   ├── src/
+│   ├── public/
+│   └── package.json
 ├── docs/                # Документация
 └── Old/                 # Архив
 ```
 
 ## Работа с базой данных
 
-### SQLite
+### PostgreSQL
 
-База данных создается автоматически при первом запуске.
+Backend подключается к PostgreSQL по `DATABASE_URL` или `DB_URL`.
+Таблицы и недостающие колонки создаются автоматически при запуске.
 
 ```bash
-# Путь к БД
-./data/app.db
-
-# Просмотр БД
-sqlite3 ./data/app.db
+# Пример строки подключения
+DATABASE_URL=postgres://user:password@host:5432/database?sslmode=disable
 ```
 
 ### Миграции
@@ -280,9 +287,9 @@ npm outdated
 
 ### База данных не создается
 
-1. Проверьте права на запись в `./data/`
-2. Создайте папку вручную: `mkdir -p data`
-3. Проверьте SQLite: `sqlite3 --version`
+1. Проверьте `DATABASE_URL` или `DB_URL`
+2. Убедитесь, что PostgreSQL доступен по сети
+3. Проверьте права пользователя БД на создание таблиц и изменение схемы
 
 ## Дополнительные ресурсы
 
