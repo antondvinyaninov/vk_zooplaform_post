@@ -98,11 +98,10 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                 const isVKVideo = attachment.type === 'vk_video' || attachment.type === 'video';
 
                 if (isS3Video) {
-                  const proxyUrl = attachment.url.replace('https://s3.firstvds.ru', 'https://gw.zooplatforma.ru/s3');
                   return (
                     <video 
                       key={index} 
-                      src={proxyUrl} 
+                      src={attachment.url} 
                       controls 
                       playsInline
                       style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid #e1e3e6' }} 

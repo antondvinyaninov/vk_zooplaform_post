@@ -3,7 +3,7 @@ const vkBridge = (vkBridgeModule as any).send ? vkBridgeModule : (vkBridgeModule
 import { UserInfo } from '@vkontakte/vk-bridge';
 
 const isVKCDN = window.location.hostname.includes('vk-apps.com');
-const API_URL = isVKCDN ? 'https://gw.zooplatforma.ru/api/app' : '/api/app';
+const API_URL = isVKCDN ? 'https://d5dm8lfd2hhhn5plloht.p8361f8z.apigw.yandexcloud.net/api/app' : '/api/app';
 
 export interface AppUser {
   id: number;
@@ -137,10 +137,9 @@ export const getS3VideoUploadUrl = async (fileName: string, fileType: string) =>
 };
 
 export const uploadVideoToS3 = async (file: File, uploadUrl: string) => {
-  const proxyUrl = uploadUrl.replace('https://s3.firstvds.ru', 'https://gw.zooplatforma.ru/s3');
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('PUT', proxyUrl, true);
+    xhr.open('PUT', uploadUrl, true);
     xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
 
     xhr.onload = () => {

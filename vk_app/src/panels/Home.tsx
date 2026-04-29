@@ -87,7 +87,6 @@ export const Home: FC<HomeProps> = ({ id }) => {
                     const isS3Video = firstAtt.type === 's3_video' || firstAtt.url.includes('.mp4') || firstAtt.url.includes('.mov');
                     const isVKVideo = firstAtt.type === 'vk_video' || firstAtt.type === 'video';
                     
-                    const proxyUrl = firstAtt.url.replace('https://s3.firstvds.ru', 'https://gw.zooplatforma.ru/s3');
                     return (
                     <div 
                       onClick={() => {
@@ -112,7 +111,7 @@ export const Home: FC<HomeProps> = ({ id }) => {
                       {isS3Video ? (
                         <>
                           <video 
-                            src={proxyUrl} 
+                            src={firstAtt.url} 
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                             muted
                             playsInline
