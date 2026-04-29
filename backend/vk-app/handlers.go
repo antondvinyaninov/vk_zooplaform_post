@@ -288,8 +288,66 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	files := r.MultipartForm.File["media"]
+
+	if len(files) > 0 {
+		adminToken, err := getActiveVKToken()
+		if err == nil && adminToken != "" {
+			vkClient := vk.NewVKClient(adminToken)
+			groupIDStr := strconv.Itoa(group.VKGroupID)
+
+			for _, fileHeader := range files {
+				file, err := fileHeader.Open()
+				if err != nil {
+					continue
+				}
+
+				// Create temp file
+				tmpFile, err := os.CreateTemp("", "upload_*"+filepath.Ext(fileHeader.Filename))
+				if err != nil {
+					file.Close()
+					continue
+				}
+
+				io.Copy(tmpFile, file)
+				tmpPath := tmpFile.Name()
+				tmpFile.Close()
+				file.Close()
+
+				// Detect if image or video
+				contentType := fileHeader.Header.Get("Content-Type")
+				filenameLower := strings.ToLower(fileHeader.Filename)
+				
+				// Если фронтенд по ошибке прислал видео в поле media
+				if strings.HasPrefix(contentType, "video/") || 
+				   strings.HasSuffix(filenameLower, ".mp4") || 
+				   strings.HasSuffix(filenameLower, ".mov") || 
+				   strings.HasSuffix(filenameLower, ".qt") {
+					os.Remove(tmpPath)
+					continue
+				}
+
+				// Грузим только фото для старых клиентов
+				att, attURL, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
+				if err == nil {
+					if attURL != "" {
+						uploadedAttachments = append(uploadedAttachments, att+"|"+attURL)
+					} else {
+						uploadedAttachments = append(uploadedAttachments, att)
+					}
+				} else {
+					log.Printf("Legacy upload failed: %v", err)
+				}
+				os.Remove(tmpPath)
+			}
+		}
+	}
+
 	// Считываем ключи медиа, загруженных в S3 (фото и видео)
 	s3KeysStr := r.FormValue("s3_media_keys")
+	if s3KeysStr == "" {
+		s3KeysStr = r.FormValue("s3_video_key") // Поддержка старых клиентов
+	}
 
 	attachmentsBytes, _ := json.Marshal(uploadedAttachments)
 	post := &models.Post{
