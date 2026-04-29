@@ -14,6 +14,7 @@ import {
   Div,
   Text,
   Avatar,
+  Gallery,
 } from '@vkontakte/vkui';
 import { 
   Icon28CalendarOutline,
@@ -91,53 +92,103 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
           </Text>
           
           {post.attachment_urls && post.attachment_urls.length > 0 && (
-            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {post.attachment_urls.map((attachment: any, index: number) => {
-                const isS3Video = attachment.type === 's3_video' || attachment.url.includes('.mp4') || attachment.url.includes('.mov');
-                const isVKVideo = attachment.type === 'vk_video' || attachment.type === 'video';
+            <div style={{ marginTop: 16 }}>
+              {post.attachment_urls.length === 1 ? (
+                // Если одно вложение - выводим как раньше
+                <div style={{ width: '100%', borderRadius: 8, overflow: 'hidden' }}>
+                  {(() => {
+                    const attachment = post.attachment_urls[0];
+                    const isS3Video = attachment.type === 's3_video' || attachment.url.includes('.mp4') || attachment.url.includes('.mov');
+                    const isVKVideo = attachment.type === 'vk_video' || attachment.type === 'video';
+                    
+                    if (isS3Video) {
+                      return (
+                        <video 
+                          src={attachment.url} 
+                          controls 
+                          playsInline
+                          style={{ width: '100%', display: 'block', objectFit: 'cover' }} 
+                        />
+                      );
+                    } else if (isVKVideo) {
+                      let iframeSrc = '';
+                      if (attachment.url.startsWith('video')) {
+                        const parts = attachment.url.replace('video', '').split('_');
+                        const oid = parts[0];
+                        const vid = parts[1];
+                        const hash = parts[2] ? `&hash=${parts[2]}` : '';
+                        iframeSrc = `https://vk.com/video_ext.php?oid=${oid}&id=${vid}${hash}&hd=2`;
+                      }
+                      
+                      return (
+                        <iframe 
+                          src={iframeSrc} 
+                          width="100%" 
+                          height="250" 
+                          frameBorder="0" 
+                          allowFullScreen 
+                          style={{ display: 'block' }}
+                        ></iframe>
+                      );
+                    } else {
+                      return (
+                        <img 
+                          src={attachment.url} 
+                          alt="Фото"
+                          style={{ width: '100%', display: 'block', objectFit: 'cover' }} 
+                        />
+                      );
+                    }
+                  })()}
+                </div>
+              ) : (
+                // Если вложений несколько - используем галерею
+                <Gallery
+                  slideWidth="100%"
+                  bullets="dark"
+                  showArrows
+                  style={{ height: 350, borderRadius: 8, overflow: 'hidden', backgroundColor: 'var(--vkui--color_background_secondary)' }}
+                >
+                  {post.attachment_urls.map((attachment: any, index: number) => {
+                    const isS3Video = attachment.type === 's3_video' || attachment.url.includes('.mp4') || attachment.url.includes('.mov');
+                    const isVKVideo = attachment.type === 'vk_video' || attachment.type === 'video';
 
-                if (isS3Video) {
-                  return (
-                    <video 
-                      key={index} 
-                      src={attachment.url} 
-                      controls 
-                      playsInline
-                      style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid #e1e3e6' }} 
-                    />
-                  );
-                } else if (isVKVideo) {
-                  let iframeSrc = '';
-                  if (attachment.url.startsWith('video')) {
-                    const parts = attachment.url.replace('video', '').split('_');
-                    const oid = parts[0];
-                    const vid = parts[1];
-                    const hash = parts[2] ? `&hash=${parts[2]}` : '';
-                    iframeSrc = `https://vk.com/video_ext.php?oid=${oid}&id=${vid}${hash}&hd=2`;
-                  }
-                  
-                  return (
-                    <iframe 
-                      key={index} 
-                      src={iframeSrc} 
-                      width="100%" 
-                      height="250" 
-                      frameBorder="0" 
-                      allowFullScreen 
-                      style={{borderRadius: 8, border: '1px solid #e1e3e6', display: 'block'}}
-                    ></iframe>
-                  );
-                } else {
-                  return (
-                    <img 
-                      key={index} 
-                      src={attachment.url} 
-                      alt={`Фото ${index + 1}`}
-                      style={{ width: '100%', borderRadius: 8, objectFit: 'cover', border: '1px solid #e1e3e6' }} 
-                    />
-                  );
-                }
-              })}
+                    return (
+                      <div key={index} style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {isS3Video ? (
+                          <video 
+                            src={attachment.url} 
+                            controls 
+                            playsInline
+                            style={{ width: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                          />
+                        ) : isVKVideo ? (
+                          <iframe 
+                            src={(() => {
+                              if (attachment.url.startsWith('video')) {
+                                const parts = attachment.url.replace('video', '').split('_');
+                                return `https://vk.com/video_ext.php?oid=${parts[0]}&id=${parts[1]}${parts[2] ? `&hash=${parts[2]}` : ''}&hd=2`;
+                              }
+                              return '';
+                            })()} 
+                            width="100%" 
+                            height="100%" 
+                            frameBorder="0" 
+                            allowFullScreen 
+                            style={{ border: 'none' }}
+                          ></iframe>
+                        ) : (
+                          <img 
+                            src={attachment.url} 
+                            alt={`Медиа ${index + 1}`}
+                            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </Gallery>
+              )}
             </div>
           )}
         </Div>
