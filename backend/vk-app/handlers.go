@@ -288,65 +288,8 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	files := r.MultipartForm.File["media"]
-
-	if len(files) > 0 {
-		adminToken, err := getActiveVKToken()
-		if err != nil || adminToken == "" {
-			utils.RespondError(w, http.StatusInternalServerError, "admin token not found to upload media")
-			return
-		}
-		vkClient := vk.NewVKClient(adminToken)
-		groupIDStr := strconv.Itoa(group.VKGroupID)
-
-		for _, fileHeader := range files {
-			file, err := fileHeader.Open()
-			if err != nil {
-				continue
-			}
-
-			// Create temp file
-			tmpFile, err := os.CreateTemp("", "upload_*"+filepath.Ext(fileHeader.Filename))
-			if err != nil {
-				file.Close()
-				continue
-			}
-
-			io.Copy(tmpFile, file)
-			tmpPath := tmpFile.Name()
-			tmpFile.Close()
-			file.Close()
-
-			// Detect if image or video
-			contentType := fileHeader.Header.Get("Content-Type")
-			filenameLower := strings.ToLower(fileHeader.Filename)
-			
-			// Если фронтенд по ошибке прислал видео в поле media (из-за старого кэша или бага)
-			if strings.HasPrefix(contentType, "video/") || 
-			   strings.HasSuffix(filenameLower, ".mp4") || 
-			   strings.HasSuffix(filenameLower, ".mov") || 
-			   strings.HasSuffix(filenameLower, ".qt") {
-				os.Remove(tmpPath)
-				utils.RespondError(w, http.StatusBadRequest, "Видео нужно загружать через S3, обновите приложение (очистите кэш ВКонтакте).")
-				return
-			}
-
-			// Грузим только фото
-			att, attURL, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
-			if err == nil {
-				if attURL != "" {
-					uploadedAttachments = append(uploadedAttachments, att+"|"+attURL)
-				} else {
-					uploadedAttachments = append(uploadedAttachments, att)
-				}
-			} else {
-				os.Remove(tmpPath)
-				utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Ошибка загрузки фото: %v", err))
-				return
-			}
-			os.Remove(tmpPath)
-		}
-	}
+	// Считываем ключи медиа, загруженных в S3 (фото и видео)
+	s3KeysStr := r.FormValue("s3_media_keys")
 
 	attachmentsBytes, _ := json.Marshal(uploadedAttachments)
 	post := &models.Post{
@@ -355,7 +298,7 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		Message:     message,
 		Status:      "pending",
 		Attachments: string(attachmentsBytes),
-		S3VideoKey:  r.FormValue("s3_video_key"),
+		S3VideoKey:  s3KeysStr,
 	}
 	if err := createPost(post); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -547,52 +490,70 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 		client := vk.NewVKClient(token)
 
-		// Если есть S3 видео - скачиваем и загружаем в VK
+		// Если есть медиа в S3 - скачиваем и загружаем в VK
 		if post.S3VideoKey != "" {
 			s3, err := s3client.New()
 			if err == nil {
-				log.Printf("[Moderate] Downloading S3 video: %s", post.S3VideoKey)
-				rc, _, err := s3.GetObject(context.Background(), post.S3VideoKey)
-				if err == nil {
-					tmpFile, err := os.CreateTemp("", "moderation_video_*.mp4")
+				s3Keys := strings.Split(post.S3VideoKey, ",")
+				
+				for _, key := range s3Keys {
+					key = strings.TrimSpace(key)
+					if key == "" {
+						continue
+					}
+					log.Printf("[Moderate] Downloading S3 media: %s", key)
+					rc, _, err := s3.GetObject(context.Background(), key)
 					if err == nil {
-						io.Copy(tmpFile, rc)
-						tmpPath := tmpFile.Name()
-						tmpFile.Close()
-						rc.Close()
-
-						// Загружаем в ВК
-						att, attURL, err := client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(post.S3VideoKey))
+						tmpFile, err := os.CreateTemp("", "moderation_media_*")
 						if err == nil {
-							attachments = append(attachments, att)
-							// Обновляем attachments в самом посте (чтобы сохранить URL если надо)
-							var oldParts []string
-							if post.Attachments != "" {
-								if strings.HasPrefix(post.Attachments, "[") {
-									json.Unmarshal([]byte(post.Attachments), &oldParts)
-								} else {
-									oldParts = strings.Split(post.Attachments, ",")
-								}
-							}
-							if attURL != "" {
-								oldParts = append(oldParts, att+"|"+attURL)
+							io.Copy(tmpFile, rc)
+							tmpPath := tmpFile.Name()
+							tmpFile.Close()
+							rc.Close()
+
+							var att, attURL string
+							var uploadErr error
+							ext := strings.ToLower(filepath.Ext(key))
+
+							if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
+								// Загружаем как видео
+								att, attURL, uploadErr = client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
 							} else {
-								oldParts = append(oldParts, att)
+								// Загружаем как фото
+								att, attURL, uploadErr = client.UploadPhotoToWall(tmpPath, strconv.Itoa(group.VKGroupID))
 							}
-							newAtts, _ := json.Marshal(oldParts)
-							post.Attachments = string(newAtts)
-							
-							// Удаляем из S3 после успешной загрузки
-							go s3DeleteVideoKey(post.S3VideoKey)
-							post.S3VideoKey = "" // Очищаем ключ, он больше не нужен
+
+							if uploadErr == nil {
+								attachments = append(attachments, att)
+								// Обновляем attachments в самом посте (чтобы сохранить URL если надо)
+								var oldParts []string
+								if post.Attachments != "" {
+									if strings.HasPrefix(post.Attachments, "[") {
+										json.Unmarshal([]byte(post.Attachments), &oldParts)
+									} else {
+										oldParts = strings.Split(post.Attachments, ",")
+									}
+								}
+								if attURL != "" {
+									oldParts = append(oldParts, att+"|"+attURL)
+								} else {
+									oldParts = append(oldParts, att)
+								}
+								newAtts, _ := json.Marshal(oldParts)
+								post.Attachments = string(newAtts)
+								
+								// Удаляем из S3 после успешной загрузки
+								go s3DeleteVideoKey(key)
+							} else {
+								log.Printf("[Moderate] VK Upload error for %s: %v", key, uploadErr)
+							}
+							os.Remove(tmpPath)
 						} else {
-							log.Printf("[Moderate] VK UploadVideo error: %v", err)
+							rc.Close()
 						}
-						os.Remove(tmpPath)
-					} else {
-						rc.Close()
 					}
 				}
+				post.S3VideoKey = "" // Очищаем ключи, они больше не нужны
 			}
 		}
 
@@ -1659,9 +1620,9 @@ func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	utils.RespondSuccess(w, map[string]string{"status": "deleted"})
 }
 
-// s3VideoPresignHandler генерирует presigned PUT URL для загрузки видео напрямую в S3.
-// GET /api/app/upload/video-presign?filename=video.mp4
-func s3VideoPresignHandler(w http.ResponseWriter, r *http.Request) {
+// s3PresignHandler генерирует presigned PUT URL для загрузки медиа напрямую в S3.
+// GET /api/app/upload/presign?filename=video.mp4&type=video/mp4
+func s3PresignHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -1677,16 +1638,16 @@ func s3VideoPresignHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Генерируем уникальный ключ для видеофайла
+	// Генерируем уникальный ключ для файла
 	filename := r.URL.Query().Get("filename")
 	contentType := r.URL.Query().Get("type")
 	if contentType == "" {
-		contentType = "video/mp4"
+		contentType = "application/octet-stream"
 	}
 	
-	key := fmt.Sprintf("pending-videos/%d_%s", time.Now().UnixNano(), filename)
+	key := fmt.Sprintf("pending-media/%d_%s", time.Now().UnixNano(), filename)
 	if filename == "" {
-		key = fmt.Sprintf("pending-videos/%d.mp4", time.Now().UnixNano())
+		key = fmt.Sprintf("pending-media/%d_file", time.Now().UnixNano())
 	}
 
 	s3, err := s3client.New()

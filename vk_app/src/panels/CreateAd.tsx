@@ -15,7 +15,7 @@ import {
 import { Icon24Camera, Icon28CancelCircleFillRed, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import bridge from '@vkontakte/vk-bridge';
-import { createPost, getS3VideoUploadUrl, uploadVideoToS3 } from '../shared/api';
+import { createPost, getS3PresignedUrl, uploadMediaToS3 } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export const CreatePost: FC<NavIdProps> = ({ id }) => {
@@ -150,8 +150,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
         // Игнорируем ошибки
       }
 
-      const imagesToUpload: File[] = [];
-      const s3VideoKeys: string[] = [];
+      const s3MediaKeys: string[] = [];
 
       for (const item of files) {
         const isVideo = item.file.type.startsWith('video/') || 
@@ -159,16 +158,20 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
                        item.file.name.toLowerCase().endsWith('.mov') || 
                        item.file.name.toLowerCase().endsWith('.qt');
                        
-        if (isVideo) {
-          const { upload_url, key } = await getS3VideoUploadUrl(item.file.name, item.file.type || 'video/mp4');
-          await uploadVideoToS3(item.file, upload_url);
-          s3VideoKeys.push(key);
-        } else {
-          imagesToUpload.push(await compressImage(item.file));
+        let fileToUpload = item.file;
+        let fileType = item.file.type;
+        
+        if (!isVideo) {
+          fileToUpload = await compressImage(item.file);
+          fileType = fileToUpload.type || 'image/jpeg';
         }
+        
+        const { upload_url, key } = await getS3PresignedUrl(fileToUpload.name, fileType);
+        await uploadMediaToS3(fileToUpload, upload_url);
+        s3MediaKeys.push(key);
       }
 
-      await createPost(text, imagesToUpload, [], s3VideoKeys);
+      await createPost(text, s3MediaKeys, []);
       routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`);
     } catch (error: any) {
       alert(`Ошибка при сохранении: ${error?.message || String(error)}`);

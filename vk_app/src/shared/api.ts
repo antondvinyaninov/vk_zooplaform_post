@@ -130,45 +130,42 @@ export const syncUserWithBackend = async (user: UserInfo, vkSignature?: string) 
   return response.json() as Promise<{ user: AppUser; viewerRole: string; groupId: number }>;
 };
 
-export const getS3VideoUploadUrl = async (fileName: string, fileType: string) => {
+export const getS3PresignedUrl = async (fileName: string, fileType: string) => {
   return fetchJSON<{ upload_url: string; key: string }>(
-    `${API_URL}/upload/video-presign?filename=${encodeURIComponent(fileName)}&type=${encodeURIComponent(fileType || 'video/mp4')}`
+    `${API_URL}/upload/presign?filename=${encodeURIComponent(fileName)}&type=${encodeURIComponent(fileType || 'application/octet-stream')}`
   );
 };
 
-export const uploadVideoToS3 = async (file: File, uploadUrl: string) => {
+export const uploadMediaToS3 = async (file: File, uploadUrl: string) => {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', uploadUrl, true);
-    xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve(true);
       } else {
-        reject(new Error(`S3 Video upload failed: ${xhr.status} ${xhr.responseText}`));
+        reject(new Error(`S3 Media upload failed: ${xhr.status} ${xhr.responseText}`));
       }
     };
 
     xhr.onerror = () => {
-      reject(new Error('S3 Video upload failed due to network error'));
+      reject(new Error('S3 Media upload failed due to network error'));
     };
 
     xhr.send(file);
   });
 };
 
-export const createPost = async (message: string, files: File[] = [], videoIds: string[] = [], s3VideoKeys: string[] = []) => {
+export const createPost = async (message: string, s3MediaKeys: string[] = [], videoIds: string[] = []) => {
   const formData = new FormData();
   formData.append('message', message);
-  files.forEach((file) => {
-    formData.append('media', file);
-  });
   if (videoIds.length > 0) {
     formData.append('attachments', videoIds.join(','));
   }
-  if (s3VideoKeys.length > 0) {
-    formData.append('s3_video_key', s3VideoKeys[0]); // Пока поддерживаем только 1 видео на S3
+  if (s3MediaKeys.length > 0) {
+    formData.append('s3_media_keys', s3MediaKeys.join(',')); // Поддерживаем несколько медиа-файлов на S3
   }
 
   const vkSignature = getVKLaunchSignature();
