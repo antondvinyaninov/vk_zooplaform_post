@@ -562,24 +562,24 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 					log.Printf("[Moderate] Downloading S3 media: %s", key)
 					rc, _, err := s3.GetObject(context.Background(), key)
 					if err == nil {
-						tmpFile, err := os.CreateTemp("", "moderation_media_*")
-						if err == nil {
-							io.Copy(tmpFile, rc)
-							tmpPath := tmpFile.Name()
-							tmpFile.Close()
-							rc.Close()
-
 							var att, attURL string
 							var uploadErr error
 							ext := strings.ToLower(filepath.Ext(key))
 
-							if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
-								// Загружаем как видео
-								att, attURL, uploadErr = client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
-							} else {
-								// Загружаем как фото
-								att, attURL, uploadErr = client.UploadPhotoToWall(tmpPath, strconv.Itoa(group.VKGroupID))
-							}
+							tmpFile, err := os.CreateTemp("", "moderation_media_*"+ext)
+							if err == nil {
+								io.Copy(tmpFile, rc)
+								tmpPath := tmpFile.Name()
+								tmpFile.Close()
+								rc.Close()
+
+								if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
+									// Загружаем как видео
+									att, attURL, uploadErr = client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
+								} else {
+									// Загружаем как фото
+									att, attURL, uploadErr = client.UploadPhotoToWall(tmpPath, strconv.Itoa(group.VKGroupID))
+								}
 
 							if uploadErr == nil {
 								attachments = append(attachments, att)
