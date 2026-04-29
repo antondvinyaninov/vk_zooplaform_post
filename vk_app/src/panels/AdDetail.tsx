@@ -18,8 +18,7 @@ import {
 import { 
   Icon28CalendarOutline,
   Icon28NewsfeedOutline,
-  Icon56ErrorOutline,
-  Icon28VideoOutline
+  Icon56ErrorOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { getPostById } from '../shared/api';
