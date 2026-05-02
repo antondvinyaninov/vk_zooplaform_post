@@ -130,7 +130,7 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
             const role = launchParams.vk_viewer_group_role;
             const isModerator = ['admin', 'editor', 'moder'].includes(role || '');
             const isAuthor = post.author && launchParams.vk_user_id && post.author.vk_user_id === Number(launchParams.vk_user_id);
-            const canEdit = (isModerator || isAuthor) && (post.status === 'pending' || post.status === 'draft');
+            const canEdit = (isModerator || isAuthor) && (post.status === 'pending' || post.status === 'draft' || post.status === 'rejected');
 
             if (isEditing) {
               return (
@@ -154,7 +154,12 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                         try {
                           setIsSaving(true);
                           await editPost(post.id, editMessage);
-                          setPost({ ...post, message: editMessage });
+                          const updatedState = { ...post, message: editMessage };
+                          if (post.status === 'rejected') {
+                            updatedState.status = 'pending';
+                            updatedState.reject_reason = '';
+                          }
+                          setPost(updatedState);
                           setIsEditing(false);
                         } catch (error) {
                           console.error('Failed to edit post:', error);

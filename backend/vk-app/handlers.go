@@ -502,9 +502,9 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		return
 	}
 
-	// Только в статусе pending или draft можно редактировать (опубликованные или отклоненные нельзя)
-	if post.Status != "pending" && post.Status != "draft" {
-		utils.RespondError(w, http.StatusForbidden, "can only edit pending or draft posts")
+	// Разрешаем редактировать pending, draft и rejected
+	if post.Status != "pending" && post.Status != "draft" && post.Status != "rejected" {
+		utils.RespondError(w, http.StatusForbidden, "can only edit pending, draft or rejected posts")
 		return
 	}
 
@@ -524,10 +524,25 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	}
 
 	post.Message = req.Message
+	
+	// Если пост был отклонен, то после редактирования возвращаем его на модерацию
+	wasRejected := post.Status == "rejected"
+	if wasRejected {
+		post.Status = "pending"
+		post.RejectReason = ""
+	}
 
 	if err := updatePost(post); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if wasRejected {
+		group, err := getGroupByID(post.GroupID)
+		if err == nil && group != nil {
+			appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
+			sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь обновил отклоненный пост в группе \"%s\". Он снова отправлен на модерацию.\n\n[%s|Перейти к модерации поста]", group.Name, appURL))
+		}
 	}
 
 	response, err := serializePost(post)
