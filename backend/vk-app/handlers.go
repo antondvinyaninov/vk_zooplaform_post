@@ -865,8 +865,17 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			}
 		}
 
+		messageToPost := post.Message
+		if post.UserID != 0 {
+			author, err := getUserByID(post.UserID)
+			if err == nil && author != nil {
+				authorLink := fmt.Sprintf("\n\nАвтор: @id%d (%s %s)", author.VKUserID, author.FirstName, author.LastName)
+				messageToPost += authorLink
+			}
+		}
+
 		// from_group=true: постим от имени группы (требует токена сообщества или токена админа с правами)
-		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, attachments, true, publishUnix)
+		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), messageToPost, attachments, true, publishUnix)
 		if err != nil {
 			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
 			utils.RespondError(w, http.StatusBadRequest, err.Error())
