@@ -16,6 +16,9 @@ import {
   Avatar,
   Gallery,
   Textarea,
+  File as VKFile,
+  HorizontalScroll,
+  Image,
 } from '@vkontakte/vkui';
 import { 
   Icon28CalendarOutline,
@@ -23,10 +26,13 @@ import {
   Icon56ErrorOutline,
   Icon24CheckCircleOutline,
   Icon24CancelOutline,
+  Icon24Camera,
+  Icon28VideoOutline,
+  Icon24Dismiss,
   Icon24WriteOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
-import { getPostById, moderatePost, editPost } from '../shared/api';
+import { getPostById, moderatePost, editPost, compressImage, getS3PresignedUrl, uploadMediaToS3 } from '../shared/api';
 
 export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -39,6 +45,51 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editFiles, setEditFiles] = useState<Array<{file: File, thumbnail?: string}>>([]);
+  const [existingAttachments, setExistingAttachments] = useState<any[]>([]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files);
+    
+    if (editFiles.length + existingAttachments.length + newFiles.length > 10) {
+      alert('Можно прикрепить не более 10 медиафайлов');
+      return;
+    }
+
+    const processedFiles = await Promise.all(newFiles.map(async (file) => {
+      let thumbnail: string | undefined;
+      const isVideo = file.type.startsWith('video/') || 
+                      file.name.toLowerCase().endsWith('.mp4') || 
+                      file.name.toLowerCase().endsWith('.mov') || 
+                      file.name.toLowerCase().endsWith('.qt');
+      
+      if (isVideo) {
+        try {
+          const videoUrl = URL.createObjectURL(file);
+          const video = document.createElement('video');
+          video.src = videoUrl;
+          video.currentTime = 1;
+          await new Promise((resolve, reject) => {
+            video.onloadeddata = resolve;
+            video.onerror = reject;
+          });
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+          thumbnail = canvas.toDataURL('image/jpeg');
+          URL.revokeObjectURL(videoUrl);
+        } catch (e) {
+          console.error("Could not generate thumbnail", e);
+        }
+      }
+      return { file, thumbnail };
+    }));
+
+    setEditFiles(prev => [...prev, ...processedFiles]);
+  };
 
   useEffect(() => {
     async function fetchDetail() {
@@ -146,6 +197,107 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                     onChange={(e) => setEditMessage(e.target.value)} 
                     style={{ minHeight: 100 }}
                   />
+                  
+                  <div style={{ marginTop: 12 }}>
+                    <VKFile 
+                      multiple 
+                      accept="image/*,video/*" 
+                      onChange={handleFileChange} 
+                      mode="secondary"
+                      before={<Icon24Camera />}
+                      size="s"
+                      disabled={editFiles.length + existingAttachments.length >= 10 || isSaving}
+                    >
+                      Прикрепить фото/видео ({editFiles.length + existingAttachments.length}/10)
+                    </VKFile>
+                  </div>
+
+                  {(existingAttachments.length > 0 || editFiles.length > 0) && (
+                    <div style={{ marginTop: 12 }}>
+                      <HorizontalScroll showArrows getScrollToLeft={(i) => i - 120} getScrollToRight={(i) => i + 120}>
+                        <div style={{ display: 'flex', gap: 12, padding: '8px 4px' }}>
+                          
+                          {existingAttachments.map((att, index) => (
+                            <div key={`exist_${index}`} style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+                              <Image 
+                                src={att.url} 
+                                size={80} 
+                                style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
+                              />
+                              {(att.type === 'vk_video' || att.type === 'video' || att.type === 's3_video') && (
+                                <div style={{ 
+                                  position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
+                                  backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, 
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none'
+                                }}>
+                                  <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />
+                                </div>
+                              )}
+                              <div 
+                                onClick={() => setExistingAttachments(prev => prev.filter((_, i) => i !== index))}
+                                style={{
+                                  position: 'absolute', top: -8, right: -8, width: 24, height: 24, 
+                                  backgroundColor: 'white', borderRadius: '50%', display: 'flex', 
+                                  alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}
+                              >
+                                <Icon24Dismiss width={16} height={16} style={{ color: 'var(--vkui--color_icon_negative)' }} />
+                              </div>
+                            </div>
+                          ))}
+
+                          {editFiles.map((item, index) => (
+                            <div key={`new_${index}`} style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+                              {item.file.type.startsWith('image/') ? (
+                                <Image 
+                                  src={URL.createObjectURL(item.file)} 
+                                  size={80} 
+                                  style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
+                                />
+                              ) : item.thumbnail ? (
+                                <div style={{ position: 'relative', width: 80, height: 80 }}>
+                                  <Image 
+                                    src={item.thumbnail} 
+                                    size={80} 
+                                    style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
+                                  />
+                                  <div style={{ 
+                                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
+                                    backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, 
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none'
+                                  }}>
+                                    <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div style={{ 
+                                  width: 80, height: 80, backgroundColor: '#f0f0f0', 
+                                  borderRadius: 8, display: 'flex', flexDirection: 'column', 
+                                  alignItems: 'center', justifyContent: 'center', border: '1px solid #e1e3e6'
+                                }}>
+                                  <Icon28VideoOutline style={{ color: '#99a2ad' }} />
+                                  <Text style={{ fontSize: 10, color: '#99a2ad', marginTop: 4 }}>Видео</Text>
+                                </div>
+                              )}
+                              <div 
+                                onClick={() => setEditFiles(prev => prev.filter((_, i) => i !== index))}
+                                style={{
+                                  position: 'absolute', top: -8, right: -8, width: 24, height: 24, 
+                                  backgroundColor: 'white', borderRadius: '50%', display: 'flex', 
+                                  alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                }}
+                              >
+                                <Icon24Dismiss width={16} height={16} style={{ color: 'var(--vkui--color_icon_negative)' }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </HorizontalScroll>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                     <Button 
                       size="s" 
@@ -153,16 +305,40 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                       onClick={async () => {
                         try {
                           setIsSaving(true);
-                          await editPost(post.id, editMessage);
-                          const updatedState = { ...post, message: editMessage };
-                          if (post.status === 'rejected') {
-                            updatedState.status = 'pending';
-                            updatedState.reject_reason = '';
+                          
+                          const newS3MediaKeys: string[] = [];
+                          for (const item of editFiles) {
+                            const isVideo = item.file.type.startsWith('video/') || 
+                                          item.file.name.toLowerCase().endsWith('.mp4') || 
+                                          item.file.name.toLowerCase().endsWith('.mov') || 
+                                          item.file.name.toLowerCase().endsWith('.qt');
+                                          
+                            let fileToUpload = item.file;
+                            let fileType = item.file.type;
+                            
+                            if (!isVideo) {
+                              fileToUpload = await compressImage(item.file);
+                              fileType = fileToUpload.type || 'image/jpeg';
+                            }
+                            
+                            const { upload_url, key } = await getS3PresignedUrl(fileToUpload.name, fileType);
+                            await uploadMediaToS3(fileToUpload, upload_url);
+                            newS3MediaKeys.push(key);
                           }
-                          setPost(updatedState);
+
+                          const existingS3Keys = existingAttachments.filter(a => a.id.startsWith('s3:')).map(a => a.id.replace('s3:', ''));
+                          const existingVKAttachments = existingAttachments.filter(a => !a.id.startsWith('s3:')).map(a => a.id).join(',');
+                          const allS3Keys = [...existingS3Keys, ...newS3MediaKeys];
+
+                          await editPost(post.id, editMessage, allS3Keys, existingVKAttachments);
+                          
+                          const data = await getPostById(post.id);
+                          setPost(data);
                           setIsEditing(false);
+                          
                         } catch (error) {
                           console.error('Failed to edit post:', error);
+                          alert('Ошибка при сохранении: ' + String(error));
                         } finally {
                           setIsSaving(false);
                         }
@@ -196,6 +372,8 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                     style={{ marginTop: 8 }}
                     onClick={() => {
                       setEditMessage(post.message);
+                      setExistingAttachments(post.attachment_urls || []);
+                      setEditFiles([]);
                       setIsEditing(true);
                     }}
                   >

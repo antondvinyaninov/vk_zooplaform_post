@@ -15,7 +15,7 @@ import {
 import { Icon24Camera, Icon28CancelCircleFillRed, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import bridge from '@vkontakte/vk-bridge';
-import { createPost, getS3PresignedUrl, uploadMediaToS3 } from '../shared/api';
+import { createPost, getS3PresignedUrl, uploadMediaToS3, compressImage } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export const CreatePost: FC<NavIdProps> = ({ id }) => {
@@ -55,52 +55,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
     });
   };
 
-  
-  const compressImage = (file: File): Promise<File> => {
-    return new Promise((resolve) => {
-      if (!file.type.startsWith('image/')) {
-        resolve(file);
-        return;
-      }
-      const img = document.createElement('img');
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          resolve(file);
-          return;
-        }
-        
-        let width = img.width;
-        let height = img.height;
-        const MAX_SIZE = 1600;
-        
-        if (width > height && width > MAX_SIZE) {
-          height *= MAX_SIZE / width;
-          width = MAX_SIZE;
-        } else if (height > MAX_SIZE) {
-          width *= MAX_SIZE / height;
-          height = MAX_SIZE;
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(new File([blob], file.name.replace(/\.[^/.]+$/, "") + '.jpg', { type: 'image/jpeg', lastModified: Date.now() }));
-          } else {
-            resolve(file);
-          }
-        }, 'image/jpeg', 0.80);
-      };
-      img.onerror = () => resolve(file);
-      img.src = url;
-    });
-  };
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;

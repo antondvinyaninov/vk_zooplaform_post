@@ -516,7 +516,9 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	}
 
 	var req struct {
-		Message string `json:"message"`
+		Message     string   `json:"message"`
+		S3VideoKeys []string `json:"s3_video_keys"`
+		Attachments string   `json:"attachments"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -524,6 +526,14 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	}
 
 	post.Message = req.Message
+	if req.S3VideoKeys != nil {
+		post.S3VideoKey = strings.Join(req.S3VideoKeys, ",")
+	}
+	// We might also update attachments if provided, but let's just check if it's explicitly sent
+	// To be safe, if the frontend sends it, we update it.
+	// Since we set default `attachments: ''` in frontend if it's empty, we should be careful not to wipe out existing attachments if they aren't sent.
+	// Actually, the frontend will send the complete new state of attachments. So we can just overwrite.
+	post.Attachments = req.Attachments
 	
 	// Если пост был отклонен, то после редактирования возвращаем его на модерацию
 	wasRejected := post.Status == "rejected"
