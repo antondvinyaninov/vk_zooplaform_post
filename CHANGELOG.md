@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-04-26
 
 ### Added
+- **Backend / Posts**: Implemented soft-delete mechanism for posts (`status = 'deleted'`) to retain post analytics instead of hard physical deletion.
+- **Backend / Posts**: Added `delete_reason` and `delete_comment` columns to capture user feedback upon post deletion.
+- **Frontend / Posts**: Added `DeletePostModal` UI component to collect deletion reasons and optional comments when users delete their own posts.
 - **Frontend / Core Architecture**: Bootstrapped and migrated the entire legacy admin panel to a modern Astro 4.0 architecture using React 18, Tailwind CSS, and shadcn/ui components (`frontadmin` module).
 - **Frontend / Design System**: Implemented a comprehensive design system featuring light/dark mode theming, CSS variables, and modern accessible UI components.
 - **Frontend / API**: Integrated `swr` data fetching library for caching and real-time UI updates across the Admin Panel.
@@ -31,6 +34,9 @@ All notable changes to this project will be documented in this file.
 - **Documentation**: Restructured project documentation, created `PROJECT_MAPPING.md` to map out the separation between legacy projects and the current ZooPlatform architecture.
 
 ### Fixed
+- **Backend / S3 Integration**: Fixed `SignatureDoesNotMatch` errors causing pseudo-CORS "Network Errors" by enforcing safe ASCII suffixes for presigned URLs to handle Cyrillic filenames.
+- **Backend / S3 Cleanup**: Added automatic garbage collection in S3 to delete orphaned media objects when a post is soft-deleted.
+- **Frontend / Media Attachments**: Fixed iOS WKWebView freezes and crashes by disabling heavy synchronous local video thumbnail generation in `CreateAd` and `AdDetail`.
 - **Backend / Publishing**: Fixed `UploadPhotoToWall` failing due to VK API rejecting files without extensions by explicitly appending the original file extension during temporary file generation.
 - **Frontend / Rendering**: Fixed `populateAttachmentURLs` empty states by splitting comma-separated keys and classifying S3 keys dynamically based on their file extensions.
 - **Backend / Publishing**: Fixed silent failures and 500 Server Errors caused by passing `vk_user_id` directly into the `posts` table `user_id` column which violated database constraints.
