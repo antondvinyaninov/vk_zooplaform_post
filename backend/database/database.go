@@ -57,6 +57,10 @@ func createTables() error {
 		return err
 	}
 
+	if err := migratePostPublications(); err != nil {
+		return err
+	}
+
 	if err := seedAdminUsers(); err != nil {
 		return err
 	}
@@ -174,6 +178,25 @@ const postgresSchema = `
 		total_subscribers INTEGER NOT NULL DEFAULT 0,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS post_publications (
+		id BIGSERIAL PRIMARY KEY,
+		post_id BIGINT REFERENCES posts(id) ON DELETE CASCADE,
+		group_id BIGINT REFERENCES groups(id) ON DELETE CASCADE,
+		status TEXT DEFAULT 'pending',
+		vk_post_id BIGINT,
+		reject_reason TEXT,
+		delete_reason TEXT,
+		delete_comment TEXT,
+		publish_date TIMESTAMPTZ,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(post_id, group_id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_post_publications_post_id ON post_publications(post_id);
+	CREATE INDEX IF NOT EXISTS idx_post_publications_group_id ON post_publications(group_id);
+	CREATE INDEX IF NOT EXISTS idx_post_publications_status ON post_publications(status);
 `
 
 func migratePostsTable() error {
@@ -217,6 +240,31 @@ func migratePostsTable() error {
 	if err := addColumnIfMissing("posts", "delete_comment", "TEXT"); err != nil {
 		return err
 	}
+	return nil
+}
+
+func migratePostPublications() error {
+	var count int
+	if err := QueryRow(`SELECT COUNT(1) FROM post_publications`).Scan(&count); err != nil {
+		return err
+	}
+
+	if count > 0 {
+		return nil
+	}
+
+	log.Println("Migrating existing posts to post_publications...")
+	_, err := DB.Exec(`
+		INSERT INTO post_publications (post_id, group_id, status, vk_post_id, reject_reason, delete_reason, delete_comment, publish_date, created_at, updated_at)
+		SELECT id, group_id, status, vk_post_id, reject_reason, delete_reason, delete_comment, publish_date, created_at, updated_at
+		FROM posts
+		WHERE group_id IS NOT NULL
+		ON CONFLICT (post_id, group_id) DO NOTHING
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to migrate post publications: %v", err)
+	}
+
 	return nil
 }
 

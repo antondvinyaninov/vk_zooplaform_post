@@ -28,21 +28,36 @@ type vkLaunchContext struct {
 	GroupRole string
 }
 
+type postPublicationResponse struct {
+	ID           int           `json:"id"`
+	GroupID      int           `json:"group_id"`
+	Group        *groupSummary `json:"group,omitempty"`
+	Status       string        `json:"status"`
+	VKPostID     int           `json:"vk_post_id,omitempty"`
+	RejectReason string        `json:"reject_reason,omitempty"`
+	PublishDate  *string       `json:"publish_date,omitempty"`
+	CreatedAt    string        `json:"created_at"`
+	UpdatedAt    string        `json:"updated_at"`
+}
+
 type postResponse struct {
-	ID          int           `json:"id"`
-	Title       string        `json:"title"`
-	Message     string        `json:"message"`
-	Status      string        `json:"status"`
-	VKPostID    int           `json:"vk_post_id,omitempty"`
-	Group       *groupSummary `json:"group,omitempty"`
-	Author      *userSummary  `json:"author,omitempty"`
-	PublishDate    *string         `json:"publish_date,omitempty"`
-	Attachments    string          `json:"attachments,omitempty"`
-	S3VideoKey     string          `json:"s3_video_key,omitempty"`
-	RejectReason   string          `json:"reject_reason,omitempty"`
-	AttachmentURLs []AttachmentURL `json:"attachment_urls,omitempty"`
-	CreatedAt      string          `json:"created_at"`
-	UpdatedAt      string          `json:"updated_at"`
+	ID             int                       `json:"id"`
+	Title          string                    `json:"title"`
+	Message        string                    `json:"message"`
+	Author         *userSummary              `json:"author,omitempty"`
+	Attachments    string                    `json:"attachments,omitempty"`
+	S3VideoKey     string                    `json:"s3_video_key,omitempty"`
+	AttachmentURLs []AttachmentURL           `json:"attachment_urls,omitempty"`
+	CreatedAt      string                    `json:"created_at"`
+	UpdatedAt      string                    `json:"updated_at"`
+	Publications   []postPublicationResponse `json:"publications,omitempty"`
+
+	// Legacy fields for backward compatibility
+	Status       string        `json:"status,omitempty"`
+	VKPostID     int           `json:"vk_post_id,omitempty"`
+	Group        *groupSummary `json:"group,omitempty"`
+	PublishDate  *string       `json:"publish_date,omitempty"`
+	RejectReason string        `json:"reject_reason,omitempty"`
 }
 
 type AttachmentURL struct {
@@ -234,7 +249,7 @@ func listPostsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := serializePosts(posts)
+	response, err := serializePosts(posts, group.ID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -369,13 +384,11 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	attachmentsBytes, _ := json.Marshal(uploadedAttachments)
 	post := &models.Post{
 		UserID:      user.ID,
-		GroupID:     group.ID,
 		Message:     message,
-		Status:      "pending",
 		Attachments: string(attachmentsBytes),
 		S3VideoKey:  s3KeysStr,
 	}
-	if err := createPost(post); err != nil {
+	if err := createPost(post, group.ID, "pending"); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -385,7 +398,72 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL))
 	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", group.Name, appURL))
 
-	response, err := serializePost(post)
+	response, err := serializePost(post, group.ID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.RespondSuccess(w, response)
+}
+
+func suggestExistingPostHandler(w http.ResponseWriter, r *http.Request, postID int) {
+	if r.Method != http.MethodPost {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil || group == nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to ensure group")
+		return
+	}
+
+	post, err := getPostByID(postID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if post == nil {
+		utils.RespondError(w, http.StatusNotFound, "post not found")
+		return
+	}
+
+	if post.UserID != ctx.UserID {
+		utils.RespondError(w, http.StatusForbidden, "Only the author can suggest this post to another group")
+		return
+	}
+
+	for _, pub := range post.Publications {
+		if pub.GroupID == group.ID {
+			utils.RespondError(w, http.StatusBadRequest, "Post is already submitted to this community")
+			return
+		}
+	}
+
+	pub := &models.PostPublication{
+		PostID:  post.ID,
+		GroupID: group.ID,
+		Status:  "pending",
+	}
+
+	if err := createPublication(pub); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
+
+	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию в новое сообщество. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL))
+	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил существующий пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", group.Name, appURL))
+
+	response, err := serializePost(post, group.ID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -426,13 +504,13 @@ func myPostsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := getPostsByUserIDAndGroup(user.ID, group.ID, 100, 0)
+	posts, err := getPostsByUserID(user.ID, 100, 0)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	response, err := serializePosts(posts)
+	response, err := serializePosts(posts, group.ID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -459,7 +537,7 @@ func postByIDHandler(w http.ResponseWriter, r *http.Request) {
 
 	if len(parts) == 1 {
 		if r.Method == http.MethodGet {
-			getPostByIDHandler(w, postID)
+			getPostByIDHandler(w, r, postID)
 			return
 		}
 		if r.Method == http.MethodPut || r.Method == http.MethodPost {
@@ -483,10 +561,17 @@ func postByIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(parts) == 2 && parts[1] == "suggest" {
+		suggestExistingPostHandler(w, r, postID)
+		return
+	}
+
 	utils.RespondError(w, http.StatusNotFound, "route not found")
 }
 
-func getPostByIDHandler(w http.ResponseWriter, postID int) {
+func getPostByIDHandler(w http.ResponseWriter, r *http.Request, postID int) {
+	ctx, _ := parseLaunchContext(r) // Try to get context, it's fine if it fails
+
 	post, err := getPostByID(postID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -497,7 +582,12 @@ func getPostByIDHandler(w http.ResponseWriter, postID int) {
 		return
 	}
 
-	response, err := serializePost(post)
+	groupID := 0
+	if ctx != nil {
+		groupID = ctx.GroupID
+	}
+
+	response, err := serializePost(post, groupID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -530,13 +620,20 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		return
 	}
 
-	if post.GroupID != group.ID {
+	var currentPub *models.PostPublication
+	for i, pub := range post.Publications {
+		if pub.GroupID == group.ID {
+			currentPub = &post.Publications[i]
+			break
+		}
+	}
+	if currentPub == nil {
 		utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
 		return
 	}
 
 	// Разрешаем редактировать pending, draft и rejected
-	if post.Status != "pending" && post.Status != "draft" && post.Status != "rejected" {
+	if currentPub.Status != "pending" && currentPub.Status != "draft" && currentPub.Status != "rejected" {
 		utils.RespondError(w, http.StatusForbidden, "can only edit pending, draft or rejected posts")
 		return
 	}
@@ -562,33 +659,32 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	if req.S3VideoKeys != nil {
 		post.S3VideoKey = strings.Join(req.S3VideoKeys, ",")
 	}
-	// We might also update attachments if provided, but let's just check if it's explicitly sent
-	// To be safe, if the frontend sends it, we update it.
-	// Since we set default `attachments: ''` in frontend if it's empty, we should be careful not to wipe out existing attachments if they aren't sent.
-	// Actually, the frontend will send the complete new state of attachments. So we can just overwrite.
 	post.Attachments = req.Attachments
 	
-	// Если пост был отклонен, то после редактирования возвращаем его на модерацию
-	wasRejected := post.Status == "rejected"
-	if wasRejected {
-		post.Status = "pending"
-		post.RejectReason = ""
-	}
-
 	if err := updatePost(post); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
+	wasRejected := currentPub.Status == "rejected"
 	if wasRejected {
-		group, err := getGroupByID(post.GroupID)
-		if err == nil && group != nil {
-			appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
-			sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь обновил отклоненный пост в группе \"%s\". Он снова отправлен на модерацию.\n\n[%s|Перейти к модерации поста]", group.Name, appURL))
+		currentPub.Status = "pending"
+		currentPub.RejectReason = ""
+		if err := updatePublication(currentPub); err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err.Error())
+			return
 		}
 	}
 
-	response, err := serializePost(post)
+	if wasRejected {
+		g, err := getGroupByID(currentPub.GroupID)
+		if err == nil && g != nil {
+			appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, g.VKGroupID, post.ID)
+			sendNotificationToAdmins(g.ID, fmt.Sprintf("Пользователь обновил отклоненный пост в группе \"%s\". Он снова отправлен на модерацию.\n\n[%s|Перейти к модерации поста]", g.Name, appURL))
+		}
+	}
+
+	response, err := serializePost(post, group.ID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -635,12 +731,19 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		return
 	}
 
-	if post.GroupID != group.ID {
+	var currentPub *models.PostPublication
+	for i, pub := range post.Publications {
+		if pub.GroupID == group.ID {
+			currentPub = &post.Publications[i]
+			break
+		}
+	}
+	if currentPub == nil {
 		utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
 		return
 	}
 
-	if post.Status != "pending" {
+	if currentPub.Status != "pending" {
 		utils.RespondError(w, http.StatusBadRequest, "post is already moderated")
 		return
 	}
@@ -661,10 +764,10 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 				utils.RespondError(w, http.StatusBadRequest, "publish_date must be RFC3339")
 				return
 			}
-			post.PublishDate = publishDate
+			currentPub.PublishDate = publishDate
 			publishUnix = publishDate.Unix()
 		} else {
-			post.PublishDate = time.Time{}
+			currentPub.PublishDate = time.Time{}
 		}
 
 		// Берём активный токен админа
@@ -769,22 +872,29 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			utils.RespondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		post.VKPostID = vkPostID
-		post.Status = req.Status
+		currentPub.VKPostID = vkPostID
+		currentPub.Status = req.Status
 
 	case "rejected":
-		post.Status = "rejected"
-		post.RejectReason = req.RejectReason
-		post.PublishDate = time.Time{}
+		currentPub.Status = "rejected"
+		currentPub.RejectReason = req.RejectReason
+		currentPub.PublishDate = time.Time{}
 		// Видео не удаляем из S3 сразу, чтобы автор мог его посмотреть.
 	default:
 		utils.RespondError(w, http.StatusBadRequest, "unsupported status")
 		return
 	}
 
-	if err := updatePost(post); err != nil {
+	if err := updatePublication(currentPub); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if req.Status == "published" || req.Status == "scheduled" {
+		if err := updatePost(post); err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 
 	if author, err := getUserByID(post.UserID); err == nil && author != nil {
@@ -792,18 +902,18 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		case "published":
 			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\n[%s|Открыть пост]", appURL))
 		case "scheduled":
-			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", post.PublishDate.Format("02.01.2006 15:04"), appURL))
+			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", currentPub.PublishDate.Format("02.01.2006 15:04"), appURL))
 		case "rejected":
 			rejectMsg := "К сожалению, ваш предложенный пост был отклонен модератором."
-			if post.RejectReason != "" {
-				rejectMsg += fmt.Sprintf("\nПричина: %s", post.RejectReason)
+			if currentPub.RejectReason != "" {
+				rejectMsg += fmt.Sprintf("\nПричина: %s", currentPub.RejectReason)
 			}
 			rejectMsg += fmt.Sprintf("\n\n[%s|Посмотреть детали]", appURL)
 			sendNotificationToUser(author.VKUserID, rejectMsg)
 		}
 	}
 
-	response, err := serializePost(post)
+	response, err := serializePost(post, group.ID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -982,10 +1092,10 @@ func fetchVKGroupData(vkGroupID int) (*models.Group, error) {
 	}, nil
 }
 
-func serializePosts(posts []*models.Post) ([]postResponse, error) {
+func serializePosts(posts []*models.Post, contextGroupID int) ([]postResponse, error) {
 	result := make([]postResponse, 0, len(posts))
 	for _, post := range posts {
-		item, err := serializePost(post)
+		item, err := serializePost(post, contextGroupID)
 		if err != nil {
 			return nil, err
 		}
@@ -994,19 +1104,12 @@ func serializePosts(posts []*models.Post) ([]postResponse, error) {
 	return result, nil
 }
 
-func serializePost(post *models.Post) (postResponse, error) {
+func serializePost(post *models.Post, contextGroupID int) (postResponse, error) {
 	var (
-		group *models.Group
 		user  *models.User
 		err   error
 	)
 
-	if post.GroupID != 0 {
-		group, err = getGroupByID(post.GroupID)
-		if err != nil {
-			return postResponse{}, err
-		}
-	}
 	if post.UserID != 0 {
 		user, err = getUserByID(post.UserID)
 		if err != nil {
@@ -1015,26 +1118,63 @@ func serializePost(post *models.Post) (postResponse, error) {
 	}
 
 	response := postResponse{
-		ID:        post.ID,
-		Title:     makePostTitle(post.Message),
+		ID:          post.ID,
+		Title:       makePostTitle(post.Message),
 		Message:     post.Message,
-		Status:      post.Status,
-		VKPostID:    post.VKPostID,
 		Attachments: post.Attachments,
 		S3VideoKey:  post.S3VideoKey,
-		RejectReason: post.RejectReason,
 		CreatedAt:   post.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   post.UpdatedAt.Format(time.RFC3339),
 	}
-	if group != nil {
-		response.Group = userFacingGroup(group)
-	}
+
 	if user != nil {
 		response.Author = userToSummary(user)
 	}
-	if !post.PublishDate.IsZero() {
-		pd := post.PublishDate.Format(time.RFC3339)
-		response.PublishDate = &pd
+
+	var primaryPub *models.PostPublication
+	for i, pub := range post.Publications {
+		pubResp := postPublicationResponse{
+			ID:           pub.ID,
+			GroupID:      pub.GroupID,
+			Status:       pub.Status,
+			VKPostID:     pub.VKPostID,
+			RejectReason: pub.RejectReason,
+			CreatedAt:    pub.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:    pub.UpdatedAt.Format(time.RFC3339),
+		}
+		if !pub.PublishDate.IsZero() {
+			pd := pub.PublishDate.Format(time.RFC3339)
+			pubResp.PublishDate = &pd
+		}
+		
+		g, err := getGroupByID(pub.GroupID)
+		if err == nil && g != nil {
+			pubResp.Group = userFacingGroup(g)
+		}
+		
+		response.Publications = append(response.Publications, pubResp)
+
+		if contextGroupID > 0 && pub.GroupID == contextGroupID {
+			primaryPub = &post.Publications[i]
+		}
+	}
+
+	if primaryPub == nil && len(post.Publications) > 0 {
+		primaryPub = &post.Publications[0]
+	}
+
+	if primaryPub != nil {
+		response.Status = primaryPub.Status
+		response.VKPostID = primaryPub.VKPostID
+		response.RejectReason = primaryPub.RejectReason
+		if !primaryPub.PublishDate.IsZero() {
+			pd := primaryPub.PublishDate.Format(time.RFC3339)
+			response.PublishDate = &pd
+		}
+		g, err := getGroupByID(primaryPub.GroupID)
+		if err == nil && g != nil {
+			response.Group = userFacingGroup(g)
+		}
 	}
 
 	return response, nil
@@ -1391,26 +1531,45 @@ func scanGroup(row *sql.Row) (*models.Group, error) {
 	return group, nil
 }
 
-func createPost(post *models.Post) error {
-	if err := database.QueryRow(`
-		INSERT INTO posts (vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		RETURNING id
-	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.S3VideoKey, post.Status, nullableTime(post.PublishDate)).Scan(&post.ID); err != nil {
+func createPost(post *models.Post, groupID int, status string) error {
+	tx, err := database.Begin()
+	if err != nil {
 		return err
 	}
-	now := time.Now()
-	post.CreatedAt = now
-	post.UpdatedAt = now
-	return nil
+	defer tx.Rollback()
+
+	if err := tx.QueryRow(`
+		INSERT INTO posts (user_id, message, attachments, s3_video_key)
+		VALUES (?, ?, ?, ?)
+		RETURNING id, created_at, updated_at
+	`, post.UserID, post.Message, post.Attachments, post.S3VideoKey).Scan(&post.ID, &post.CreatedAt, &post.UpdatedAt); err != nil {
+		return err
+	}
+
+	pub := models.PostPublication{
+		PostID:  post.ID,
+		GroupID: groupID,
+		Status:  status,
+	}
+	if err := tx.QueryRow(`
+		INSERT INTO post_publications (post_id, group_id, status)
+		VALUES (?, ?, ?)
+		RETURNING id, created_at, updated_at
+	`, pub.PostID, pub.GroupID, pub.Status).Scan(&pub.ID, &pub.CreatedAt, &pub.UpdatedAt); err != nil {
+		return err
+	}
+
+	post.Publications = []models.PostPublication{pub}
+
+	return tx.Commit()
 }
 
 func updatePost(post *models.Post) error {
 	_, err := database.Exec(`
 		UPDATE posts
-		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, s3_video_key = ?, status = ?, reject_reason = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
+		SET message = ?, attachments = ?, s3_video_key = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.S3VideoKey, post.Status, post.RejectReason, nullableTime(post.PublishDate), post.ID)
+	`, post.Message, post.Attachments, post.S3VideoKey, post.ID)
 	if err != nil {
 		return err
 	}
@@ -1418,42 +1577,161 @@ func updatePost(post *models.Post) error {
 	return nil
 }
 
+func updatePublication(pub *models.PostPublication) error {
+	_, err := database.Exec(`
+		UPDATE post_publications
+		SET status = ?, vk_post_id = ?, reject_reason = ?, delete_reason = ?, delete_comment = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, pub.Status, pub.VKPostID, pub.RejectReason, pub.DeleteReason, pub.DeleteComment, nullableTime(pub.PublishDate), pub.ID)
+	if err != nil {
+		return err
+	}
+	pub.UpdatedAt = time.Now()
+	return nil
+}
+
+func createPublication(pub *models.PostPublication) error {
+	query := `
+		INSERT INTO post_publications (post_id, group_id, status)
+		VALUES (?, ?, ?)
+		RETURNING id
+	`
+	if err := database.QueryRow(query, pub.PostID, pub.GroupID, pub.Status).Scan(&pub.ID); err != nil {
+		return err
+	}
+	pub.CreatedAt = time.Now()
+	pub.UpdatedAt = time.Now()
+	return nil
+}
+
 func getPostByID(id int) (*models.Post, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, reject_reason, publish_date, created_at, updated_at
+		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at
 		FROM posts WHERE id = ?
 	`, id)
-	return scanPost(row)
+	post, err := scanPost(row)
+	if err != nil || post == nil {
+		return post, err
+	}
+	pubs, err := getPublicationsForPost(post.ID)
+	if err == nil {
+		post.Publications = pubs
+	}
+	return post, nil
+}
+
+func getPublicationsForPost(postID int) ([]models.PostPublication, error) {
+	rows, err := database.Query(`
+		SELECT id, post_id, group_id, vk_post_id, status, reject_reason, delete_reason, delete_comment, publish_date, created_at, updated_at
+		FROM post_publications
+		WHERE post_id = ?
+		ORDER BY id DESC
+	`, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var pubs []models.PostPublication
+	for rows.Next() {
+		var pub models.PostPublication
+		var dbVKPostID sql.NullInt64
+		var rejectReason, deleteReason, deleteComment sql.NullString
+		var publishDate sql.NullTime
+
+		if err := rows.Scan(
+			&pub.ID,
+			&pub.PostID,
+			&pub.GroupID,
+			&dbVKPostID,
+			&pub.Status,
+			&rejectReason,
+			&deleteReason,
+			&deleteComment,
+			&publishDate,
+			&pub.CreatedAt,
+			&pub.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if dbVKPostID.Valid {
+			pub.VKPostID = int(dbVKPostID.Int64)
+		}
+		if rejectReason.Valid {
+			pub.RejectReason = rejectReason.String
+		}
+		if deleteReason.Valid {
+			pub.DeleteReason = deleteReason.String
+		}
+		if deleteComment.Valid {
+			pub.DeleteComment = deleteComment.String
+		}
+		if publishDate.Valid {
+			pub.PublishDate = publishDate.Time
+		}
+
+		pubs = append(pubs, pub)
+	}
+	return pubs, nil
+}
+
+func populatePublicationsForPosts(posts []*models.Post) error {
+	for _, post := range posts {
+		pubs, err := getPublicationsForPost(post.ID)
+		if err != nil {
+			return err
+		}
+		post.Publications = pubs
+	}
+	return nil
 }
 
 func getPostsByStatusAndGroup(status string, groupID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, reject_reason, publish_date, created_at, updated_at
-		FROM posts
-		WHERE status = ? AND group_id = ?
-		ORDER BY created_at DESC
+		SELECT p.id, p.user_id, p.message, p.attachments, p.s3_video_key, p.created_at, p.updated_at
+		FROM posts p
+		INNER JOIN post_publications pub ON p.id = pub.post_id
+		WHERE pub.status = ? AND pub.group_id = ?
+		ORDER BY p.created_at DESC
 		LIMIT ? OFFSET ?
 	`, status, groupID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanPostRows(rows)
+
+	posts, err := scanPostRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	if err := populatePublicationsForPosts(posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
-func getPostsByUserIDAndGroup(userID int, groupID int, limit, offset int) ([]*models.Post, error) {
+func getPostsByUserID(userID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, reject_reason, publish_date, created_at, updated_at
+		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at
 		FROM posts
-		WHERE user_id = ? AND group_id = ?
+		WHERE user_id = ?
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`, userID, groupID, limit, offset)
+	`, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanPostRows(rows)
+
+	posts, err := scanPostRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	if err := populatePublicationsForPosts(posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
 func scanPostRows(rows *sql.Rows) ([]*models.Post, error) {
@@ -1470,25 +1748,17 @@ func scanPostRows(rows *sql.Rows) ([]*models.Post, error) {
 
 func scanPost(row *sql.Row) (*models.Post, error) {
 	var (
-		post        models.Post
-		dbUserID    sql.NullInt64
-		dbVKPostID  sql.NullInt64
-		publishDate sql.NullTime
+		post       models.Post
+		dbUserID   sql.NullInt64
+		s3VideoKey sql.NullString
 	)
 
-	var s3VideoKey sql.NullString
-	var rejectReason sql.NullString
 	err := row.Scan(
 		&post.ID,
-		&dbVKPostID,
 		&dbUserID,
-		&post.GroupID,
 		&post.Message,
 		&post.Attachments,
 		&s3VideoKey,
-		&post.Status,
-		&rejectReason,
-		&publishDate,
 		&post.CreatedAt,
 		&post.UpdatedAt,
 	)
@@ -1498,45 +1768,28 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s3VideoKey.Valid {
-		post.S3VideoKey = s3VideoKey.String
-	}
-	if rejectReason.Valid {
-		post.RejectReason = rejectReason.String
-	}
 	if dbUserID.Valid {
 		post.UserID = int(dbUserID.Int64)
 	}
-	if dbVKPostID.Valid {
-		post.VKPostID = int(dbVKPostID.Int64)
-	}
-	if publishDate.Valid {
-		post.PublishDate = publishDate.Time
+	if s3VideoKey.Valid {
+		post.S3VideoKey = s3VideoKey.String
 	}
 	return &post, nil
 }
 
 func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 	var (
-		post        models.Post
-		dbUserID    sql.NullInt64
-		dbVKPostID  sql.NullInt64
-		publishDate sql.NullTime
+		post       models.Post
+		dbUserID   sql.NullInt64
+		s3VideoKey sql.NullString
 	)
 
-	var s3VideoKey sql.NullString
-	var rejectReason sql.NullString
 	if err := rows.Scan(
 		&post.ID,
-		&dbVKPostID,
 		&dbUserID,
-		&post.GroupID,
 		&post.Message,
 		&post.Attachments,
 		&s3VideoKey,
-		&post.Status,
-		&rejectReason,
-		&publishDate,
 		&post.CreatedAt,
 		&post.UpdatedAt,
 	); err != nil {
@@ -1546,17 +1799,8 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 	if dbUserID.Valid {
 		post.UserID = int(dbUserID.Int64)
 	}
-	if dbVKPostID.Valid {
-		post.VKPostID = int(dbVKPostID.Int64)
-	}
 	if s3VideoKey.Valid {
 		post.S3VideoKey = s3VideoKey.String
-	}
-	if rejectReason.Valid {
-		post.RejectReason = rejectReason.String
-	}
-	if publishDate.Valid {
-		post.PublishDate = publishDate.Time
 	}
 	return &post, nil
 }
