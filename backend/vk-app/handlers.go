@@ -1860,17 +1860,22 @@ func s3PresignHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Генерируем уникальный ключ для файла
-	filename := r.URL.Query().Get("filename")
+	// Генерируем уникальный ключ для файла (используем только безопасные символы)
+	_ = r.URL.Query().Get("filename")
 	contentType := r.URL.Query().Get("type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
 	
-	key := fmt.Sprintf("pending-media/%d_%s", time.Now().UnixNano(), filename)
-	if filename == "" {
-		key = fmt.Sprintf("pending-media/%d_file", time.Now().UnixNano())
+	// Чтобы избежать проблем с кодировками (кириллица, пробелы), используем только безопасный префикс
+	safeSuffix := "file"
+	if strings.Contains(contentType, "video") {
+		safeSuffix = "video.mp4"
+	} else if strings.Contains(contentType, "image") {
+		safeSuffix = "image.jpg"
 	}
+	
+	key := fmt.Sprintf("pending-media/%d_%s", time.Now().UnixNano(), safeSuffix)
 
 	s3, err := s3client.New()
 	if err != nil {
