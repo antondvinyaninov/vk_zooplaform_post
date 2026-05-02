@@ -437,6 +437,10 @@ func postByIDHandler(w http.ResponseWriter, r *http.Request) {
 			getPostByIDHandler(w, postID)
 			return
 		}
+		if r.Method == http.MethodPut {
+			updatePostContentHandler(w, r, postID)
+			return
+		}
 		if r.Method == http.MethodDelete {
 			deletePostHandler(w, r, postID)
 			return
@@ -465,6 +469,61 @@ func getPostByIDHandler(w http.ResponseWriter, postID int) {
 	}
 	if post == nil {
 		utils.RespondError(w, http.StatusNotFound, "post not found")
+		return
+	}
+
+	response, err := serializePost(post)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	responses := populateAttachmentURLs([]postResponse{response})
+	utils.RespondSuccess(w, responses[0])
+}
+
+func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int) {
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	post, err := getPostByID(postID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if post == nil {
+		utils.RespondError(w, http.StatusNotFound, "post not found")
+		return
+	}
+
+	// Только в статусе pending или draft можно редактировать (опубликованные или отклоненные нельзя)
+	if post.Status != "pending" && post.Status != "draft" {
+		utils.RespondError(w, http.StatusForbidden, "can only edit pending or draft posts")
+		return
+	}
+
+	// Проверяем права: автор или модератор
+	isAuthor := (post.UserID == ctx.UserID)
+	if !isAuthor && !isModerator(ctx.GroupRole) {
+		utils.RespondError(w, http.StatusForbidden, "only author or moderator can edit the post")
+		return
+	}
+
+	var req struct {
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	post.Message = req.Message
+
+	if err := updatePost(post); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 

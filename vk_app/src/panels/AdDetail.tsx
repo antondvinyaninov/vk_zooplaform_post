@@ -15,22 +15,27 @@ import {
   Text,
   Avatar,
   Gallery,
+  Textarea,
 } from '@vkontakte/vkui';
 import { 
   Icon28CalendarOutline,
   Icon28NewsfeedOutline,
   Icon56ErrorOutline,
   Icon24CheckCircleOutline,
-  Icon24CancelOutline
+  Icon24CancelOutline,
+  Icon24WriteOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
-import { getPostById, moderatePost } from '../shared/api';
+import { getPostById, moderatePost, editPost } from '../shared/api';
 
 export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const params = useParams();
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editMessage, setEditMessage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     async function fetchDetail() {
@@ -110,9 +115,81 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
               </Button>
             </div>
           )}
-          <Text style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-            {post.message}
-          </Text>
+          {(() => {
+            const launchParams = (window as any).vkLaunchParams || {};
+            const role = launchParams.vk_viewer_group_role;
+            const isModerator = ['admin', 'editor', 'moder'].includes(role || '');
+            const isAuthor = post.author && launchParams.vk_user_id && post.author.vk_user_id === Number(launchParams.vk_user_id);
+            const canEdit = (isModerator || isAuthor) && (post.status === 'pending' || post.status === 'draft');
+
+            if (isEditing) {
+              return (
+                <div style={{ marginTop: 12, marginBottom: 12 }}>
+                  <Textarea 
+                    getRef={(textarea) => {
+                      if (textarea) {
+                        textarea.style.height = 'auto';
+                        textarea.style.height = `${textarea.scrollHeight}px`;
+                      }
+                    }}
+                    value={editMessage} 
+                    onChange={(e) => setEditMessage(e.target.value)} 
+                    style={{ minHeight: 100 }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <Button 
+                      size="s" 
+                      loading={isSaving}
+                      onClick={async () => {
+                        try {
+                          setIsSaving(true);
+                          await editPost(post.id, editMessage);
+                          setPost({ ...post, message: editMessage });
+                          setIsEditing(false);
+                        } catch (error) {
+                          console.error('Failed to edit post:', error);
+                        } finally {
+                          setIsSaving(false);
+                        }
+                      }}
+                    >
+                      Сохранить
+                    </Button>
+                    <Button 
+                      size="s" 
+                      mode="secondary" 
+                      disabled={isSaving}
+                      onClick={() => setIsEditing(false)}
+                    >
+                      Отмена
+                    </Button>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ position: 'relative' }}>
+                <Text style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                  {post.message}
+                </Text>
+                {canEdit && (
+                  <Button
+                    size="s"
+                    mode="tertiary"
+                    before={<Icon24WriteOutline width={16} height={16} />}
+                    style={{ marginTop: 8 }}
+                    onClick={() => {
+                      setEditMessage(post.message);
+                      setIsEditing(true);
+                    }}
+                  >
+                    Редактировать текст
+                  </Button>
+                )}
+              </div>
+            );
+          })()}
           
           {post.attachment_urls && post.attachment_urls.length > 0 && (
             <div style={{ marginTop: 16 }}>

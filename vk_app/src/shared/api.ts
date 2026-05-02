@@ -205,6 +205,13 @@ export const getPostById = async (id: string | number) => {
   return fetchJSON<AppPost>(`${API_URL}/posts/${id}`);
 };
 
+export const editPost = async (id: string | number, message: string) => {
+  return fetchJSON<AppPost>(`${API_URL}/posts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ message }),
+  });
+};
+
 export const moderatePost = async (
   id: number,
   status: 'published' | 'scheduled' | 'rejected',
