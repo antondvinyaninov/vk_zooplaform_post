@@ -32,7 +32,7 @@ import {
   Icon24WriteOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
-import { getPostById, moderatePost, editPost, compressImage, getS3PresignedUrl, uploadMediaToS3 } from '../shared/api';
+import { getPostById, moderatePost, editPost, compressImage, getS3PresignedUrl, uploadMediaToS3, suggestExistingPost } from '../shared/api';
 
 export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -104,6 +104,14 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
     );
   }
 
+  const launchParams = (window as any).vkLaunchParams || {};
+  const currentVkGroupId = Number(launchParams.vk_group_id);
+  const isAuthor = post.author && launchParams.vk_user_id && post.author.vk_user_id === Number(launchParams.vk_user_id);
+  const currentPub = post.publications?.find((p: any) => p.group?.vk_group_id === currentVkGroupId);
+  const role = launchParams.vk_viewer_group_role;
+  const isModerator = ['admin', 'editor', 'moder'].includes(role || '');
+  const canEdit = (isModerator || isAuthor) && currentPub && (currentPub.status === 'pending' || currentPub.status === 'draft' || currentPub.status === 'rejected');
+
   return (
     <Panel id={id}>
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />} style={{ textAlign: 'center' }}>
@@ -112,50 +120,90 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
 
       <Group>
         <Div>
-          <Text weight="3" style={{ color: 'var(--vkui--color_text_accent)', marginBottom: 12 }}>
-            Статус: {(() => {
-              if (post.status === 'published') return '✅ Опубликовано';
-              if (post.status === 'pending') return '⏳ На модерации';
-              if (post.status === 'rejected') return '❌ Отклонено';
-              if (post.status === 'draft') return '📝 Черновик';
-              if (post.status === 'scheduled') {
-                if (post.publish_date && new Date(post.publish_date).getTime() <= Date.now()) {
-                  return '✅ Опубликовано (отложенный)';
-                }
-                const dateStr = post.publish_date 
-                  ? new Date(post.publish_date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                  : '';
-                return `📅 Отложено на ${dateStr}`;
-              }
-              return post.status;
-            })()}
-          </Text>
-
-          {post.status === 'rejected' && post.reject_reason && (
-            <div style={{ marginBottom: 16, padding: '12px', backgroundColor: 'var(--vkui--color_background_negative_tint)', color: 'var(--vkui--color_text_negative)', borderRadius: 8 }}>
-              <Text weight="3" style={{ marginBottom: 4 }}>Причина отклонения:</Text>
-              <Text style={{ whiteSpace: 'pre-wrap' }}>{post.reject_reason}</Text>
-            </div>
-          )}
-
-          {post.vk_post_id && post.group?.vk_group_id && (
-            <div style={{ marginBottom: 12 }}>
-              <Button 
-                size="s" 
-                mode="secondary" 
-                onClick={() => window.open(`https://vk.com/wall-${post.group.vk_group_id}_${post.vk_post_id}`, '_blank')}
-              >
-                Открыть ВКонтакте
-              </Button>
-            </div>
-          )}
           {(() => {
-            const launchParams = (window as any).vkLaunchParams || {};
-            const role = launchParams.vk_viewer_group_role;
-            const isModerator = ['admin', 'editor', 'moder'].includes(role || '');
-            const isAuthor = post.author && launchParams.vk_user_id && post.author.vk_user_id === Number(launchParams.vk_user_id);
-            const canEdit = (isModerator || isAuthor) && (post.status === 'pending' || post.status === 'draft' || post.status === 'rejected');
+            return (
+              <>
+                <Text weight="3" style={{ color: 'var(--vkui--color_text_accent)', marginBottom: 12 }}>
+                  Статус: {(() => {
+                    if (!currentPub) return 'Не предложено в эту группу';
+                    if (currentPub.status === 'published') return '✅ Опубликовано';
+                    if (currentPub.status === 'pending') return '⏳ На модерации';
+                    if (currentPub.status === 'rejected') return '❌ Отклонено';
+                    if (currentPub.status === 'draft') return '📝 Черновик';
+                    if (currentPub.status === 'scheduled') {
+                      if (currentPub.publish_date && new Date(currentPub.publish_date).getTime() <= Date.now()) {
+                        return '✅ Опубликовано (отложенный)';
+                      }
+                      const dateStr = currentPub.publish_date 
+                        ? new Date(currentPub.publish_date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                        : '';
+                      return `📅 Отложено на ${dateStr}`;
+                    }
+                    return currentPub.status;
+                  })()}
+                </Text>
 
+                {!currentPub && isAuthor && currentVkGroupId > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Button 
+                      size="m" 
+                      onClick={async () => {
+                        try {
+                          setIsSubmitting(true);
+                          await suggestExistingPost(post.id);
+                          const data = await getPostById(params!.id!);
+                          setPost(data);
+                        } catch(e: any) {
+                          alert("Ошибка: " + e.message);
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      loading={isSubmitting}
+                      stretched
+                    >
+                      Предложить в текущую группу
+                    </Button>
+                  </div>
+                )}
+
+                {currentPub?.status === 'rejected' && currentPub.reject_reason && (
+                  <div style={{ marginBottom: 16, padding: '12px', backgroundColor: 'var(--vkui--color_background_negative_tint)', color: 'var(--vkui--color_text_negative)', borderRadius: 8 }}>
+                    <Text weight="3" style={{ marginBottom: 4 }}>Причина отклонения:</Text>
+                    <Text style={{ whiteSpace: 'pre-wrap' }}>{currentPub.reject_reason}</Text>
+                  </div>
+                )}
+
+                {currentPub?.vk_post_id && currentPub.group?.vk_group_id && (
+                  <div style={{ marginBottom: 12 }}>
+                    <Button 
+                      size="s" 
+                      mode="secondary" 
+                      onClick={() => window.open(`https://vk.com/wall-${currentPub.group.vk_group_id}_${currentPub.vk_post_id}`, '_blank')}
+                    >
+                      Открыть ВКонтакте
+                    </Button>
+                  </div>
+                )}
+
+                {post.publications && post.publications.length > 0 && (
+                  <div style={{ marginBottom: 16, padding: '12px', backgroundColor: 'var(--vkui--color_background_secondary)', borderRadius: 8 }}>
+                    <Text weight="3" style={{ marginBottom: 8 }}>Где опубликовано/предложено:</Text>
+                    {post.publications.map((pub: any) => (
+                      <div key={pub.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
+                        <Avatar size={24} src={pub.group?.photo_200} style={{ marginRight: 8 }} />
+                        <Text style={{ flex: 1, fontSize: 13 }}>{pub.group?.name || 'Группа ' + pub.group_id}</Text>
+                        <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)' }}>
+                          {pub.status === 'published' ? '✅ Опубликовано' : pub.status === 'pending' ? '⏳ Модерация' : pub.status === 'rejected' ? '❌ Отклонено' : pub.status}
+                        </Text>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
+          {(() => {
             if (isEditing) {
               return (
                 <div style={{ marginTop: 12, marginBottom: 12 }}>
@@ -498,7 +546,7 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
         </Group>
       )}
 
-      {post.status === 'pending' && (() => {
+      {currentPub?.status === 'pending' && (() => {
         const launchParams = (window as any).vkLaunchParams || {};
         const role = launchParams.vk_viewer_group_role;
         const isModerator = ['admin', 'editor', 'moder'].includes(role || '');
@@ -524,7 +572,8 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                         try {
                           setIsSubmitting(true);
                           await moderatePost(post.id, 'rejected', undefined, rejectReason);
-                          setPost({ ...post, status: 'rejected', reject_reason: rejectReason });
+                          const data = await getPostById(params!.id!);
+                          setPost(data);
                           window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId: post.id } }));
                         } catch (e) {
                           console.error('Failed to reject:', e);

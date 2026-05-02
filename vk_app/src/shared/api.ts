@@ -36,6 +36,18 @@ export interface AppAttachmentURL {
   url: string;
 }
 
+export interface AppPostPublication {
+  id: number;
+  group_id: number;
+  group?: AppGroup;
+  status: 'pending' | 'scheduled' | 'published' | 'rejected' | 'failed' | 'draft';
+  vk_post_id?: number;
+  reject_reason?: string;
+  publish_date?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AppPost {
   id: number;
   title: string;
@@ -49,6 +61,7 @@ export interface AppPost {
   updated_at: string;
   group?: AppGroup;
   author?: AppUser;
+  publications?: AppPostPublication[];
 }
 
 const getVKLaunchSignature = () => {
@@ -368,5 +381,11 @@ export const updateCommunitySettings = async (payload: Partial<Pick<AppGroupSett
   return fetchJSON<AppGroupSettings>(`${API_URL}/groups/me`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  });
+};
+
+export const suggestExistingPost = async (id: number | string) => {
+  return fetchJSON<AppPost>(`${API_URL}/posts/${id}/suggest`, {
+    method: 'POST',
   });
 };
