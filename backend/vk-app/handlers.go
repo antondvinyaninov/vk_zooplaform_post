@@ -217,12 +217,18 @@ func listPostsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil || group == nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
+		return
+	}
+
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	if status == "" {
 		status = "published"
 	}
 
-	posts, err := getPostsByStatusAndGroup(status, ctx.GroupID, 100, 0)
+	posts, err := getPostsByStatusAndGroup(status, group.ID, 100, 0)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -404,6 +410,12 @@ func myPostsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil || group == nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
+		return
+	}
+
 	user, err := getUserByVKUserID(ctx.UserID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -414,7 +426,7 @@ func myPostsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := getPostsByUserIDAndGroup(user.ID, ctx.GroupID, 100, 0)
+	posts, err := getPostsByUserIDAndGroup(user.ID, group.ID, 100, 0)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -512,7 +524,13 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		return
 	}
 
-	if post.GroupID != ctx.GroupID {
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil || group == nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
+		return
+	}
+
+	if post.GroupID != group.ID {
 		utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
 		return
 	}
@@ -611,7 +629,13 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		return
 	}
 
-	if post.GroupID != ctx.GroupID {
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil || group == nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
+		return
+	}
+
+	if post.GroupID != group.ID {
 		utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
 		return
 	}
@@ -621,15 +645,6 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		return
 	}
 
-	group, err := getGroupByID(post.GroupID)
-	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if group == nil {
-		utils.RespondError(w, http.StatusBadRequest, "group not found")
-		return
-	}
 
 	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 
