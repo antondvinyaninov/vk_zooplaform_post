@@ -508,6 +508,11 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		return
 	}
 
+	if post.Status != "pending" {
+		utils.RespondError(w, http.StatusBadRequest, "post is already moderated")
+		return
+	}
+
 	switch req.Status {
 	case "published", "scheduled":
 		var publishUnix int64

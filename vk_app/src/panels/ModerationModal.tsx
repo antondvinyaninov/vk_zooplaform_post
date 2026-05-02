@@ -29,10 +29,13 @@ export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => 
     return d;
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const closeModal = () => routeNavigator.hideModal();
 
   const handleConfirm = async () => {
-    if (params?.id) {
+    if (params?.id && !isSubmitting) {
+      setIsSubmitting(true);
       const postId = Number(params.id);
       try {
         await moderatePost(postId, pubType === 'scheduled' ? 'scheduled' : 'published', pubType === 'scheduled' ? scheduledDate : undefined);
@@ -46,6 +49,7 @@ export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => 
         closeModal();
       } catch (error) {
         console.error('Failed to moderate post:', error);
+        setIsSubmitting(false);
       }
     }
   };
@@ -96,7 +100,7 @@ export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => 
         )}
 
         <Div>
-          <Button size="l" stretched onClick={handleConfirm}>
+          <Button size="l" stretched onClick={handleConfirm} disabled={isSubmitting} loading={isSubmitting}>
             {pubType === 'now' ? 'Опубликовать сейчас' : 'Подтвердить график'}
           </Button>
         </Div>
