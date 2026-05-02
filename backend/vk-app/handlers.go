@@ -363,8 +363,10 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendNotificationToUser(ctx.UserID, "Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.")
-	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!", group.Name))
+	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
+
+	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.\n\nПроверить статус: %s", appURL))
+	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\nПерейти к модерации поста: %s", group.Name, appURL))
 
 	response, err := serializePost(post)
 	if err != nil {
@@ -572,6 +574,18 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		return
 	}
 
+	group, err := getGroupByID(post.GroupID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if group == nil {
+		utils.RespondError(w, http.StatusBadRequest, "group not found")
+		return
+	}
+
+	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
+
 	switch req.Status {
 	case "published", "scheduled":
 		var publishUnix int64
@@ -589,16 +603,6 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			publishUnix = publishDate.Unix()
 		} else {
 			post.PublishDate = time.Time{}
-		}
-
-		group, err := getGroupByID(post.GroupID)
-		if err != nil {
-			utils.RespondError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		if group == nil {
-			utils.RespondError(w, http.StatusBadRequest, "group not found")
-			return
 		}
 
 		// Берём активный токен админа
@@ -727,11 +731,11 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	if author, err := getUserByID(post.UserID); err == nil && author != nil {
 		switch req.Status {
 		case "published":
-			sendNotificationToUser(author.VKUserID, "Ваш предложенный пост был успешно опубликован!")
+			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\nОткрыть пост: %s", appURL))
 		case "scheduled":
-			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s", post.PublishDate.Format("02.01.2006 15:04")))
+			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\nОткрыть пост: %s", post.PublishDate.Format("02.01.2006 15:04"), appURL))
 		case "rejected":
-			sendNotificationToUser(author.VKUserID, "К сожалению, ваш предложенный пост был отклонен модератором.")
+			sendNotificationToUser(author.VKUserID, fmt.Sprintf("К сожалению, ваш предложенный пост был отклонен модератором.\n\nПосмотреть детали: %s", appURL))
 		}
 	}
 
