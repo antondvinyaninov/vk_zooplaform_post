@@ -19,6 +19,7 @@ export const DEFAULT_VIEW_PANELS = {
 
   CREATE_POST: 'create_post',
   POST_DETAIL: 'post_detail',
+  MODERATION_DETAIL: 'moderation_detail',
   MODERATION: 'moderation',
 } as const;
 
@@ -33,6 +34,7 @@ export const routes = RoutesConfig.create([
 
       createPanel(DEFAULT_VIEW_PANELS.CREATE_POST, `/${DEFAULT_VIEW_PANELS.CREATE_POST}`, []),
       createPanel(DEFAULT_VIEW_PANELS.POST_DETAIL, `/${DEFAULT_VIEW_PANELS.POST_DETAIL}/:id`, []),
+      createPanel(DEFAULT_VIEW_PANELS.MODERATION_DETAIL, `/${DEFAULT_VIEW_PANELS.MODERATION_DETAIL}/:id`, []),
       createPanel(DEFAULT_VIEW_PANELS.MODERATION, `/${DEFAULT_VIEW_PANELS.MODERATION}`, [
         createModal('approve_settings', `/${DEFAULT_VIEW_PANELS.MODERATION}/approve_settings/:id`),
       ]),

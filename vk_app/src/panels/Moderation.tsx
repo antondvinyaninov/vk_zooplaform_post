@@ -172,7 +172,7 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
                     size="s" 
                     mode="secondary" 
                     stretched
-                    onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POST_DETAIL}/${post.id}`)}
+                    onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MODERATION_DETAIL}/${post.id}`)}
                   >
                     Подробнее
                   </Button>
