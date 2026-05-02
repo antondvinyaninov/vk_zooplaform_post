@@ -222,6 +222,14 @@ export const App = () => {
             window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId } }));
           }} 
         />
+        <ModerationModal 
+          id="approve_settings_detail" 
+          onConfirm={(postId, type, date) => {
+            console.log(`Action confirmed for post ${postId}: ${type} at ${date?.toLocaleString() || 'NOW'}`);
+            window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId } }));
+            routeNavigator.back();
+          }} 
+        />
       </Suspense>
     </ModalRoot>
   );

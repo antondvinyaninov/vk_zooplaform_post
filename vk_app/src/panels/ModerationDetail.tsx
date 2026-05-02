@@ -325,7 +325,7 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
                     mode="primary" 
                     appearance="positive"
                     before={<Icon24CheckCircleOutline />}
-                    onClick={() => routeNavigator.push(`/moderation/approve_settings/${post.id}`)}
+                    onClick={() => routeNavigator.push(`/moderation_detail/approve_settings/${post.id}`)}
                     stretched
                   >
                     Одобрить

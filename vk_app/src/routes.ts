@@ -34,7 +34,9 @@ export const routes = RoutesConfig.create([
 
       createPanel(DEFAULT_VIEW_PANELS.CREATE_POST, `/${DEFAULT_VIEW_PANELS.CREATE_POST}`, []),
       createPanel(DEFAULT_VIEW_PANELS.POST_DETAIL, `/${DEFAULT_VIEW_PANELS.POST_DETAIL}/:id`, []),
-      createPanel(DEFAULT_VIEW_PANELS.MODERATION_DETAIL, `/${DEFAULT_VIEW_PANELS.MODERATION_DETAIL}/:id`, []),
+      createPanel(DEFAULT_VIEW_PANELS.MODERATION_DETAIL, `/${DEFAULT_VIEW_PANELS.MODERATION_DETAIL}/:id`, [
+        createModal('approve_settings_detail', `/${DEFAULT_VIEW_PANELS.MODERATION_DETAIL}/approve_settings/:id`),
+      ]),
       createPanel(DEFAULT_VIEW_PANELS.MODERATION, `/${DEFAULT_VIEW_PANELS.MODERATION}`, [
         createModal('approve_settings', `/${DEFAULT_VIEW_PANELS.MODERATION}/approve_settings/:id`),
       ]),
