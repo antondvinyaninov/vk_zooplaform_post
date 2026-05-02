@@ -6,10 +6,12 @@ import "time"
 type User struct {
 	ID        int       `json:"id"`
 	VKUserID  int       `json:"vk_user_id"`
-	FirstName string    `json:"first_name"`
-	LastName  string    `json:"last_name"`
-	Photo200  string    `json:"photo_200"`
-	Role      string    `json:"role"` // admin, user
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	FirstName  string    `json:"first_name"`
+	LastName   string    `json:"last_name"`
+	Photo200   string    `json:"photo_200"`
+	CityID     *int      `json:"city_id"`
+	CityTitle  *string   `json:"city_title"`
+	Role       string    `json:"role"` // admin, user
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }

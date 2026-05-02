@@ -174,18 +174,6 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                   </div>
                 )}
 
-                {currentPub?.vk_post_id && currentPub.group?.vk_group_id && (
-                  <div style={{ marginBottom: 12 }}>
-                    <Button 
-                      size="s" 
-                      mode="secondary" 
-                      onClick={() => window.open(`https://vk.com/wall-${currentPub.group.vk_group_id}_${currentPub.vk_post_id}`, '_blank')}
-                    >
-                      Открыть ВКонтакте
-                    </Button>
-                  </div>
-                )}
-
                 {post.publications && post.publications.length > 0 && (
                   <div style={{ marginBottom: 16, padding: '12px', backgroundColor: 'var(--vkui--color_background_secondary)', borderRadius: 8 }}>
                     <Text weight="3" style={{ marginBottom: 8 }}>Где опубликовано/предложено:</Text>
@@ -196,30 +184,28 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                           display: 'flex', 
                           alignItems: 'center', 
                           marginBottom: 6,
-                          cursor: pub.vk_post_id ? 'pointer' : 'default',
                           padding: '4px',
-                          borderRadius: '6px',
-                          transition: 'background-color 0.2s',
-                        }}
-                        onClick={() => {
-                          if (pub.vk_post_id && pub.group?.vk_group_id) {
-                            window.open(`https://vk.com/wall-${pub.group.vk_group_id}_${pub.vk_post_id}`, '_blank');
-                          }
-                        }}
-                        onMouseEnter={(e) => {
-                          if (pub.vk_post_id) e.currentTarget.style.backgroundColor = 'var(--vkui--color_background_hover)';
-                        }}
-                        onMouseLeave={(e) => {
-                          if (pub.vk_post_id) e.currentTarget.style.backgroundColor = 'transparent';
+                          borderRadius: '6px'
                         }}
                       >
                         <Avatar size={24} src={pub.group?.photo_200} style={{ marginRight: 8 }} />
-                        <Text style={{ flex: 1, fontSize: 13, color: pub.vk_post_id ? 'var(--vkui--color_text_link)' : 'inherit' }}>
-                          {pub.group?.name || 'Группа ' + pub.group_id}
-                        </Text>
-                        <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)' }}>
-                          {pub.status === 'published' ? '✅ Опубликовано' : pub.status === 'pending' ? '⏳ Модерация' : pub.status === 'rejected' ? '❌ Отклонено' : pub.status}
-                        </Text>
+                        <div style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: 500 }}>
+                            {pub.group?.name || 'Группа ' + pub.group_id}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)' }}>
+                            {pub.status === 'published' ? '✅ Опубликовано' : pub.status === 'pending' ? '⏳ Модерация' : pub.status === 'rejected' ? '❌ Отклонено' : pub.status}
+                          </Text>
+                        </div>
+                        {pub.vk_post_id && pub.group?.vk_group_id && (
+                          <Button 
+                            mode="tertiary" 
+                            size="s" 
+                            onClick={() => window.open(`https://vk.com/wall-${pub.group.vk_group_id}_${pub.vk_post_id}`, '_blank')}
+                          >
+                            ВКонтакте
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -542,13 +528,7 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
             })}
           </InfoRow>
         </SimpleCell>
-        {post.group && (
-          <SimpleCell before={<Icon28NewsfeedOutline />}>
-            <InfoRow header="Сообщество">
-              {post.group.name}
-            </InfoRow>
-          </SimpleCell>
-        )}
+
       </Group>
 
       {post.author && (

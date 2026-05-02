@@ -90,10 +90,12 @@ type groupSettingsResponse struct {
 type userSummary struct {
 	ID        int    `json:"id"`
 	VKUserID  int    `json:"vk_user_id"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Photo200  string `json:"photo_200"`
-	Role      string `json:"role"`
+	FirstName  string  `json:"first_name"`
+	LastName   string  `json:"last_name"`
+	Photo200   string  `json:"photo_200"`
+	CityID     *int    `json:"city_id"`
+	CityTitle  *string `json:"city_title"`
+	Role       string  `json:"role"`
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -117,12 +119,56 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func syncUserHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
+func usersMeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPatch {
+		updateUserProfileHandler(w, r)
+		return
+	}
+	if r.Method == http.MethodGet {
+		syncUserHandler(w, r)
+		return
+	}
+	utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
+}
+
+func updateUserProfileHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
+	user, err := getUserByVKUserID(ctx.UserID)
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if user == nil {
+		utils.RespondError(w, http.StatusNotFound, "user not found")
+		return
+	}
+
+	var req struct {
+		CityID    *int    `json:"city_id"`
+		CityTitle *string `json:"city_title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	user.CityID = req.CityID
+	user.CityTitle = req.CityTitle
+
+	if err := updateUser(user); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.RespondSuccess(w, userToSummary(user))
+}
+
+func syncUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, err := parseLaunchContext(r)
 	if err != nil {
 		utils.RespondError(w, http.StatusBadRequest, err.Error())
@@ -134,7 +180,7 @@ func syncUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	user, err := upsertUser(ctx.UserID, q.Get("firstName"), q.Get("lastName"), q.Get("photo200"))
+	user, err := upsertUser(ctx.UserID, q.Get("firstName"), q.Get("lastName"), q.Get("photo200"), q.Get("cityId"), q.Get("cityTitle"))
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1316,6 +1362,8 @@ func userToSummary(user *models.User) *userSummary {
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 		Photo200:  user.Photo200,
+		CityID:    user.CityID,
+		CityTitle: user.CityTitle,
 		Role:      user.Role,
 	}
 }
@@ -1374,17 +1422,31 @@ func isModerator(role string) bool {
 	}
 }
 
-func upsertUser(vkUserID int, firstName, lastName, photo200 string) (*models.User, error) {
+func upsertUser(vkUserID int, firstName, lastName, photo200, cityIdStr, cityTitleStr string) (*models.User, error) {
 	user, err := getUserByVKUserID(vkUserID)
 	if err != nil {
 		return nil, err
 	}
+	
+	var cityID *int
+	if cityIdStr != "" {
+		if id, err := strconv.Atoi(cityIdStr); err == nil {
+			cityID = &id
+		}
+	}
+	var cityTitle *string
+	if cityTitleStr != "" {
+		cityTitle = &cityTitleStr
+	}
+
 	if user == nil {
 		user = &models.User{
 			VKUserID:  vkUserID,
 			FirstName: firstName,
 			LastName:  lastName,
 			Photo200:  photo200,
+			CityID:    cityID,
+			CityTitle: cityTitle,
 			Role:      "user",
 		}
 		if err := createUser(user); err != nil {
@@ -1394,6 +1456,14 @@ func upsertUser(vkUserID int, firstName, lastName, photo200 string) (*models.Use
 	}
 
 	needsUpdate := user.FirstName != firstName || user.LastName != lastName || user.Photo200 != photo200
+	
+	// Если с VK пришел город, а у пользователя он не установлен - сохраняем
+	if cityID != nil && user.CityID == nil {
+		user.CityID = cityID
+		user.CityTitle = cityTitle
+		needsUpdate = true
+	}
+
 	if needsUpdate {
 		user.FirstName = firstName
 		user.LastName = lastName
@@ -1407,10 +1477,10 @@ func upsertUser(vkUserID int, firstName, lastName, photo200 string) (*models.Use
 
 func createUser(user *models.User) error {
 	if err := database.QueryRow(`
-		INSERT INTO users (vk_user_id, first_name, last_name, photo_200, role)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO users (vk_user_id, first_name, last_name, photo_200, city_id, city_title, role)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, user.VKUserID, user.FirstName, user.LastName, user.Photo200, user.Role).Scan(&user.ID); err != nil {
+	`, user.VKUserID, user.FirstName, user.LastName, user.Photo200, user.CityID, user.CityTitle, user.Role).Scan(&user.ID); err != nil {
 		return err
 	}
 	now := time.Now()
@@ -1422,9 +1492,9 @@ func createUser(user *models.User) error {
 func updateUser(user *models.User) error {
 	_, err := database.Exec(`
 		UPDATE users
-		SET first_name = ?, last_name = ?, photo_200 = ?, role = ?, updated_at = CURRENT_TIMESTAMP
+		SET first_name = ?, last_name = ?, photo_200 = ?, city_id = ?, city_title = ?, role = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, user.FirstName, user.LastName, user.Photo200, user.Role, user.ID)
+	`, user.FirstName, user.LastName, user.Photo200, user.CityID, user.CityTitle, user.Role, user.ID)
 	if err != nil {
 		return err
 	}
@@ -1434,7 +1504,7 @@ func updateUser(user *models.User) error {
 
 func getUserByID(id int) (*models.User, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_user_id, first_name, last_name, photo_200, role, created_at, updated_at
+		SELECT id, vk_user_id, first_name, last_name, photo_200, city_id, city_title, role, created_at, updated_at
 		FROM users WHERE id = ?
 	`, id)
 	return scanUser(row)
@@ -1442,7 +1512,7 @@ func getUserByID(id int) (*models.User, error) {
 
 func getUserByVKUserID(vkUserID int) (*models.User, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_user_id, first_name, last_name, photo_200, role, created_at, updated_at
+		SELECT id, vk_user_id, first_name, last_name, photo_200, city_id, city_title, role, created_at, updated_at
 		FROM users WHERE vk_user_id = ?
 	`, vkUserID)
 	return scanUser(row)
@@ -1456,6 +1526,8 @@ func scanUser(row *sql.Row) (*models.User, error) {
 		&user.FirstName,
 		&user.LastName,
 		&user.Photo200,
+		&user.CityID,
+		&user.CityTitle,
 		&user.Role,
 		&user.CreatedAt,
 		&user.UpdatedAt,

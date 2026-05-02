@@ -11,6 +11,8 @@ export interface AppUser {
   first_name: string;
   last_name: string;
   photo_200: string;
+  city_id?: number;
+  city_title?: string;
   role: string;
 }
 
@@ -112,6 +114,12 @@ export const syncUserWithBackend = async (user: UserInfo, vkSignature?: string) 
   params.append('firstName', user?.first_name || '');
   params.append('lastName', user?.last_name || '');
   params.append('photo200', user?.photo_200 || '');
+  
+  if (user?.city) {
+    params.append('cityId', String(user.city.id));
+    params.append('cityTitle', user.city.title);
+  }
+
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -141,6 +149,13 @@ export const syncUserWithBackend = async (user: UserInfo, vkSignature?: string) 
   }
 
   return response.json() as Promise<{ user: AppUser; viewerRole: string; groupId: number }>;
+};
+
+export const updateUserProfile = async (payload: { city_id?: number; city_title?: string }) => {
+  return fetchJSON<AppUser>(`${API_URL}/users/me`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
 };
 
 export const getS3PresignedUrl = async (fileName: string, fileType: string) => {

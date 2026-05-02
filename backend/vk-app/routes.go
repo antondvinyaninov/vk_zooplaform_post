@@ -10,7 +10,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	// API endpoints для VK Mini App
 	mux.HandleFunc("/api/app/health", middleware.CORSFunc(healthHandler))
 	mux.HandleFunc("/api/app/config", middleware.CORSFunc(configHandler))
-	mux.HandleFunc("/api/app/users/me", middleware.CORSFunc(syncUserHandler))
+	mux.HandleFunc("/api/app/users/me", middleware.CORSFunc(usersMeHandler))
 	mux.HandleFunc("/api/app/posts", middleware.CORSFunc(postsHandler))
 	mux.HandleFunc("/api/app/posts/video-upload-url", middleware.CORSFunc(videoUploadUrlHandler))
 	mux.HandleFunc("/api/app/posts/my", middleware.CORSFunc(myPostsHandler))

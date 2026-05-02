@@ -20,7 +20,7 @@ import {
 
 import { DEFAULT_VIEW_PANELS } from './routes';
 import { useActiveVkuiLocation, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { syncUserWithBackend } from './shared/api';
+import { syncUserWithBackend, AppUser } from './shared/api';
 
 const Home = lazy(() => import('./panels/Home').then(m => ({ default: m.Home })));
 const Onboarding = lazy(() => import('./panels/Onboarding').then(m => ({ default: m.Onboarding })));
@@ -82,6 +82,7 @@ export const App = () => {
   const { panel: activePanel = DEFAULT_VIEW_PANELS.HOME, modal: activeModal } = useActiveVkuiLocation();
   const routeNavigator = useRouteNavigator();
   const [fetchedUser, setUser] = useState<UserInfo | undefined>();
+  const [appUser, setAppUser] = useState<AppUser | undefined>();
   const [role, setRole] = useState<string | null>(null);
   const [popout, setPopout] = useState<ReactNode | null>(<ScreenSpinner />);
 
@@ -137,8 +138,9 @@ export const App = () => {
           });
           
           console.log('Syncing with backend, VK params:', vkSignParams.toString());
-          await syncUserWithBackend(user, vkSignParams.toString());
-          console.log('Backend sync successful');
+          const syncRes = await syncUserWithBackend(user, vkSignParams.toString());
+          setAppUser(syncRes.user);
+          console.log('Backend sync successful', syncRes);
         } catch (backendError) {
           console.warn('Backend sync failed, but user data is available:', backendError);
           // Не падаем, если backend недоступен, но пользователь есть
@@ -288,7 +290,7 @@ export const App = () => {
                 <CreatePost id="create_post" />
               </View>
               <View id={STORY_IDS.PROFILE} activePanel={activePanel}>
-                <Profile id="profile" fetchedUser={fetchedUser} role={role} />
+                <Profile id="profile" fetchedUser={fetchedUser} appUser={appUser} role={role} onAppUserUpdate={setAppUser} />
               </View>
               <View id={STORY_IDS.COMMUNITY_SETTINGS} activePanel={activePanel}>
                 <CommunitySettings id="community_settings" />

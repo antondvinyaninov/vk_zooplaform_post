@@ -61,6 +61,10 @@ func createTables() error {
 		return err
 	}
 
+	if err := migrateUsersTable(); err != nil {
+		return err
+	}
+
 	if err := seedAdminUsers(); err != nil {
 		return err
 	}
@@ -103,6 +107,8 @@ const postgresSchema = `
 		first_name TEXT,
 		last_name TEXT,
 		photo_200 TEXT,
+		city_id BIGINT,
+		city_title TEXT,
 		role TEXT DEFAULT 'user',
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -265,6 +271,16 @@ func migratePostPublications() error {
 		return fmt.Errorf("failed to migrate post publications: %v", err)
 	}
 
+	return nil
+}
+
+func migrateUsersTable() error {
+	if err := addColumnIfMissing("users", "city_id", "BIGINT"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("users", "city_title", "TEXT"); err != nil {
+		return err
+	}
 	return nil
 }
 
