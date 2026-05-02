@@ -19,10 +19,12 @@ import {
 import { 
   Icon28CalendarOutline,
   Icon28NewsfeedOutline,
-  Icon56ErrorOutline
+  Icon56ErrorOutline,
+  Icon24CheckCircleOutline,
+  Icon24CancelOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
-import { getPostById } from '../shared/api';
+import { getPostById, moderatePost } from '../shared/api';
 
 export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -252,6 +254,49 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
           </SimpleCell>
         </Group>
       )}
+
+      {post.status === 'pending' && (() => {
+        const launchParams = (window as any).vkLaunchParams || {};
+        const role = launchParams.vk_viewer_group_role;
+        const isModerator = ['admin', 'editor', 'moder'].includes(role || '');
+        if (!isModerator) return null;
+
+        return (
+          <Group>
+            <Div style={{ display: 'flex', gap: 8 }}>
+              <Button 
+                size="l" 
+                mode="primary" 
+                appearance="positive"
+                before={<Icon24CheckCircleOutline />}
+                onClick={() => routeNavigator.push(`/moderation/approve_settings/${post.id}`)}
+                stretched
+              >
+                Одобрить
+              </Button>
+              <Button 
+                size="l" 
+                mode="secondary" 
+                appearance="negative"
+                before={<Icon24CancelOutline />}
+                onClick={async () => {
+                  try {
+                    await moderatePost(post.id, 'rejected');
+                    setPost({ ...post, status: 'rejected' });
+                    window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId: post.id } }));
+                  } catch (e) {
+                    console.error('Failed to reject:', e);
+                  }
+                }}
+                stretched
+              >
+                Отклонить
+              </Button>
+            </Div>
+          </Group>
+        );
+      })()}
+
     </Panel>
   );
 };

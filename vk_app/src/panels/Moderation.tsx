@@ -15,12 +15,10 @@ import {
 } from '@vkontakte/vkui';
 import {
   Icon56CheckShieldOutline,
-  Icon24CheckCircleOutline, 
-  Icon24CancelOutline,
   Icon28VideoOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getFeedPosts, moderatePost, AppPost } from '../shared/api';
+import { getFeedPosts, AppPost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export const Moderation: FC<NavIdProps> = ({ id }) => {
@@ -56,19 +54,6 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
       window.removeEventListener('postModerated', handlePostModerated);
     };
   }, []);
-
-  const handleApprove = (postId: number) => {
-    routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MODERATION}/approve_settings/${postId}`);
-  };
-
-  const handleReject = async (postId: number) => {
-    try {
-      await moderatePost(postId, 'rejected');
-      setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
-    } catch (error) {
-      console.error('Failed to reject post:', error);
-    }
-  };
 
   return (
     <Panel id={id}>
@@ -185,23 +170,11 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
                 <Div style={{ display: 'flex', gap: 8, paddingTop: 0 }}>
                   <Button 
                     size="s" 
-                    mode="primary" 
-                    appearance="positive"
-                    before={<Icon24CheckCircleOutline width={16} height={16} />}
-                    onClick={() => handleApprove(post.id)}
-                    stretched
-                  >
-                    Одобрить
-                  </Button>
-                  <Button 
-                    size="s" 
                     mode="secondary" 
-                    appearance="negative"
-                    before={<Icon24CancelOutline width={16} height={16} />}
-                    onClick={() => handleReject(post.id)}
                     stretched
+                    onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POST_DETAIL}/${post.id}`)}
                   >
-                    Отклонить
+                    Подробнее
                   </Button>
                 </Div>
               </Card>
