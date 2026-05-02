@@ -6,8 +6,8 @@ import { AppConfig } from './AppConfig.tsx';
 console.log('main.tsx loaded');
 console.log('React createRoot available:', typeof createRoot);
 
-// Добавляем Eruda консоль для отладки в мобильных приложениях VK
-if (import.meta.env.MODE === 'development' || window.location.search.includes('vk_platform')) {
+// Добавляем Eruda консоль для отладки только в dev режиме или если передан параметр eruda=1
+if (import.meta.env.MODE === 'development' || window.location.search.includes('eruda=1')) {
   import('./eruda.ts');
 }
 
