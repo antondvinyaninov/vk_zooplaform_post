@@ -22,6 +22,7 @@ import {
   Icon28NewsfeedOutline,
   Icon56ErrorOutline,
   Icon24CheckCircleOutline,
+  Icon24CancelOutline,
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { getPostById, moderatePost } from '../shared/api';
@@ -328,6 +329,16 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
                     stretched
                   >
                     Одобрить
+                  </Button>
+                  <Button 
+                    size="l" 
+                    mode="secondary" 
+                    appearance="negative"
+                    before={<Icon24CancelOutline />}
+                    onClick={() => setIsRejecting(true)}
+                    stretched
+                  >
+                    Отклонить
                   </Button>
                 </div>
               )}
