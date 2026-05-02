@@ -206,7 +206,6 @@ export const App = () => {
   const activeStory = getActiveStory(activePanel);
   const shouldShowTabbar =
     activePanel !== DEFAULT_VIEW_PANELS.ONBOARDING &&
-    activePanel !== DEFAULT_VIEW_PANELS.POST_DETAIL &&
     activePanel !== DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS;
 
   const modal = (

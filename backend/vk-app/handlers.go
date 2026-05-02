@@ -39,6 +39,7 @@ type postResponse struct {
 	PublishDate    *string         `json:"publish_date,omitempty"`
 	Attachments    string          `json:"attachments,omitempty"`
 	S3VideoKey     string          `json:"s3_video_key,omitempty"`
+	RejectReason   string          `json:"reject_reason,omitempty"`
 	AttachmentURLs []AttachmentURL `json:"attachment_urls,omitempty"`
 	CreatedAt      string          `json:"created_at"`
 	UpdatedAt      string          `json:"updated_at"`
@@ -715,11 +716,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		post.Status = "rejected"
 		post.RejectReason = req.RejectReason
 		post.PublishDate = time.Time{}
-		// Удаляем видео из S3 при отклонении
-		if post.S3VideoKey != "" {
-			go s3DeleteVideoKey(post.S3VideoKey)
-			post.S3VideoKey = ""
-		}
+		// Видео не удаляем из S3 сразу, чтобы автор мог его посмотреть.
 	default:
 		utils.RespondError(w, http.StatusBadRequest, "unsupported status")
 		return
@@ -965,6 +962,7 @@ func serializePost(post *models.Post) (postResponse, error) {
 		VKPostID:    post.VKPostID,
 		Attachments: post.Attachments,
 		S3VideoKey:  post.S3VideoKey,
+		RejectReason: post.RejectReason,
 		CreatedAt:   post.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:   post.UpdatedAt.Format(time.RFC3339),
 	}
