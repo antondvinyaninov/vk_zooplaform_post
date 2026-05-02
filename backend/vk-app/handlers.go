@@ -365,8 +365,8 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 
-	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.\n\nПроверить статус: %s", appURL))
-	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\nПерейти к модерации поста: %s", group.Name, appURL))
+	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL))
+	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", group.Name, appURL))
 
 	response, err := serializePost(post)
 	if err != nil {
@@ -731,11 +731,11 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	if author, err := getUserByID(post.UserID); err == nil && author != nil {
 		switch req.Status {
 		case "published":
-			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\nОткрыть пост: %s", appURL))
+			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\n[%s|Открыть пост]", appURL))
 		case "scheduled":
-			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\nОткрыть пост: %s", post.PublishDate.Format("02.01.2006 15:04"), appURL))
+			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", post.PublishDate.Format("02.01.2006 15:04"), appURL))
 		case "rejected":
-			sendNotificationToUser(author.VKUserID, fmt.Sprintf("К сожалению, ваш предложенный пост был отклонен модератором.\n\nПосмотреть детали: %s", appURL))
+			sendNotificationToUser(author.VKUserID, fmt.Sprintf("К сожалению, ваш предложенный пост был отклонен модератором.\n\n[%s|Посмотреть детали]", appURL))
 		}
 	}
 
