@@ -79,14 +79,35 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
       <Group>
         <Div>
           <Text weight="3" style={{ color: 'var(--vkui--color_text_accent)', marginBottom: 12 }}>
-            Статус: {
-              post.status === 'published' ? '✅ Опубликовано' :
-              post.status === 'pending' ? '⏳ На модерации' :
-              post.status === 'rejected' ? '❌ Отклонено' :
-              post.status === 'draft' ? '📝 Черновик' :
-              post.status
-            }
+            Статус: {(() => {
+              if (post.status === 'published') return '✅ Опубликовано';
+              if (post.status === 'pending') return '⏳ На модерации';
+              if (post.status === 'rejected') return '❌ Отклонено';
+              if (post.status === 'draft') return '📝 Черновик';
+              if (post.status === 'scheduled') {
+                if (post.publish_date && new Date(post.publish_date).getTime() <= Date.now()) {
+                  return '✅ Опубликовано (отложенный)';
+                }
+                const dateStr = post.publish_date 
+                  ? new Date(post.publish_date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                  : '';
+                return `📅 Отложено на ${dateStr}`;
+              }
+              return post.status;
+            })()}
           </Text>
+
+          {post.vk_post_id && post.group?.vk_group_id && (
+            <div style={{ marginBottom: 12 }}>
+              <Button 
+                size="s" 
+                mode="secondary" 
+                onClick={() => window.open(`https://vk.com/wall-${post.group.vk_group_id}_${post.vk_post_id}`, '_blank')}
+              >
+                Открыть ВКонтакте
+              </Button>
+            </div>
+          )}
           <Text style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
             {post.message}
           </Text>
