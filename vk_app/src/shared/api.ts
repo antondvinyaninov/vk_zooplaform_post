@@ -136,11 +136,14 @@ export const getS3PresignedUrl = async (fileName: string, fileType: string) => {
   );
 };
 
-export const uploadMediaToS3 = async (file: File, uploadUrl: string) => {
+export const uploadMediaToS3 = async (file: File, uploadUrl: string, explicitType?: string) => {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', uploadUrl, true);
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    
+    // Ensure the Content-Type header matches exactly what the URL was presigned with
+    const contentType = explicitType || file.type || 'application/octet-stream';
+    xhr.setRequestHeader('Content-Type', contentType);
 
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
@@ -150,8 +153,9 @@ export const uploadMediaToS3 = async (file: File, uploadUrl: string) => {
       }
     };
 
-    xhr.onerror = () => {
-      reject(new Error('S3 Media upload failed due to network error'));
+    xhr.onerror = (e) => {
+      console.error('XHR Error:', e);
+      reject(new Error(`S3 Media upload failed due to network error. URL: ${uploadUrl.substring(0, 50)}... Type: ${file.type}, Size: ${file.size}`));
     };
 
     xhr.send(file);

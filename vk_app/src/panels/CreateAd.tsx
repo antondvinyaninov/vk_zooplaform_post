@@ -122,7 +122,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
         }
         
         const { upload_url, key } = await getS3PresignedUrl(fileToUpload.name, fileType);
-        await uploadMediaToS3(fileToUpload, upload_url);
+        await uploadMediaToS3(fileToUpload, upload_url, fileType);
         s3MediaKeys.push(key);
       }
 
