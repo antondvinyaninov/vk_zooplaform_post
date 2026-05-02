@@ -509,7 +509,24 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 
 	switch req.Status {
-	case "published":
+	case "published", "scheduled":
+		var publishUnix int64
+		if req.Status == "scheduled" {
+			if strings.TrimSpace(req.PublishDate) == "" {
+				utils.RespondError(w, http.StatusBadRequest, "publish_date is required for scheduled status")
+				return
+			}
+			publishDate, err := time.Parse(time.RFC3339, req.PublishDate)
+			if err != nil {
+				utils.RespondError(w, http.StatusBadRequest, "publish_date must be RFC3339")
+				return
+			}
+			post.PublishDate = publishDate
+			publishUnix = publishDate.Unix()
+		} else {
+			post.PublishDate = time.Time{}
+		}
+
 		group, err := getGroupByID(post.GroupID)
 		if err != nil {
 			utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -616,27 +633,15 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 
 		// from_group=true: постим от имени группы (требует токена сообщества или токена админа с правами)
-		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, attachments, true, 0)
+		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), post.Message, attachments, true, publishUnix)
 		if err != nil {
 			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
 			utils.RespondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		post.VKPostID = vkPostID
-		post.Status = "published"
-		post.PublishDate = time.Time{}
-	case "scheduled":
-		if strings.TrimSpace(req.PublishDate) == "" {
-			utils.RespondError(w, http.StatusBadRequest, "publish_date is required for scheduled status")
-			return
-		}
-		publishDate, err := time.Parse(time.RFC3339, req.PublishDate)
-		if err != nil {
-			utils.RespondError(w, http.StatusBadRequest, "publish_date must be RFC3339")
-			return
-		}
-		post.Status = "scheduled"
-		post.PublishDate = publishDate
+		post.Status = req.Status
+
 	case "rejected":
 		post.Status = "rejected"
 		post.PublishDate = time.Time{}
