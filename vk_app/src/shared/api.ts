@@ -257,7 +257,7 @@ export const getPostById = async (id: string | number) => {
 
 export const editPost = async (id: string | number, message: string, s3MediaKeys: string[] = [], attachments: string = '') => {
   return fetchJSON<AppPost>(`${API_URL}/posts/${id}`, {
-    method: 'PUT',
+    method: 'POST',
     body: JSON.stringify({ 
       message, 
       s3_video_keys: s3MediaKeys,

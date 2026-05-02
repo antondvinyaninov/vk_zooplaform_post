@@ -440,7 +440,7 @@ func postByIDHandler(w http.ResponseWriter, r *http.Request) {
 			getPostByIDHandler(w, postID)
 			return
 		}
-		if r.Method == http.MethodPut {
+		if r.Method == http.MethodPut || r.Method == http.MethodPost {
 			updatePostContentHandler(w, r, postID)
 			return
 		}
