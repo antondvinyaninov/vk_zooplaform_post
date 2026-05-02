@@ -207,12 +207,22 @@ func videoUploadUrlHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func listPostsHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if ctx.GroupID == 0 {
+		utils.RespondError(w, http.StatusBadRequest, "vk_group_id is required")
+		return
+	}
+
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	if status == "" {
 		status = "published"
 	}
 
-	posts, err := getPostsByStatus(status, 100, 0)
+	posts, err := getPostsByStatusAndGroup(status, ctx.GroupID, 100, 0)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1391,14 +1401,14 @@ func getPostByID(id int) (*models.Post, error) {
 	return scanPost(row)
 }
 
-func getPostsByStatus(status string, limit, offset int) ([]*models.Post, error) {
+func getPostsByStatusAndGroup(status string, groupID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
 		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, reject_reason, publish_date, created_at, updated_at
 		FROM posts
-		WHERE status = ?
+		WHERE status = ? AND group_id = ?
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`, status, limit, offset)
+	`, status, groupID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
