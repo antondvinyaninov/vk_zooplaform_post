@@ -24,39 +24,6 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
   const [files, setFiles] = useState<{ file: File, thumbnail?: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const getVideoThumbnail = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const video = document.createElement('video');
-      video.src = URL.createObjectURL(file);
-      video.crossOrigin = 'anonymous';
-      video.muted = true;
-      video.playsInline = true;
-      
-      video.onloadeddata = () => {
-        video.currentTime = 1; // 1 second
-      };
-      
-      video.onseeked = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg'));
-        } else {
-          resolve('');
-        }
-      };
-      
-      video.onerror = () => {
-        resolve('');
-      };
-    });
-  };
-
-
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const newFilesList = Array.from(e.target.files);
@@ -67,21 +34,6 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
 
     const items = newFilesList.map(file => ({ file }));
     setFiles((prev) => [...prev, ...items]);
-
-    // Async load thumbnails for videos
-    items.forEach(async (item) => {
-      const isVideo = item.file.type.startsWith('video/') || 
-                     item.file.name.toLowerCase().endsWith('.mp4') || 
-                     item.file.name.toLowerCase().endsWith('.mov') || 
-                     item.file.name.toLowerCase().endsWith('.qt');
-                     
-      if (isVideo) {
-        const thumb = await getVideoThumbnail(item.file);
-        if (thumb) {
-          setFiles(prev => prev.map(p => p.file === item.file ? { ...p, thumbnail: thumb } : p));
-        }
-      }
-    });
   };
 
   const removeFile = (index: number) => {

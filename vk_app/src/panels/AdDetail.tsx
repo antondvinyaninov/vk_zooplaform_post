@@ -57,36 +57,9 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
       return;
     }
 
-    const processedFiles = await Promise.all(newFiles.map(async (file) => {
-      let thumbnail: string | undefined;
-      const isVideo = file.type.startsWith('video/') || 
-                      file.name.toLowerCase().endsWith('.mp4') || 
-                      file.name.toLowerCase().endsWith('.mov') || 
-                      file.name.toLowerCase().endsWith('.qt');
-      
-      if (isVideo) {
-        try {
-          const videoUrl = URL.createObjectURL(file);
-          const video = document.createElement('video');
-          video.src = videoUrl;
-          video.currentTime = 1;
-          await new Promise((resolve, reject) => {
-            video.onloadeddata = resolve;
-            video.onerror = reject;
-          });
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-          thumbnail = canvas.toDataURL('image/jpeg');
-          URL.revokeObjectURL(videoUrl);
-        } catch (e) {
-          console.error("Could not generate thumbnail", e);
-        }
-      }
-      return { file, thumbnail };
-    }));
+    const processedFiles = newFiles.map((file) => {
+      return { file, thumbnail: undefined };
+    });
 
     setEditFiles(prev => [...prev, ...processedFiles]);
   };
