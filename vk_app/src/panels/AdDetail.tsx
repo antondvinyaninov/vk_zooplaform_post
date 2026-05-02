@@ -36,6 +36,9 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editMessage, setEditMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     async function fetchDetail() {
@@ -103,6 +106,13 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
               return post.status;
             })()}
           </Text>
+
+          {post.status === 'rejected' && post.reject_reason && (
+            <div style={{ marginBottom: 16, padding: '12px', backgroundColor: 'var(--vkui--color_background_negative_tint)', color: 'var(--vkui--color_text_negative)', borderRadius: 8 }}>
+              <Text weight="3" style={{ marginBottom: 4 }}>Причина отклонения:</Text>
+              <Text style={{ whiteSpace: 'pre-wrap' }}>{post.reject_reason}</Text>
+            </div>
+          )}
 
           {post.vk_post_id && post.group?.vk_group_id && (
             <div style={{ marginBottom: 12 }}>
@@ -340,35 +350,70 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
 
         return (
           <Group>
-            <Div style={{ display: 'flex', gap: 8 }}>
-              <Button 
-                size="l" 
-                mode="primary" 
-                appearance="positive"
-                before={<Icon24CheckCircleOutline />}
-                onClick={() => routeNavigator.push(`/moderation/approve_settings/${post.id}`)}
-                stretched
-              >
-                Одобрить
-              </Button>
-              <Button 
-                size="l" 
-                mode="secondary" 
-                appearance="negative"
-                before={<Icon24CancelOutline />}
-                onClick={async () => {
-                  try {
-                    await moderatePost(post.id, 'rejected');
-                    setPost({ ...post, status: 'rejected' });
-                    window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId: post.id } }));
-                  } catch (e) {
-                    console.error('Failed to reject:', e);
-                  }
-                }}
-                stretched
-              >
-                Отклонить
-              </Button>
+            <Div>
+              {isRejecting ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <Textarea 
+                    placeholder="Укажите причину отклонения (необязательно)"
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <Button 
+                      size="l" 
+                      mode="primary" 
+                      appearance="negative"
+                      loading={isSubmitting}
+                      onClick={async () => {
+                        try {
+                          setIsSubmitting(true);
+                          await moderatePost(post.id, 'rejected', undefined, rejectReason);
+                          setPost({ ...post, status: 'rejected', reject_reason: rejectReason });
+                          window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId: post.id } }));
+                        } catch (e) {
+                          console.error('Failed to reject:', e);
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      stretched
+                    >
+                      Подтвердить отклонение
+                    </Button>
+                    <Button 
+                      size="l" 
+                      mode="secondary" 
+                      disabled={isSubmitting}
+                      onClick={() => setIsRejecting(false)}
+                    >
+                      Отмена
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button 
+                    size="l" 
+                    mode="primary" 
+                    appearance="positive"
+                    before={<Icon24CheckCircleOutline />}
+                    onClick={() => routeNavigator.push(`/moderation/approve_settings/${post.id}`)}
+                    stretched
+                  >
+                    Одобрить
+                  </Button>
+                  <Button 
+                    size="l" 
+                    mode="secondary" 
+                    appearance="negative"
+                    before={<Icon24CancelOutline />}
+                    onClick={() => setIsRejecting(true)}
+                    stretched
+                  >
+                    Отклонить
+                  </Button>
+                </div>
+              )}
             </Div>
           </Group>
         );

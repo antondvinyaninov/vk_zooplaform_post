@@ -216,12 +216,14 @@ export const moderatePost = async (
   id: number,
   status: 'published' | 'scheduled' | 'rejected',
   publishDate?: Date,
+  rejectReason?: string,
 ) => {
   return fetchJSON<AppPost>(`${API_URL}/posts/${id}/moderate`, {
     method: 'PATCH',
     body: JSON.stringify({
       status,
       publish_date: publishDate?.toISOString(),
+      reject_reason: rejectReason,
     }),
   });
 };

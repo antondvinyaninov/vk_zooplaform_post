@@ -551,8 +551,9 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 
 	var req struct {
-		Status      string `json:"status"`
-		PublishDate string `json:"publish_date"`
+		Status       string `json:"status"`
+		PublishDate  string `json:"publish_date"`
+		RejectReason string `json:"reject_reason"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -712,6 +713,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 	case "rejected":
 		post.Status = "rejected"
+		post.RejectReason = req.RejectReason
 		post.PublishDate = time.Time{}
 		// Удаляем видео из S3 при отклонении
 		if post.S3VideoKey != "" {
@@ -735,7 +737,12 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		case "scheduled":
 			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", post.PublishDate.Format("02.01.2006 15:04"), appURL))
 		case "rejected":
-			sendNotificationToUser(author.VKUserID, fmt.Sprintf("К сожалению, ваш предложенный пост был отклонен модератором.\n\n[%s|Посмотреть детали]", appURL))
+			rejectMsg := "К сожалению, ваш предложенный пост был отклонен модератором."
+			if post.RejectReason != "" {
+				rejectMsg += fmt.Sprintf("\nПричина: %s", post.RejectReason)
+			}
+			rejectMsg += fmt.Sprintf("\n\n[%s|Посмотреть детали]", appURL)
+			sendNotificationToUser(author.VKUserID, rejectMsg)
 		}
 	}
 
@@ -1343,9 +1350,9 @@ func createPost(post *models.Post) error {
 func updatePost(post *models.Post) error {
 	_, err := database.Exec(`
 		UPDATE posts
-		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, s3_video_key = ?, status = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
+		SET vk_post_id = ?, user_id = ?, group_id = ?, message = ?, attachments = ?, s3_video_key = ?, status = ?, reject_reason = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.S3VideoKey, post.Status, nullableTime(post.PublishDate), post.ID)
+	`, post.VKPostID, post.UserID, post.GroupID, post.Message, post.Attachments, post.S3VideoKey, post.Status, post.RejectReason, nullableTime(post.PublishDate), post.ID)
 	if err != nil {
 		return err
 	}
@@ -1355,7 +1362,7 @@ func updatePost(post *models.Post) error {
 
 func getPostByID(id int) (*models.Post, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, reject_reason, publish_date, created_at, updated_at
 		FROM posts WHERE id = ?
 	`, id)
 	return scanPost(row)
@@ -1363,7 +1370,7 @@ func getPostByID(id int) (*models.Post, error) {
 
 func getPostsByStatus(status string, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, reject_reason, publish_date, created_at, updated_at
 		FROM posts
 		WHERE status = ?
 		ORDER BY created_at DESC
@@ -1378,7 +1385,7 @@ func getPostsByStatus(status string, limit, offset int) ([]*models.Post, error) 
 
 func getPostsByUserID(userID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, publish_date, created_at, updated_at
+		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, reject_reason, publish_date, created_at, updated_at
 		FROM posts
 		WHERE user_id = ?
 		ORDER BY created_at DESC
@@ -1412,6 +1419,7 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 	)
 
 	var s3VideoKey sql.NullString
+	var rejectReason sql.NullString
 	err := row.Scan(
 		&post.ID,
 		&dbVKPostID,
@@ -1421,6 +1429,7 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 		&post.Attachments,
 		&s3VideoKey,
 		&post.Status,
+		&rejectReason,
 		&publishDate,
 		&post.CreatedAt,
 		&post.UpdatedAt,
@@ -1433,6 +1442,9 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 	}
 	if s3VideoKey.Valid {
 		post.S3VideoKey = s3VideoKey.String
+	}
+	if rejectReason.Valid {
+		post.RejectReason = rejectReason.String
 	}
 	if dbUserID.Valid {
 		post.UserID = int(dbUserID.Int64)
@@ -1455,6 +1467,7 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 	)
 
 	var s3VideoKey sql.NullString
+	var rejectReason sql.NullString
 	if err := rows.Scan(
 		&post.ID,
 		&dbVKPostID,
@@ -1464,6 +1477,7 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 		&post.Attachments,
 		&s3VideoKey,
 		&post.Status,
+		&rejectReason,
 		&publishDate,
 		&post.CreatedAt,
 		&post.UpdatedAt,
@@ -1479,6 +1493,9 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 	}
 	if s3VideoKey.Valid {
 		post.S3VideoKey = s3VideoKey.String
+	}
+	if rejectReason.Valid {
+		post.RejectReason = rejectReason.String
 	}
 	if publishDate.Valid {
 		post.PublishDate = publishDate.Time

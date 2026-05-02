@@ -113,6 +113,7 @@ const postgresSchema = `
 		attachments TEXT,
 		s3_video_key TEXT,
 		status TEXT DEFAULT 'draft',
+		reject_reason TEXT,
 		publish_date TIMESTAMPTZ,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -203,6 +204,9 @@ func migratePostsTable() error {
 	}
 	// S3 pre-moderation video storage
 	if err := addColumnIfMissing("posts", "s3_video_key", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("posts", "reject_reason", "TEXT"); err != nil {
 		return err
 	}
 	return nil
