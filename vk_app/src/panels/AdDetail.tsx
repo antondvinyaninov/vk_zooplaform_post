@@ -22,7 +22,6 @@ import {
 } from '@vkontakte/vkui';
 import { 
   Icon28CalendarOutline,
-  Icon28NewsfeedOutline,
   Icon56ErrorOutline,
   Icon24CheckCircleOutline,
   Icon24CancelOutline,
