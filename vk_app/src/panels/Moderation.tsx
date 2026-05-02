@@ -5,24 +5,20 @@ import {
   PanelHeaderBack,
   Header,
   Group,
-  CardGrid,
-  ContentCard,
+  Card,
+  Text,
   PanelSpinner,
   Placeholder,
   Button,
   NavIdProps,
-  ButtonGroup,
   Div,
-  HorizontalScroll,
 } from '@vkontakte/vkui';
 import {
   Icon56CheckShieldOutline,
   Icon24CheckCircleOutline, 
   Icon24CancelOutline,
-  Icon28VideoOutline,
-  Icon24Camera
+  Icon28VideoOutline
 } from '@vkontakte/icons';
-import { Link } from '@vkontakte/vkui';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getFeedPosts, moderatePost, AppPost } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
@@ -102,101 +98,115 @@ export const Moderation: FC<NavIdProps> = ({ id }) => {
             Все публикации проверены. Отличная работа!
           </Placeholder>
         ) : (
-          <CardGrid size="l">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 16px', paddingBottom: 24 }}>
             {posts.map((post) => (
-              <ContentCard
-                key={post.id}
-                caption={post.group?.name || 'Публикация сообщества'}
-                title={post.title}
-                description={
-                  <>
-                    <Div style={{ padding: 0, marginBottom: 8 }}>{post.message}</Div>
-                    {post.attachment_urls && post.attachment_urls.length > 0 ? (
-                      <Div style={{ padding: 0, marginBottom: 12 }}>
-                        <div style={{ fontSize: 13, color: '#818c99', marginBottom: 6 }}>Прикрепленные медиа:</div>
-                        <HorizontalScroll showArrows getScrollToLeft={(i) => i - 120} getScrollToRight={(i) => i + 120}>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            {post.attachment_urls.map((att, i) => {
-                              const isS3Video = att.type === 's3_video' || att.url.includes('.mp4') || att.url.includes('.mov');
-                              const isVKVideo = att.type === 'vk_video' || att.type === 'video';
-                              const href = att.id.startsWith('s3:') ? att.url : `https://vk.com/${att.id}`;
-                              
-                              return (
-                              <a key={i} href={href} target="_blank" rel="noreferrer" style={{ position: 'relative', width: 80, height: 80, flexShrink: 0, display: 'block' }}>
-                                {isS3Video ? (
-                                  <video 
-                                    src={att.url} 
-                                    style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
-                                    muted
-                                    playsInline
-                                  />
-                                ) : (
-                                  <img 
-                                    src={att.url} 
-                                    style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e1e3e6' }} 
-                                    alt={`attachment-${i}`}
-                                  />
-                                )}
-                                {(isS3Video || isVKVideo) && (
-                                  <div style={{ 
-                                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, 
-                                    backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, 
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center' 
-                                  }}>
-                                    <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />
-                                  </div>
-                                )}
-                              </a>
-                              );
-                            })}
+              <Card key={post.id} mode="shadow">
+                <Div style={{ display: 'flex', gap: 12 }}>
+                  {/* Изображение */}
+                  {post.attachment_urls?.[0]?.url && (() => {
+                    const firstAtt = post.attachment_urls[0];
+                    const isS3Video = firstAtt.type === 's3_video' || firstAtt.url.includes('.mp4') || firstAtt.url.includes('.mov');
+                    const isVKVideo = firstAtt.type === 'vk_video' || firstAtt.type === 'video';
+                    
+                    return (
+                    <div 
+                      onClick={() => {
+                        if (isVKVideo) {
+                           window.open(`https://vk.com/${firstAtt.id}`, '_blank');
+                        }
+                      }}
+                      style={{ 
+                        width: 80, 
+                        height: 80, 
+                        flexShrink: 0, 
+                        borderRadius: 8, 
+                        overflow: 'hidden', 
+                        backgroundColor: 'var(--vkui--color_background_secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                        cursor: isVKVideo ? 'pointer' : 'default'
+                      }}
+                    >
+                      {isS3Video ? (
+                        <>
+                          <video 
+                            src={firstAtt.url} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            muted
+                            playsInline
+                          />
+                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />
                           </div>
-                        </HorizontalScroll>
-                      </Div>
-                    ) : post.attachments ? (
-                      <Div style={{ padding: 0, marginBottom: 12 }}>
-                        <div style={{ fontSize: 13, color: '#818c99', marginBottom: 6 }}>Прикрепленные медиа ({post.attachments.split(',').length}):</div>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          {post.attachments.split(',').map((att: string, i: number) => {
-                            const isVideo = att.startsWith('video');
-                            const url = `https://vk.com/${att}`;
-                            return (
-                              <Link key={i} href={url} target="_blank" style={{ display: 'flex', alignItems: 'center', background: '#f0f0f0', padding: '6px 10px', borderRadius: 8, textDecoration: 'none' }}>
-                                {isVideo ? <Icon28VideoOutline width={16} height={16} style={{ marginRight: 6 }} /> : <Icon24Camera width={16} height={16} style={{ marginRight: 6 }} />}
-                                <span style={{ fontSize: 13, fontWeight: 500 }}>{isVideo ? 'Видео' : 'Фото'} {i + 1}</span>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      </Div>
-                    ) : null}
-                    <ButtonGroup mode="horizontal" gap="s" stretched>
-                      <Button 
-                        size="s" 
-                        mode="primary" 
-                        appearance="positive"
-                        before={<Icon24CheckCircleOutline width={16} height={16} />}
-                        onClick={() => handleApprove(post.id)}
-                        stretched
-                      >
-                        Одобрить
-                      </Button>
-                      <Button 
-                        size="s" 
-                        mode="secondary" 
-                        appearance="negative"
-                        before={<Icon24CancelOutline width={16} height={16} />}
-                        onClick={() => handleReject(post.id)}
-                        stretched
-                      >
-                        Отклонить
-                      </Button>
-                    </ButtonGroup>
-                  </>
-                }
-                maxHeight={300}
-              />
+                        </>
+                      ) : isVKVideo ? (
+                        <>
+                          <img 
+                            src={firstAtt.url} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            alt="VK Видео"
+                          />
+                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon28VideoOutline width={32} height={32} style={{ color: 'white' }} />
+                          </div>
+                        </>
+                      ) : (
+                        <img 
+                          src={firstAtt.url} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          alt="Медиа"
+                        />
+                      )}
+                    </div>
+                    );
+                  })()}
+                  
+                  {/* Информация */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, justifyContent: 'center' }}>
+                    <Text weight="2" style={{ color: 'var(--vkui--color_text_subhead)', marginBottom: 4 }}>
+                      {post.group?.name || 'Публикация сообщества'}
+                    </Text>
+                    <Text style={{ 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis', 
+                      display: '-webkit-box', 
+                      WebkitLineClamp: 2, 
+                      WebkitBoxOrient: 'vertical',
+                      wordBreak: 'break-word',
+                      color: 'var(--vkui--color_text_primary)'
+                    }}>
+                      {post.title || post.message}
+                    </Text>
+                  </div>
+                </Div>
+
+                <Div style={{ display: 'flex', gap: 8, paddingTop: 0 }}>
+                  <Button 
+                    size="s" 
+                    mode="primary" 
+                    appearance="positive"
+                    before={<Icon24CheckCircleOutline width={16} height={16} />}
+                    onClick={() => handleApprove(post.id)}
+                    stretched
+                  >
+                    Одобрить
+                  </Button>
+                  <Button 
+                    size="s" 
+                    mode="secondary" 
+                    appearance="negative"
+                    before={<Icon24CancelOutline width={16} height={16} />}
+                    onClick={() => handleReject(post.id)}
+                    stretched
+                  >
+                    Отклонить
+                  </Button>
+                </Div>
+              </Card>
             ))}
-          </CardGrid>
+          </div>
         )}
       </Group>
     </Panel>

@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 - **Frontend / Design System**: Implemented a comprehensive design system featuring light/dark mode theming, CSS variables, and modern accessible UI components.
 - **Frontend / API**: Integrated `swr` data fetching library for caching and real-time UI updates across the Admin Panel.
 - **Frontend / Auth**: Implemented VK OAuth token parsing and connection management flow in `vk-connect-card.tsx` bridging to Go Backend.
+- **Frontend & Backend / Infrastructure**: Re-architected media uploads to bypass 10MB API Gateway limitations by implementing a direct client-to-Yandex-S3 upload flow using presigned URLs for all media types (photos and videos).
+- **Frontend / UI**: Implemented native VKUI `Gallery` component with swipe functionality and bullet indicators for rendering multiple media attachments in detailed post views.
+- **Backend / Fallbacks**: Added backwards compatibility in `createPostHandler` to support `multipart/form-data` uploads from users with older cached versions of the VK Mini App.
 - **Frontend & Backend / Media Attachments**: Added support for uploading up to 10 photos and videos via `multipart/form-data` when creating a post. 
 - **Backend / Media Processing**: Added Go client method `UploadVideo` to handle VK `video.save` two-step upload protocol, and updated `UploadPhotoToWall` to integrate with post creation flow.
 - **Frontend / Moderation**: Implemented real-time media thumbnails fetching via VK API in the backend to display visual photo and video galleries directly in the moderation feed.
@@ -28,5 +31,7 @@ All notable changes to this project will be documented in this file.
 - **Documentation**: Restructured project documentation, created `PROJECT_MAPPING.md` to map out the separation between legacy projects and the current ZooPlatform architecture.
 
 ### Fixed
+- **Backend / Publishing**: Fixed `UploadPhotoToWall` failing due to VK API rejecting files without extensions by explicitly appending the original file extension during temporary file generation.
+- **Frontend / Rendering**: Fixed `populateAttachmentURLs` empty states by splitting comma-separated keys and classifying S3 keys dynamically based on their file extensions.
 - **Backend / Publishing**: Fixed silent failures and 500 Server Errors caused by passing `vk_user_id` directly into the `posts` table `user_id` column which violated database constraints.
 - **Frontend / UX**: Fixed an issue where a moderated post would remain visible in the queue on the frontend until the application was reloaded.

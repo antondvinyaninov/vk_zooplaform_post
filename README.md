@@ -29,8 +29,7 @@ smm/
 │   ├── utils/           # Вспомогательные функции
 │   └── main.go          # Главный файл
 ├── vk_app/              # VK Mini App (React + VKUI + VK Bridge)
-├── frontadmin/          # Админка (Astro + React)
-└── Old/                 # Архив старого кода
+└── frontadmin/          # Админка (Astro + React)
 ```
 
 ## 🎯 Компоненты системы

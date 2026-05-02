@@ -6,7 +6,6 @@ import {
   Group,
   SimpleCell,
   Avatar,
-  InfoRow,
   NavIdProps,
   List,
 } from '@vkontakte/vkui';
@@ -38,13 +37,6 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, role }) => {
       <Group>
         <SimpleCell
           before={photo_200 ? <Avatar size={72} src={photo_200} /> : <Avatar size={72} />}
-          subtitle={
-            <InfoRow header="Твоя роль (для тестов)">
-              <span style={{ color: isAdmin ? 'var(--vkui--color_text_accent)' : 'var(--vkui--color_text_secondary)', fontWeight: 'bold' }}>
-                {role ? role.toUpperCase() : 'НЕТ РОЛИ / ГОСТЬ'}
-              </span>
-            </InfoRow>
-          }
         >
           {first_name} {last_name}
         </SimpleCell>
