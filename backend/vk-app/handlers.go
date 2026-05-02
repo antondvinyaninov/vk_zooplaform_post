@@ -414,7 +414,7 @@ func myPostsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts, err := getPostsByUserID(user.ID, 100, 0)
+	posts, err := getPostsByUserIDAndGroup(user.ID, ctx.GroupID, 100, 0)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -512,6 +512,11 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		return
 	}
 
+	if post.GroupID != ctx.GroupID {
+		utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
+		return
+	}
+
 	// Разрешаем редактировать pending, draft и rejected
 	if post.Status != "pending" && post.Status != "draft" && post.Status != "rejected" {
 		utils.RespondError(w, http.StatusForbidden, "can only edit pending, draft or rejected posts")
@@ -603,6 +608,11 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 	if post == nil {
 		utils.RespondError(w, http.StatusNotFound, "post not found")
+		return
+	}
+
+	if post.GroupID != ctx.GroupID {
+		utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
 		return
 	}
 
@@ -1416,14 +1426,14 @@ func getPostsByStatusAndGroup(status string, groupID int, limit, offset int) ([]
 	return scanPostRows(rows)
 }
 
-func getPostsByUserID(userID int, limit, offset int) ([]*models.Post, error) {
+func getPostsByUserIDAndGroup(userID int, groupID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
 		SELECT id, vk_post_id, user_id, group_id, message, attachments, s3_video_key, status, reject_reason, publish_date, created_at, updated_at
 		FROM posts
-		WHERE user_id = ?
+		WHERE user_id = ? AND group_id = ?
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`, userID, limit, offset)
+	`, userID, groupID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
