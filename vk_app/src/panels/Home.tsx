@@ -1,5 +1,5 @@
 import { FC, useEffect, useState } from 'react';
-import { Alert,
+import {
   Panel,
   PanelHeader,
   Group,
@@ -14,7 +14,7 @@ import { Alert,
 } from '@vkontakte/vkui';
 import { Icon28AddOutline, Icon56AddCircleOutline, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getMyPosts, deletePost } from '../shared/api';
+import { getMyPosts } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export interface HomeProps extends NavIdProps {}
@@ -23,7 +23,6 @@ export const Home: FC<HomeProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     async function fetchPosts() {
@@ -37,6 +36,15 @@ export const Home: FC<HomeProps> = ({ id }) => {
       }
     }
     fetchPosts();
+
+    const handlePostDeleted = (e: any) => {
+      if (e.detail && e.detail.postId) {
+        setPosts(prev => prev.filter(p => p.id !== e.detail.postId));
+      }
+    };
+    
+    window.addEventListener('postDeleted', handlePostDeleted);
+    return () => window.removeEventListener('postDeleted', handlePostDeleted);
   }, []);
 
   return (
@@ -58,7 +66,7 @@ export const Home: FC<HomeProps> = ({ id }) => {
             </Button>
           }
         >
-          Лента публикаций (v5.2)
+          Лента публикаций (v5.3)
         </Header>
       }>
         {loading ? (
@@ -191,48 +199,7 @@ export const Home: FC<HomeProps> = ({ id }) => {
                     mode="outline" 
                     appearance="negative"
                     stretched
-                    loading={deletingId === post.id}
-                    onClick={() => {
-                      const closePopout = () => (window as any).setGlobalPopout(null);
-                      (window as any).setGlobalPopout(
-                        <Alert
-                          actions={[
-                            { title: 'Отмена', mode: 'cancel', autoCloseDisabled: true, action: () => { closePopout(); } },
-                            { 
-                              title: 'Удалить', 
-                              mode: 'destructive',
-                              autoCloseDisabled: true,
-                              action: async () => {
-                                closePopout();
-                                try {
-                                  setDeletingId(post.id);
-                                  await deletePost(post.id);
-                                  setPosts(prev => prev.filter(p => p.id !== post.id));
-                                } catch (e: any) {
-                                  console.error('Failed to delete post:', e);
-                                  (window as any).setGlobalPopout(
-                                    <Alert
-                                      actions={[{ title: 'ОК', mode: 'cancel', action: closePopout }]}
-                                      onClose={closePopout}
-                          onClosed={() => {}}
-                                      title="Ошибка"
-                                      description={e.message || 'Не удалось удалить пост'}
-                                    />
-                                  );
-                                } finally {
-                                  setDeletingId(null);
-                                }
-                              }
-                            }
-                          ]}
-                          actionsLayout="horizontal"
-                          onClose={closePopout}
-                          onClosed={() => {}}
-                          title="Подтвердите действие"
-                          description="Вы уверены, что хотите удалить эту публикацию?"
-                        />
-                      );
-                    }}
+                    onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}/delete_post/${post.id}`)}
                   >
                     Удалить
                   </Button>

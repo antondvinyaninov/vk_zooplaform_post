@@ -1788,7 +1788,46 @@ func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		return
 	}
 
-	res, err := database.Exec("DELETE FROM posts WHERE id = ? AND user_id = ?", postID, user.ID)
+	var reqBody struct {
+		Reason  string `json:"reason"`
+		Comment string `json:"comment"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil && err != io.EOF {
+		utils.RespondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Сначала проверим, есть ли пост и принадлежит ли он пользователю
+	var s3VideoKey, attachments string
+	err = database.DB.QueryRow("SELECT s3_video_key, attachments FROM posts WHERE id = $1 AND user_id = $2", postID, user.ID).Scan(&s3VideoKey, &attachments)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.RespondError(w, http.StatusNotFound, "post not found or you are not the author")
+			return
+		}
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Удаляем медиа из S3
+	if s3VideoKey != "" {
+		s3Client, err := s3client.New()
+		if err == nil {
+			// attachments может содержать список S3 ключей, если мы поддерживаем несколько фото
+			s3Keys := strings.Split(s3VideoKey, ",")
+			for _, key := range s3Keys {
+				if key != "" {
+					s3Client.DeleteObject(r.Context(), key)
+				}
+			}
+		}
+	}
+
+	// Soft-delete: обновляем статус и очищаем медиа
+	res, err := database.DB.Exec(
+		"UPDATE posts SET status = 'deleted', delete_reason = $1, delete_comment = $2, s3_video_key = '', attachments = '' WHERE id = $3 AND user_id = $4", 
+		reqBody.Reason, reqBody.Comment, postID, user.ID,
+	)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return

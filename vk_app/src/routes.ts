@@ -26,14 +26,20 @@ export const DEFAULT_VIEW_PANELS = {
 export const routes = RoutesConfig.create([
   createRoot(DEFAULT_ROOT, [
     createView(DEFAULT_VIEW, [
-      createPanel(DEFAULT_VIEW_PANELS.HOME, '/', []), // Добавляем корневой роут
-      createPanel(DEFAULT_VIEW_PANELS.HOME, '/home', []),
+      createPanel(DEFAULT_VIEW_PANELS.HOME, '/', [
+        createModal('delete_post_modal', `/${DEFAULT_VIEW_PANELS.HOME}/delete_post/:id`),
+      ]), // Добавляем корневой роут
+      createPanel(DEFAULT_VIEW_PANELS.HOME, '/home', [
+        createModal('delete_post_modal_home', `/${DEFAULT_VIEW_PANELS.HOME}/delete_post/:id`),
+      ]),
       createPanel(DEFAULT_VIEW_PANELS.ONBOARDING, `/${DEFAULT_VIEW_PANELS.ONBOARDING}`, []),
       createPanel(DEFAULT_VIEW_PANELS.PROFILE, `/${DEFAULT_VIEW_PANELS.PROFILE}`, []),
       createPanel(DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS, `/${DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS}`, []),
 
       createPanel(DEFAULT_VIEW_PANELS.CREATE_POST, `/${DEFAULT_VIEW_PANELS.CREATE_POST}`, []),
-      createPanel(DEFAULT_VIEW_PANELS.POST_DETAIL, `/${DEFAULT_VIEW_PANELS.POST_DETAIL}/:id`, []),
+      createPanel(DEFAULT_VIEW_PANELS.POST_DETAIL, `/${DEFAULT_VIEW_PANELS.POST_DETAIL}/:id`, [
+        createModal('delete_post_modal_detail', `/${DEFAULT_VIEW_PANELS.POST_DETAIL}/delete_post/:id`),
+      ]),
       createPanel(DEFAULT_VIEW_PANELS.MODERATION_DETAIL, `/${DEFAULT_VIEW_PANELS.MODERATION_DETAIL}/:id`, [
         createModal('approve_settings_detail', `/${DEFAULT_VIEW_PANELS.MODERATION_DETAIL}/approve_settings/:id`),
       ]),

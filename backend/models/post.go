@@ -11,9 +11,11 @@ type Post struct {
 	Message     string    `json:"message"`
 	Attachments string    `json:"attachments,omitempty"`
 	S3VideoKey  string    `json:"s3_video_key,omitempty"`
-	Status      string    `json:"status"` // pending, scheduled, published, rejected, failed
-	RejectReason string   `json:"reject_reason,omitempty"`
-	PublishDate time.Time `json:"publish_date,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	Status        string    `json:"status"` // pending, scheduled, published, rejected, failed, deleted
+	RejectReason  string    `json:"reject_reason,omitempty"`
+	DeleteReason  string    `json:"delete_reason,omitempty"`
+	DeleteComment string    `json:"delete_comment,omitempty"`
+	PublishDate   time.Time `json:"publish_date,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }

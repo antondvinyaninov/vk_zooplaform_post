@@ -114,6 +114,8 @@ const postgresSchema = `
 		s3_video_key TEXT,
 		status TEXT DEFAULT 'draft',
 		reject_reason TEXT,
+		delete_reason TEXT,
+		delete_comment TEXT,
 		publish_date TIMESTAMPTZ,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -207,6 +209,12 @@ func migratePostsTable() error {
 		return err
 	}
 	if err := addColumnIfMissing("posts", "reject_reason", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("posts", "delete_reason", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("posts", "delete_comment", "TEXT"); err != nil {
 		return err
 	}
 	return nil

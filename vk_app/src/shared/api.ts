@@ -245,9 +245,11 @@ export const getMyPosts = async () => {
 };
 
 
-export const deletePost = async (id: string | number) => {
+export const deletePost = async (id: string | number, reason: string, comment: string = '') => {
   return fetchJSON<void>(`${API_URL}/posts/${id}`, {
     method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason, comment }),
   });
 };
 

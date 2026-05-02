@@ -32,6 +32,7 @@ const AdDetail = lazy(() => import('./panels/AdDetail'));
 const ModerationDetail = lazy(() => import('./panels/ModerationDetail'));
 const Moderation = lazy(() => import('./panels/Moderation'));
 const ModerationModal = lazy(() => import('./panels/ModerationModal'));
+const DeletePostModal = lazy(() => import('./panels/DeletePostModal').then(m => ({ default: m.DeletePostModal })));
 
 const STORY_IDS = {
   HOME: 'home_story',
@@ -230,6 +231,9 @@ export const App = () => {
             routeNavigator.back();
           }} 
         />
+        <DeletePostModal id="delete_post_modal" />
+        <DeletePostModal id="delete_post_modal_home" />
+        <DeletePostModal id="delete_post_modal_detail" onConfirm={() => routeNavigator.back()} />
       </Suspense>
     </ModalRoot>
   );
