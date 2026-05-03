@@ -1933,7 +1933,11 @@ func sendNotificationToAdmins(groupID int, message string) {
 		}
 
 		for _, vkUserID := range notifyUserIDs {
-			_ = client.SendDirectMessage(vkUserID, message)
+			if err := client.SendDirectMessage(vkUserID, message); err != nil {
+				log.Printf("[VK Notifications] Failed to send to admin %d: %v", vkUserID, err)
+			} else {
+				log.Printf("[VK Notifications] Successfully sent to admin %d", vkUserID)
+			}
 		}
 	}()
 }
@@ -1945,7 +1949,11 @@ func sendNotificationToUser(vkUserID int, message string) {
 			return
 		}
 		client := vk.NewVKClient(cfg.VKOfficialGroupToken)
-		_ = client.SendDirectMessage(vkUserID, message)
+		if err := client.SendDirectMessage(vkUserID, message); err != nil {
+			log.Printf("[VK Notifications] Failed to send to user %d: %v", vkUserID, err)
+		} else {
+			log.Printf("[VK Notifications] Successfully sent to user %d", vkUserID)
+		}
 	}()
 }
 
