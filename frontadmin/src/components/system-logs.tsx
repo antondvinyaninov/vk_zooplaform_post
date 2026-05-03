@@ -45,7 +45,8 @@ export function SystemLogs() {
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setLogs(response.data.data || []);
+      const data = response.data.data || response.data;
+      setLogs(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Failed to fetch logs", error);
     } finally {
