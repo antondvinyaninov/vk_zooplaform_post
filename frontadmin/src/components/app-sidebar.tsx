@@ -49,6 +49,11 @@ const data = {
       url: "/posts",
       icon: <IconListDetails />,
     },
+    {
+      title: "Системные логи",
+      url: "/logs",
+      icon: <IconReport />,
+    },
   ],
   navSecondary: [
     {

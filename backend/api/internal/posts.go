@@ -27,7 +27,7 @@ func (s *PostService) Create(post *models.Post) error {
 		INSERT INTO posts (user_id, message, attachments, s3_video_key)
 		VALUES (?, ?, ?, ?) RETURNING id
 	`
-	if err := tx.QueryRow(query, post.UserID, post.Message, post.Attachments, post.S3VideoKey).Scan(&post.ID); err != nil {
+	if err := tx.QueryRow(database.Rebind(query), post.UserID, post.Message, post.Attachments, post.S3VideoKey).Scan(&post.ID); err != nil {
 		return err
 	}
 	post.CreatedAt = time.Now()

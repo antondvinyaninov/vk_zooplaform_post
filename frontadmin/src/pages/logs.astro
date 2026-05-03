@@ -1,0 +1,21 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import { SystemLogs } from '@/components/system-logs';
+
+// Убедимся, что пользователь авторизован, хотя Astro может использовать client:only
+---
+
+<AppLayout title="Системные логи | ЗооПлатформа">
+  <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+    <div className="flex items-center justify-between space-y-2">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Системные логи</h2>
+        <p className="text-muted-foreground">
+          Журнал действий администраторов и системных ошибок
+        </p>
+      </div>
+    </div>
+    
+    <SystemLogs client:only="react" />
+  </div>
+</AppLayout>

@@ -49,6 +49,8 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	models.LogInfo("ADMIN_LOGIN", "Вход в панель администратора", &user.ID, "Username: "+user.Username)
+
 	fresh, err := getAdminUserByID(user.ID)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to fetch user"})

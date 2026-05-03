@@ -1619,11 +1619,11 @@ func createPost(post *models.Post, groupID int, status string) error {
 	}
 	defer tx.Rollback()
 
-	if err := tx.QueryRow(`
+	if err := tx.QueryRow(database.Rebind(`
 		INSERT INTO posts (user_id, message, attachments, s3_video_key)
 		VALUES (?, ?, ?, ?)
 		RETURNING id, created_at, updated_at
-	`, post.UserID, post.Message, post.Attachments, post.S3VideoKey).Scan(&post.ID, &post.CreatedAt, &post.UpdatedAt); err != nil {
+	`), post.UserID, post.Message, post.Attachments, post.S3VideoKey).Scan(&post.ID, &post.CreatedAt, &post.UpdatedAt); err != nil {
 		return err
 	}
 
@@ -1632,11 +1632,11 @@ func createPost(post *models.Post, groupID int, status string) error {
 		GroupID: groupID,
 		Status:  status,
 	}
-	if err := tx.QueryRow(`
+	if err := tx.QueryRow(database.Rebind(`
 		INSERT INTO post_publications (post_id, group_id, status)
 		VALUES (?, ?, ?)
 		RETURNING id, created_at, updated_at
-	`, pub.PostID, pub.GroupID, pub.Status).Scan(&pub.ID, &pub.CreatedAt, &pub.UpdatedAt); err != nil {
+	`), pub.PostID, pub.GroupID, pub.Status).Scan(&pub.ID, &pub.CreatedAt, &pub.UpdatedAt); err != nil {
 		return err
 	}
 

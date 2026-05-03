@@ -61,6 +61,10 @@ func createTables() error {
 		return err
 	}
 
+	if err := migrateSystemLogsTable(); err != nil {
+		return err
+	}
+
 	if err := migrateUsersTable(); err != nil {
 		return err
 	}
@@ -203,6 +207,19 @@ const postgresSchema = `
 	CREATE INDEX IF NOT EXISTS idx_post_publications_post_id ON post_publications(post_id);
 	CREATE INDEX IF NOT EXISTS idx_post_publications_group_id ON post_publications(group_id);
 	CREATE INDEX IF NOT EXISTS idx_post_publications_status ON post_publications(status);
+
+	CREATE TABLE IF NOT EXISTS system_logs (
+		id BIGSERIAL PRIMARY KEY,
+		level TEXT NOT NULL,
+		action TEXT NOT NULL,
+		message TEXT NOT NULL,
+		user_id BIGINT,
+		details TEXT,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(level);
+	CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at);
 `
 
 func migratePostsTable() error {
@@ -271,6 +288,29 @@ func migratePostPublications() error {
 		return fmt.Errorf("failed to migrate post publications: %v", err)
 	}
 
+	return nil
+}
+
+func migrateSystemLogsTable() error {
+	// Создаем таблицу system_logs, если она не существует
+	if !tableExists("system_logs") {
+		query := `
+			CREATE TABLE IF NOT EXISTS system_logs (
+				id BIGSERIAL PRIMARY KEY,
+				level TEXT NOT NULL,
+				action TEXT NOT NULL,
+				message TEXT NOT NULL,
+				user_id BIGINT,
+				details TEXT,
+				created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+			);
+			CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(level);
+			CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at);
+		`
+		if _, err := DB.Exec(query); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

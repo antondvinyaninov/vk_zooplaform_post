@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"backend/models"
 	"log"
 	"net/http"
 	"time"
@@ -19,7 +20,12 @@ func Logger(next http.Handler) http.Handler {
 		duration := time.Since(start)
 
 		// Подробное логирование с эмодзи для легкого поиска
-		if rw.statusCode >= 400 {
+		if rw.statusCode >= 500 {
+			msg := r.Method + " " + r.RequestURI + " (" + duration.String() + ")"
+			models.LogError("HTTP_500", msg, nil, r.RemoteAddr+" | "+r.UserAgent())
+			log.Printf("❌ %s %s %d %s (from %s, UA: %s)",
+				r.Method, r.RequestURI, rw.statusCode, duration, r.RemoteAddr, r.UserAgent())
+		} else if rw.statusCode >= 400 {
 			log.Printf("❌ %s %s %d %s (from %s, UA: %s)",
 				r.Method, r.RequestURI, rw.statusCode, duration, r.RemoteAddr, r.UserAgent())
 		} else if r.RequestURI == "/health" || r.RequestURI == "/api/health" {
