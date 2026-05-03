@@ -263,13 +263,24 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                         );
                       }).catch((e: any) => {
                         console.error(e);
+                        const isAccessDenied = e?.error_data?.error_code === 15 || e?.error_data?.error_code === 104 || e?.error_type === 'api_error';
                         setSnackbar(
                           <Snackbar
                             onClose={() => setSnackbar(null)}
                             onClosed={() => setSnackbar(null)}
+                            action={isAccessDenied ? "Перейти в диалог" : undefined}
+                            onActionClick={isAccessDenied ? () => {
+                              try {
+                                vkBridge.send('VKWebAppOpenMessages', { peer_id: -165434330 }).catch(() => {
+                                  window.location.href = 'https://vk.com/im?sel=-165434330';
+                                });
+                              } catch {
+                                window.location.href = 'https://vk.com/im?sel=-165434330';
+                              }
+                            } : undefined}
                             before={<Icon24ErrorCircleOutline fill="var(--vkui--color_icon_negative)" />}
                           >
-                            Ошибка ВК: {JSON.stringify(e)}
+                            {isAccessDenied ? "Ваш браузер блокирует окно ВКонтакте. Перейдите в диалог группы и напишите слово «Привет» вручную." : `Ошибка ВК: ${JSON.stringify(e)}`}
                           </Snackbar>
                         );
                       });
