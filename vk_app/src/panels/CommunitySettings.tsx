@@ -263,9 +263,11 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                         );
                       }).catch((e: any) => {
                         console.error(e);
+                        alert("Ошибка ВК: " + JSON.stringify(e));
                       });
                     } catch (e) {
                       console.error(e);
+                      alert("Системная ошибка: " + String(e));
                     }
                   }}
                 >
