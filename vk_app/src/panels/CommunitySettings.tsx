@@ -18,7 +18,7 @@ import {
 } from '@vkontakte/vkui';
 import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, type AppGroupSettings, type AppManager } from '../shared/api';
+import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, sendTestNotification, type AppGroupSettings, type AppManager } from '../shared/api';
 
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -294,23 +294,16 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                   size="m" 
                   onClick={async () => {
                     try {
-                      const response = await fetch(`${API_URL}/api/app/notifications/test${window.location.search}`, {
-                        method: 'POST'
-                      });
-                      const data = await response.json();
-                      if (response.ok && data.status === 'ok') {
-                        setSnackbar(
-                          <Snackbar
-                            onClose={() => setSnackbar(null)}
-                            onClosed={() => setSnackbar(null)}
-                            before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
-                          >
-                            Тестовое сообщение успешно отправлено!
-                          </Snackbar>
-                        );
-                      } else {
-                        throw new Error(data.error || 'Неизвестная ошибка');
-                      }
+                      await sendTestNotification();
+                      setSnackbar(
+                        <Snackbar
+                          onClose={() => setSnackbar(null)}
+                          onClosed={() => setSnackbar(null)}
+                          before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+                        >
+                          Тестовое сообщение успешно отправлено!
+                        </Snackbar>
+                      );
                     } catch (e: any) {
                       setSnackbar(
                         <Snackbar
