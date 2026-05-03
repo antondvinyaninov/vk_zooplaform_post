@@ -260,6 +260,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                           >
                             Уведомления успешно разрешены
                           </Snackbar>
+                        );
                       }).catch((e: any) => {
                         console.error(e);
                         setSnackbar(
