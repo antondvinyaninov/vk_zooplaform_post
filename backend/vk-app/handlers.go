@@ -481,7 +481,7 @@ func suggestExistingPostHandler(w http.ResponseWriter, r *http.Request, postID i
 		return
 	}
 
-	if post.UserID != ctx.UserID {
+	if post.UserID != 0 && post.UserID != ctx.UserID {
 		utils.RespondError(w, http.StatusForbidden, "Only the author can suggest this post to another group")
 		return
 	}
