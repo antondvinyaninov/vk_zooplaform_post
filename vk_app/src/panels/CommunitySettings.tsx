@@ -260,14 +260,29 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                           >
                             Уведомления успешно разрешены
                           </Snackbar>
-                        );
                       }).catch((e: any) => {
                         console.error(e);
-                        alert("Ошибка ВК: " + JSON.stringify(e));
+                        setSnackbar(
+                          <Snackbar
+                            onClose={() => setSnackbar(null)}
+                            onClosed={() => setSnackbar(null)}
+                            before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+                          >
+                            Ошибка ВК: {JSON.stringify(e)}
+                          </Snackbar>
+                        );
                       });
                     } catch (e) {
                       console.error(e);
-                      alert("Системная ошибка: " + String(e));
+                      setSnackbar(
+                        <Snackbar
+                          onClose={() => setSnackbar(null)}
+                          onClosed={() => setSnackbar(null)}
+                          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+                        >
+                          Системная ошибка: {String(e)}
+                        </Snackbar>
+                      );
                     }
                   }}
                 >
