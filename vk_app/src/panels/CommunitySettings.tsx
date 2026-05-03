@@ -288,6 +288,44 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                 >
                   Разрешить сообщения от ЗооПлатформы
                 </Button>
+                <Button 
+                  mode="tertiary" 
+                  size="m" 
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`${API_URL}/api/app/notifications/test${window.location.search}`, {
+                        method: 'POST'
+                      });
+                      const data = await response.json();
+                      if (response.ok && data.status === 'ok') {
+                        setSnackbar(
+                          <Snackbar
+                            onClose={() => setSnackbar(null)}
+                            onClosed={() => setSnackbar(null)}
+                            before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+                          >
+                            Тестовое сообщение успешно отправлено!
+                          </Snackbar>
+                        );
+                      } else {
+                        throw new Error(data.error || 'Неизвестная ошибка');
+                      }
+                    } catch (e: any) {
+                      setSnackbar(
+                        <Snackbar
+                          onClose={() => setSnackbar(null)}
+                          onClosed={() => setSnackbar(null)}
+                          before={<Icon24ErrorCircleOutline fill="var(--vkui--color_icon_negative)" />}
+                        >
+                          Ошибка отправки: {e.message}
+                        </Snackbar>
+                      );
+                    }
+                  }}
+                  style={{ marginTop: 8 }}
+                >
+                  Отправить тестовое сообщение
+                </Button>
               </Div>
             </FormItem>
           </Group>

@@ -2281,3 +2281,34 @@ func s3DeleteVideoKey(key string) {
 		log.Printf("[s3Delete] deleted %s from S3", key)
 	}
 }
+
+// POST /api/app/notifications/test
+func testNotificationHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	cfg := config.Load()
+	if cfg.VKOfficialGroupToken == "" {
+		utils.RespondError(w, http.StatusInternalServerError, "Official group token not configured")
+		return
+	}
+	client := vk.NewVKClient(cfg.VKOfficialGroupToken)
+
+	message := "Привет! Это тестовое сообщение от ЗооПлатформы. Уведомления работают отлично! 🎉"
+	if err := client.SendDirectMessage(ctx.UserID, message); err != nil {
+		log.Printf("[Test Notification] Failed to send to %d: %v", ctx.UserID, err)
+		utils.RespondError(w, http.StatusBadRequest, fmt.Sprintf("Ошибка ВК: %v", err))
+		return
+	}
+
+	log.Printf("[Test Notification] Successfully sent to %d", ctx.UserID)
+	utils.RespondSuccess(w, map[string]string{"status": "ok"})
+}
