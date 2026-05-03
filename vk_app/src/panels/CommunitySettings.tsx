@@ -266,7 +266,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                           <Snackbar
                             onClose={() => setSnackbar(null)}
                             onClosed={() => setSnackbar(null)}
-                            before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+                            before={<Icon24ErrorCircleOutline fill="var(--vkui--color_icon_negative)" />}
                           >
                             Ошибка ВК: {JSON.stringify(e)}
                           </Snackbar>
@@ -278,7 +278,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                         <Snackbar
                           onClose={() => setSnackbar(null)}
                           onClosed={() => setSnackbar(null)}
-                          before={<Icon24ErrorCircle fill="var(--vkui--color_icon_negative)" />}
+                          before={<Icon24ErrorCircleOutline fill="var(--vkui--color_icon_negative)" />}
                         >
                           Системная ошибка: {String(e)}
                         </Snackbar>
