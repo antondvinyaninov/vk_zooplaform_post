@@ -241,6 +241,37 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                 placeholder="Выберите администраторов"
                 emptyText="Администраторы не найдены"
               />
+              <Div style={{ padding: '12px 0 0 0' }}>
+                <Button 
+                  mode="secondary" 
+                  size="m" 
+                  onClick={() => {
+                    try {
+                      // @ts-ignore
+                      vkBridge.send('VKWebAppAllowMessagesFromGroup', {
+                        group_id: 165434330,
+                        key: 'admin_notifications'
+                      }).then(() => {
+                        setSnackbar(
+                          <Snackbar
+                            onClose={() => setSnackbar(null)}
+                            onClosed={() => setSnackbar(null)}
+                            before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+                          >
+                            Уведомления успешно разрешены
+                          </Snackbar>
+                        );
+                      }).catch((e: any) => {
+                        console.error(e);
+                      });
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                >
+                  Разрешить сообщения от ЗооПлатформы
+                </Button>
+              </Div>
             </FormItem>
           </Group>
 
