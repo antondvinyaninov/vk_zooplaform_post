@@ -230,7 +230,10 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                 fetching={citySearchLoading}
               />
             </FormItem>
-            <FormItem top="Получатели уведомлений">
+            <FormItem 
+              top="Получатели уведомлений" 
+              bottom="⚠️ Важно: чтобы получать уведомления, администратор должен хотя бы раз написать любое сообщение в официальную группу ЗооПлатформы (или нажать «Разрешить сообщения»). Без этого ВКонтакте заблокирует отправку."
+            >
               <ChipsSelect
                 value={managers.filter(m => notifyUserIds.includes(m.id)).map(m => ({ value: m.id, label: `${m.first_name} ${m.last_name}` }))}
                 onChange={(options) => setNotifyUserIds(options.map(o => Number(o.value)))}
