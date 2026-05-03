@@ -406,16 +406,11 @@ export const suggestExistingPost = async (id: number | string) => {
 };
 
 export async function sendTestNotification(): Promise<void> {
-  const urlParams = window.location.search;
-  const res = await fetch(`${API_URL}/notifications/test${urlParams}`, {
-    method: 'POST'
-  });
-  if (!res.ok) {
-    let msg = 'Failed to send test notification';
-    try {
-      const data = await res.json();
-      if (data.error) msg = data.error;
-    } catch (e) {}
-    throw new Error(msg);
+  try {
+    await fetchJSON(`${API_URL}/notifications/test`, {
+      method: 'POST'
+    });
+  } catch (e: any) {
+    throw new Error(e.message || 'Failed to send test notification');
   }
 }
