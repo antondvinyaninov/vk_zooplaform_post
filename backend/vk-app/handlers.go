@@ -1796,7 +1796,7 @@ func getPostsByUserID(userID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
 		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at
 		FROM posts
-		WHERE user_id = ?
+		WHERE user_id = ? AND COALESCE(status, '') != 'deleted'
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
 	`, userID, limit, offset)
@@ -1829,16 +1829,17 @@ func scanPostRows(rows *sql.Rows) ([]*models.Post, error) {
 
 func scanPost(row *sql.Row) (*models.Post, error) {
 	var (
-		post       models.Post
-		dbUserID   sql.NullInt64
-		s3VideoKey sql.NullString
+		post        models.Post
+		dbUserID    sql.NullInt64
+		s3VideoKey  sql.NullString
+		attachments sql.NullString
 	)
 
 	err := row.Scan(
 		&post.ID,
 		&dbUserID,
 		&post.Message,
-		&post.Attachments,
+		&attachments,
 		&s3VideoKey,
 		&post.CreatedAt,
 		&post.UpdatedAt,
@@ -1855,21 +1856,25 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 	if s3VideoKey.Valid {
 		post.S3VideoKey = s3VideoKey.String
 	}
+	if attachments.Valid {
+		post.Attachments = attachments.String
+	}
 	return &post, nil
 }
 
 func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 	var (
-		post       models.Post
-		dbUserID   sql.NullInt64
-		s3VideoKey sql.NullString
+		post        models.Post
+		dbUserID    sql.NullInt64
+		s3VideoKey  sql.NullString
+		attachments sql.NullString
 	)
 
 	if err := rows.Scan(
 		&post.ID,
 		&dbUserID,
 		&post.Message,
-		&post.Attachments,
+		&attachments,
 		&s3VideoKey,
 		&post.CreatedAt,
 		&post.UpdatedAt,
@@ -1882,6 +1887,9 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 	}
 	if s3VideoKey.Valid {
 		post.S3VideoKey = s3VideoKey.String
+	}
+	if attachments.Valid {
+		post.Attachments = attachments.String
 	}
 	return &post, nil
 }
@@ -2166,24 +2174,26 @@ func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 
 	// Сначала проверим, есть ли пост и принадлежит ли он пользователю
-	var s3VideoKey, attachments string
+	var s3VideoKey, attachments sql.NullString
 	err = database.DB.QueryRow("SELECT s3_video_key, attachments FROM posts WHERE id = $1 AND user_id = $2", postID, user.ID).Scan(&s3VideoKey, &attachments)
 	if err != nil {
 		if err == sql.ErrNoRows {
+			log.Printf("[deletePostHandler] Post %d not found or user %d is not the author", postID, user.ID)
 			utils.RespondError(w, http.StatusNotFound, "post not found or you are not the author")
 			return
 		}
+		log.Printf("[deletePostHandler] Database error: %v", err)
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Удаляем медиа из S3
-	if s3VideoKey != "" {
+	if s3VideoKey.Valid && s3VideoKey.String != "" {
 		s3Client, err := s3client.New()
 		if err == nil {
-			// attachments может содержать список S3 ключей, если мы поддерживаем несколько фото
-			s3Keys := strings.Split(s3VideoKey, ",")
+			s3Keys := strings.Split(s3VideoKey.String, ",")
 			for _, key := range s3Keys {
+				key = strings.TrimSpace(key)
 				if key != "" {
 					s3Client.DeleteObject(r.Context(), key)
 				}
@@ -2191,21 +2201,51 @@ func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 	}
 
-	// Soft-delete: обновляем статус и очищаем медиа
-	res, err := database.DB.Exec(
+	// Начинаем транзакцию для атомарного удаления
+	tx, err := database.DB.Begin()
+	if err != nil {
+		log.Printf("[deletePostHandler] Failed to begin transaction: %v", err)
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Rollback()
+
+	// Soft-delete: обновляем статус и очищаем медиа в posts
+	res, err := tx.Exec(
 		"UPDATE posts SET status = 'deleted', delete_reason = $1, delete_comment = $2, s3_video_key = '', attachments = '' WHERE id = $3 AND user_id = $4", 
 		reqBody.Reason, reqBody.Comment, postID, user.ID,
 	)
 	if err != nil {
+		log.Printf("[deletePostHandler] Failed to update posts table: %v", err)
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	
 	rowsAffected, _ := res.RowsAffected()
 	if rowsAffected == 0 {
+		log.Printf("[deletePostHandler] No rows affected in posts table")
 		utils.RespondError(w, http.StatusNotFound, "post not found or you are not the author")
 		return
 	}
+
+	// Soft-delete в post_publications
+	_, err = tx.Exec(
+		"UPDATE post_publications SET status = 'deleted', delete_reason = $1, delete_comment = $2 WHERE post_id = $3",
+		reqBody.Reason, reqBody.Comment, postID,
+	)
+	if err != nil {
+		log.Printf("[deletePostHandler] Failed to update post_publications table: %v", err)
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Printf("[deletePostHandler] Failed to commit transaction: %v", err)
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	log.Printf("[deletePostHandler] Successfully deleted post %d by user %d", postID, user.ID)
 
 	utils.RespondSuccess(w, map[string]string{"status": "deleted"})
 }

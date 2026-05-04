@@ -98,12 +98,13 @@ func (s *PostService) GetByID(id int) (*models.Post, error) {
 	post := &models.Post{}
 	var userID sql.NullInt64
 	var s3VideoKey sql.NullString
+	var attachments sql.NullString
 
 	err := database.QueryRow(query, id).Scan(
 		&post.ID,
 		&userID,
 		&post.Message,
-		&post.Attachments,
+		&attachments,
 		&s3VideoKey,
 		&post.CreatedAt,
 		&post.UpdatedAt,
@@ -121,6 +122,9 @@ func (s *PostService) GetByID(id int) (*models.Post, error) {
 	}
 	if s3VideoKey.Valid {
 		post.S3VideoKey = s3VideoKey.String
+	}
+	if attachments.Valid {
+		post.Attachments = attachments.String
 	}
 
 	if err := s.loadPublications(post); err != nil {
@@ -152,12 +156,13 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 		post := &models.Post{}
 		var userID sql.NullInt64
 		var s3VideoKey sql.NullString
+		var attachments sql.NullString
 
 		err := rows.Scan(
 			&post.ID,
 			&userID,
 			&post.Message,
-			&post.Attachments,
+			&attachments,
 			&s3VideoKey,
 			&post.CreatedAt,
 			&post.UpdatedAt,
@@ -171,6 +176,9 @@ func (s *PostService) GetByGroupID(groupID int, limit, offset int) ([]*models.Po
 		}
 		if s3VideoKey.Valid {
 			post.S3VideoKey = s3VideoKey.String
+		}
+		if attachments.Valid {
+			post.Attachments = attachments.String
 		}
 
 		if err := s.loadPublications(post); err != nil {
@@ -205,12 +213,13 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 		post := &models.Post{}
 		var userID sql.NullInt64
 		var s3VideoKey sql.NullString
+		var attachments sql.NullString
 
 		err := rows.Scan(
 			&post.ID,
 			&userID,
 			&post.Message,
-			&post.Attachments,
+			&attachments,
 			&s3VideoKey,
 			&post.CreatedAt,
 			&post.UpdatedAt,
@@ -224,6 +233,9 @@ func (s *PostService) GetByStatus(status string, limit, offset int) ([]*models.P
 		}
 		if s3VideoKey.Valid {
 			post.S3VideoKey = s3VideoKey.String
+		}
+		if attachments.Valid {
+			post.Attachments = attachments.String
 		}
 
 		if err := s.loadPublications(post); err != nil {
@@ -241,7 +253,7 @@ func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post
 	query := `
 		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at
 		FROM posts
-		WHERE user_id = ?
+		WHERE user_id = ? AND COALESCE(status, '') != 'deleted'
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
 	`
@@ -257,12 +269,13 @@ func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post
 		post := &models.Post{}
 		var dbUserID sql.NullInt64
 		var s3VideoKey sql.NullString
+		var attachments sql.NullString
 
 		err := rows.Scan(
 			&post.ID,
 			&dbUserID,
 			&post.Message,
-			&post.Attachments,
+			&attachments,
 			&s3VideoKey,
 			&post.CreatedAt,
 			&post.UpdatedAt,
@@ -276,6 +289,9 @@ func (s *PostService) GetByUserID(userID int, limit, offset int) ([]*models.Post
 		}
 		if s3VideoKey.Valid {
 			post.S3VideoKey = s3VideoKey.String
+		}
+		if attachments.Valid {
+			post.Attachments = attachments.String
 		}
 
 		if err := s.loadPublications(post); err != nil {
