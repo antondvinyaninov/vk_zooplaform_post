@@ -1,219 +1,108 @@
-# VK ZooPlatforma
+# VK ZooPlatforma 1.0.0 🐾
 
-Платформа для управления публикациями в группах ВКонтакте с VK Mini App интерфейсом.
+Единая экосистема для автоматизации, модерации и публикации объявлений о животных в группах ВКонтакте. Платформа состоит из пользовательского VK Mini App, мощного Go-бэкенда и современной админ-панели для суперадминов и модераторов.
 
 ## 🌐 Продакшен
 
-- **Сайт**: https://vk.zooplatforma.ru/
-- **Админка**: https://vk.zooplatforma.ru/dashboard
+- **Лендинг**: https://vk.zooplatforma.ru/
+- **Админ-панель**: https://vk.zooplatforma.ru/dashboard
 - **VK Mini App**: https://vk.zooplatforma.ru/vk_app/
-- **API**: https://vk.zooplatforma.ru/api/health
+- **API Health Check**: https://vk.zooplatforma.ru/api/health
 
-## �️ Архитектура проекта
+## 🏗️ Архитектура проекта
+
+Проект построен на современной модульной архитектуре:
 
 ```
 smm/
-├── backend/              # Go backend
-│   ├── admin/           # Админка API (управление группами, постами)
-│   ├── vk-app/          # VK Mini App API (публикация из приложения)
-│   ├── site/            # Основной сайт API
-│   ├── api/             # API слой
-│   │   ├── external/    # Внешние API (VK, Telegram)
-│   │   └── internal/    # Внутренние API (БД, бизнес-логика)
-│   ├── vk/              # VK API клиент
-│   ├── database/        # PostgreSQL подключение и схема
-│   ├── models/          # Модели данных (Group, Post, User)
-│   ├── middleware/      # Middleware (CORS, Logger)
-│   ├── config/          # Конфигурация
-│   ├── services/        # Бизнес-логика
-│   ├── utils/           # Вспомогательные функции
-│   └── main.go          # Главный файл
-├── vk_app/              # VK Mini App (React + VKUI + VK Bridge)
-└── frontadmin/          # Админка (Astro + React)
+├── backend/              # Высоконагруженный API-шлюз и бизнес-логика (Go 1.24)
+│   ├── admin/           # API админ-панели (управление группами, дашборды, модерация)
+│   ├── vk-app/          # API для VK Mini App (прием постов, загрузка медиа)
+│   ├── vk/              # Клиент для VK API (работа с токенами, Wall, Video, Photos)
+│   ├── database/        # PostgreSQL подключение, пулинг и миграции
+│   ├── models/          # GORM-совместимые структуры таблиц
+│   ├── middleware/      # RateLimiter, CORS, Panic Recovery
+│   └── main.go          # Входная точка приложения
+├── vk_app/              # Пользовательский интерфейс VK Mini App (React + VKUI)
+└── frontadmin/          # Панель администратора (Astro 4 + React + shadcn/ui)
 ```
 
 ## 🎯 Компоненты системы
 
 ### 1. VK Mini App (`vk_app/`)
-- **Назначение**: Пользовательский интерфейс для создания постов
-- **Технологии**: React, VKUI, VK Bridge, TypeScript
+- **Назначение**: Интерфейс для подписчиков сообществ (создание предложенных новостей).
+- **Технологии**: React 18, VKUI 8, VK Bridge, Vite.
 - **Функционал**:
-  - Авторизация через VK Bridge
-  - Создание и редактирование постов
-  - Загрузка фото и видео
-  - Предпросмотр постов
+  - Интеграция с VK Bridge (Авторизация, города, шаринг).
+  - Умная форма создания постов с поддержкой до 10 медиафайлов (фото/видео).
+  - Прямая S3-загрузка тяжелых видео с мгновенной генерацией превью.
+  - Управление своими объявлениями (статусы, история, мягкое удаление).
 
 ### 2. Админка (`frontadmin/`)
-- **Назначение**: Управление группами и настройками
-- **Технологии**: Astro, React, Tailwind CSS, shadcn/ui
+- **Назначение**: Управление сообществами, модерация и общая статистика платформы.
+- **Технологии**: Astro, React, Tailwind CSS, shadcn/ui, SWR.
 - **Функционал**:
-  - Подключение групп ВКонтакте
-  - Управление токенами доступа
-  - Настройки постинга
-  - Статистика публикаций
+  - Подключение и мониторинг состояния групп (Health Check токенов и Callback API).
+  - Выделение **Тестовых групп** для чистой аналитики.
+  - Живая лента модерации с визуальным отображением фото/видео галерей.
+  - Подробные дашборды (рост подписчиков, воронка публикаций).
 
-### 3. Backend (`backend/`)
-- **Назначение**: Единый API сервер
-- **Технологии**: Go, PostgreSQL
+### 3. Backend Server (`backend/`)
+- **Назначение**: Единый отказоустойчивый сервер обработки данных.
+- **Технологии**: Go 1.24, PostgreSQL, Yandex Cloud S3, Traefik.
 - **Функционал**:
-  - REST API для всех компонентов
-  - Работа с VK API
-  - Хранение данных в PostgreSQL
-  - Управление публикациями
-
-## 🚀 Запуск проекта
-
-### Локальная разработка
-
-#### Backend
-```bash
-cd backend
-go run main.go
-```
-
-#### VK Mini App
-```bash
-cd vk_app
-npm install
-npm start
-```
-
-### Docker
-```bash
-docker build -t vk-post-platform .
-docker run -p 80:80 vk-post-platform
-```
+  - Асинхронная выгрузка фото и видео во ВКонтакте (через 2-х этапную загрузку).
+  - Встроенный **Rate Limiter** (защита от DDoS) и **Panic Recovery** (бесперебойная работа).
+  - Connection Pooling для защиты базы данных от истощения при пиковых нагрузках.
+  - Экспоненциальные ретраи для обхода временных лимитов VK API.
+  - Сбор системных логов бизнес-событий (`system_logs`).
 
 ## 📊 База данных (PostgreSQL)
 
-### Таблицы:
+Ключевые таблицы системы:
 
-#### `groups` - Подключенные группы
-- `id` - ID записи
-- `vk_group_id` - ID группы в VK
-- `name` - Название группы
-- `screen_name` - Короткое имя
-- `photo_200` - Аватар
-- `access_token` - Токен доступа
-- `is_active` - Активна ли группа
-- `created_at`, `updated_at` - Временные метки
+- `groups` — Подключенные группы (токены, `health_status`, настройки городов, `is_test`).
+- `posts` — Предложенные записи (автор, текст, S3-вложения, `status`: draft/pending/published/rejected, причины удаления).
+- `users` — Пользователи системы (с привязкой к `vk_user_id` и ролевой моделью).
+- `post_publications` — Связь постов с их финальным ID на стене ВКонтакте (для отслеживания).
+- `system_logs` — Бизнес-аудит системы (кто, когда и что сделал).
+- `group_stats_history` — Ежедневные слепки для построения графиков роста платформы.
 
-#### `posts` - Посты
-- `id` - ID записи
-- `vk_post_id` - ID поста в VK
-- `group_id` - ID группы
-- `message` - Текст поста
-- `attachments` - Вложения
-- `status` - Статус (draft, scheduled, published, failed)
-- `publish_date` - Дата публикации
-- `created_at`, `updated_at` - Временные метки
+## 🚀 Деплой и Инфраструктура
 
-#### `users` - Пользователи
-- `id` - ID записи
-- `vk_user_id` - ID пользователя в VK
-- `first_name`, `last_name` - Имя
-- `photo_200` - Аватар
-- `role` - Роль (admin, user)
-- `created_at`, `updated_at` - Временные метки
+Система развернута с использованием **Easypanel** на базе Ubuntu 24.04:
+- Автоматический CI/CD pipeline при пуше в ветку `main`.
+- Nginx/Traefik проксирование.
+- Хранилище объектов: **Yandex Cloud S3** (используется для промежуточного хранения тяжелых видеофайлов перед отправкой в VK, с автоматическим Garbage Collection).
 
-## 🔑 API Endpoints
-
-### Админка (`/api/vk/`)
-- `POST /api/vk/post` - Публикация поста
-- `POST /api/vk/posts` - Получение постов
-- `POST /api/vk/groups` - Получение групп
-- `POST /api/vk/user-info` - Информация о пользователе
-- `GET /api/vk/service-key` - Service key
-
-### VK Mini App (`/api/app/`)
-- `GET /api/app/health` - Health check
-- TODO: Добавить endpoints для работы с постами
-
-### Основной сайт (`/api/site/`)
-- `GET /api/site/health` - Health check
-- TODO: Добавить endpoints для сайта
-
-## 🔧 Конфигурация
-
-### Переменные окружения:
-
+### Переменные окружения (`.env`):
 ```bash
-PORT=80                          # Порт сервера
-VK_SERVICE_KEY=...              # Service key VK
+# VK API
+VK_SERVICE_KEY=...
+VK_CLIENT_ID=...
+VK_CLIENT_SECRET=...
 
-# VK Standalone App (для постинга через API)
-VK_CLIENT_ID=54555042           # ID приложения VK для постинга
-VK_CLIENT_SECRET=...            # Secret приложения VK для постинга
+# Yandex S3
+S3_ENDPOINT=https://storage.yandexcloud.net
+S3_BUCKET=yazooplatforma
+S3_ACCESS_KEY=...
+S3_SECRET_KEY=...
 
-# VK Mini App (для мини-приложения в сообществе)  
-VK_MINI_APP_ID=54560047         # ID VK Mini App
-VK_MINI_APP_SECRET=kI41QDPyyK87kIopZ2U9    # Защищённый ключ VK Mini App
-VK_MINI_APP_SERVICE_KEY=e59b585ae59b585ae59b585a67e6dbdd75ee59be59b585a8c7299470181bb987c8b3c03  # Сервисный ключ VK Mini App
-
-DATABASE_URL=postgres://user:password@host:5432/database?sslmode=disable
+# Database
+DATABASE_URL=postgres://user:password@host:5432/db_name?sslmode=disable
 ```
 
-## 📝 Workflow
+## 🛡️ Безопасность и Стабильность
 
-### Публикация поста:
-
-1. **Пользователь** создает пост в VK Mini App
-2. **VK Mini App** отправляет запрос на `/api/app/posts/create`
-3. **Backend** сохраняет пост в БД со статусом `draft`
-4. **Backend** публикует пост в выбранные группы через VK API
-5. **Backend** обновляет статус поста на `published`
-6. **Админка** показывает статистику публикаций
-
-### Подключение группы:
-
-1. **Админ** авторизуется в админке
-2. **Админка** получает список групп через VK API
-3. **Админ** выбирает группы для подключения
-4. **Backend** сохраняет группы и токены в БД
-5. **VK Mini App** может публиковать в эти группы
-
-## �️ Технологии
-
-### Backend:
-- **Go 1.24** - основной язык
-- **PostgreSQL** - база данных
-- **VK API** - интеграция с ВКонтакте
-
-### Frontend:
-- **React 18** - UI библиотека
-- **VKUI 8** - компоненты VK
-- **VK Bridge** - интеграция с VK Mini Apps
-- **TypeScript** - типизация
-- **Vite** - сборщик
-
-## 📚 Документация
-
-- [Архитектура проекта](docs/ARCHITECTURE.md) - Подробная архитектура системы
-- [Руководство по разработке](docs/DEVELOPMENT.md) - Как начать разработку
-- [API Routes](docs/ROUTES.md) - Описание маршрутов
-- [VK Post Parameters](docs/VK_POST_PARAMS.md) - Параметры постов VK
-- [Полная документация](docs/README.md) - Все документы проекта
-
-## � Безопасность
-
-- Токены доступа хранятся в БД
-- CORS настроен для всех endpoints
-- Service key используется для fallback запросов
-- PostgreSQL-схема создает нужные таблицы и индексы при запуске
-
-## 📈 Планы развития
-
-- [ ] Отложенная публикация постов
-- [ ] Статистика по постам (просмотры, лайки, репосты)
-- [ ] Шаблоны постов
-- [ ] Массовая публикация
-- [ ] Интеграция с Telegram
-- [ ] Версионированные миграции базы данных
+- **Аутентификация**: Использование параметров запуска VK (`X-VK-Sign`) для безопасной верификации пользователей внутри Mini App без паролей.
+- **Токены сообществ**: Токены групп хранятся в БД и используются строго на бэкенде для публикации и настройки вебхуков (Callback API).
+- **Soft Delete**: Удаление постов пользователями является "мягким" (`status = 'deleted'`), что сохраняет целостность аналитики.
+- **Zero Downtime**: При падении горутин (Panic) сервер не отключается, а корректно логирует ошибку и отдает 500 статус для конкретного запроса.
 
 ## 👥 Команда
 
-Разработка: Anton Dvinyaninov
+Разработка: **Anton Dvinyaninov**
 
-## � Лицензия
+## 📜 Лицензия
 
 Proprietary
