@@ -2,6 +2,7 @@ package vk
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,9 +32,7 @@ type VKClient struct {
 func NewVKClient(accessToken string) *VKClient {
 	return &VKClient{
 		AccessToken: accessToken,
-		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		HTTPClient:  &http.Client{},
 	}
 }
 
@@ -49,8 +48,15 @@ type VKResponse struct {
 	Error    *VKError        `json:"error"`
 }
 
-// CallMethod вызывает метод VK API
+// CallMethod вызывает метод VK API (с таймаутом по умолчанию 15 секунд)
 func (c *VKClient) CallMethod(method string, params map[string]string) (json.RawMessage, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	return c.CallMethodContext(ctx, method, params)
+}
+
+// CallMethodContext вызывает метод VK API с поддержкой контекста и автоматическими повторами (Retries)
+func (c *VKClient) CallMethodContext(ctx context.Context, method string, params map[string]string) (json.RawMessage, error) {
 	values := url.Values{}
 	values.Set("access_token", c.AccessToken)
 	values.Set("v", VKAPIVersion)
@@ -60,27 +66,66 @@ func (c *VKClient) CallMethod(method string, params map[string]string) (json.Raw
 	}
 
 	apiURL := fmt.Sprintf("%s/%s", VKAPIURL, method)
-	resp, err := c.HTTPClient.PostForm(apiURL, values)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
+	maxRetries := 3
+	var lastErr error
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+	for i := 0; i < maxRetries; i++ {
+		req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(values.Encode()))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		resp, err := c.HTTPClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("HTTP request failed: %w", err)
+			// При сетевой ошибке (или таймауте) пробуем снова, если контекст еще жив
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			time.Sleep(time.Duration(i+1) * 500 * time.Millisecond)
+			continue
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("failed to read response: %w", err)
+			time.Sleep(time.Duration(i+1) * 500 * time.Millisecond)
+			continue
+		}
+
+		// Если VK вернул ошибку шлюза или внутреннюю ошибку (5xx), пробуем снова
+		if resp.StatusCode >= 500 {
+			lastErr = fmt.Errorf("VK server error %d", resp.StatusCode)
+			time.Sleep(time.Duration(i+1) * time.Second)
+			continue
+		}
+
+		var vkResp VKResponse
+		if err := json.Unmarshal(body, &vkResp); err != nil {
+			lastErr = fmt.Errorf("failed to parse response: %w", err)
+			time.Sleep(time.Duration(i+1) * 500 * time.Millisecond)
+			continue
+		}
+
+		if vkResp.Error != nil {
+			// Ошибка 6 - Too many requests per second
+			// Ошибка 9 - Flood control
+			// Ошибка 10 - Internal server error
+			if vkResp.Error.ErrorCode == 6 || vkResp.Error.ErrorCode == 9 || vkResp.Error.ErrorCode == 10 {
+				lastErr = fmt.Errorf("VK API Error [%d]: %s", vkResp.Error.ErrorCode, vkResp.Error.ErrorMsg)
+				time.Sleep(time.Duration(i+1) * time.Second)
+				continue
+			}
+			// Другие ошибки не повторяем (например, неверный токен)
+			return nil, fmt.Errorf("VK API Error [%d]: %s", vkResp.Error.ErrorCode, vkResp.Error.ErrorMsg)
+		}
+
+		return vkResp.Response, nil
 	}
 
-	var vkResp VKResponse
-	if err := json.Unmarshal(body, &vkResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	if vkResp.Error != nil {
-		return nil, fmt.Errorf("VK API Error [%d]: %s", vkResp.Error.ErrorCode, vkResp.Error.ErrorMsg)
-	}
-
-	return vkResp.Response, nil
+	return nil, fmt.Errorf("max retries exceeded, last error: %v", lastErr)
 }
 
 // UploadServer структура для получения URL загрузки
@@ -150,7 +195,9 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 	}
 	writer.Close()
 
-	req, err := http.NewRequest("POST", uploadServer.UploadURL, body)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "POST", uploadServer.UploadURL, body)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create upload request: %w", err)
 	}
@@ -493,7 +540,9 @@ func (c *VKClient) UploadVideo(filePath string, groupID string, fileName string)
 	}
 	writer.Close()
 
-	req, err := http.NewRequest("POST", videoSave.UploadURL, body)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "POST", videoSave.UploadURL, body)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create video upload request: %w", err)
 	}
