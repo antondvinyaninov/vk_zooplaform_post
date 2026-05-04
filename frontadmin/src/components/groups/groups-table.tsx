@@ -37,11 +37,11 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant="secondary">Не проверено</Badge>
 }
 
-export function GroupsTable({ endpoint = "/admin/groups/installed" }: { endpoint?: string }) {
+export function GroupsTable({ endpoint = "/admin/groups/installed", filterFn }: { endpoint?: string, filterFn?: (g: Group) => boolean }) {
   const { data, error, isLoading, mutate } = useSWR<GroupsResponse>(endpoint, fetcher)
   const [refreshingId, setRefreshingId] = React.useState<number | null>(null)
 
-  const groups = data?.groups || []
+  const groups = data?.groups ? (filterFn ? data.groups.filter(filterFn) : data.groups) : []
 
   const handleRefreshHealth = async (groupId: number) => {
     try {

@@ -21,6 +21,7 @@ type installedGroupResponse struct {
 	ScreenName   string  `json:"screen_name"`
 	Photo200     string  `json:"photo_200"`
 	IsActive     bool    `json:"is_active"`
+	IsTest       bool    `json:"is_test"`
 	HealthStatus string  `json:"health_status"`
 	LastCheckAt  *string `json:"last_check_at,omitempty"`
 	HealthError  string  `json:"health_error,omitempty"`
@@ -122,7 +123,7 @@ func refreshGroupHealthHandler(w http.ResponseWriter, r *http.Request) {
 
 func listInstalledGroups() ([]installedGroupResponse, error) {
 	rows, err := database.Query(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, is_active, health_status, last_check_at, health_error, members_count
+		SELECT id, vk_group_id, name, screen_name, photo_200, is_active, is_test, health_status, last_check_at, health_error, members_count
 		FROM groups
 		WHERE is_active = ?
 		ORDER BY updated_at DESC
@@ -146,6 +147,7 @@ func listInstalledGroups() ([]installedGroupResponse, error) {
 			ScreenName:   group.ScreenName,
 			Photo200:     group.Photo200,
 			IsActive:     group.IsActive,
+			IsTest:       group.IsTest,
 			HealthStatus: normalizeHealthStatus(group.HealthStatus),
 			HealthError:  strings.TrimSpace(group.HealthError),
 			MembersCount: group.MembersCount,
@@ -177,6 +179,7 @@ func scanInstalledGroup(scanner interface {
 		&group.ScreenName,
 		&group.Photo200,
 		&group.IsActive,
+		&group.IsTest,
 		&healthStatus,
 		&lastCheckAt,
 		&healthErrorRaw,
@@ -346,7 +349,7 @@ func saveDailyStatsSnapshot() {
 	err := database.QueryRow(`
 		SELECT COUNT(1), COALESCE(SUM(members_count), 0) 
 		FROM groups 
-		WHERE is_active = ?
+		WHERE is_active = ? AND is_test = false
 	`, true).Scan(&totalGroups, &totalSubscribers)
 
 	if err != nil {

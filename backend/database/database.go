@@ -107,9 +107,16 @@ const postgresSchema = `
 		health_error TEXT,
 		members_count INTEGER DEFAULT 0,
 		notify_user_ids TEXT DEFAULT '[]',
+		is_test BOOLEAN DEFAULT FALSE,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
+
+	-- Миграция: добавление колонки, если ее нет (на случай если таблица уже существует)
+	ALTER TABLE groups ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+	
+	-- Помечаем группу Антона как тестовую
+	UPDATE groups SET is_test = TRUE WHERE vk_group_id = 227624792;
 
 	CREATE TABLE IF NOT EXISTS users (
 		id BIGSERIAL PRIMARY KEY,

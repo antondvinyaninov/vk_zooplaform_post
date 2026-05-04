@@ -21,6 +21,7 @@ export interface Group {
   screen_name: string;
   photo_200: string;
   is_active: boolean;
+  is_test?: boolean;
   health_status: "ok" | "error" | "unknown";
   last_check_at?: string;
   health_error?: string;

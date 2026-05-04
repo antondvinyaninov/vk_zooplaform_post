@@ -34,12 +34,16 @@ export function GroupsPage() {
             <TabsList className="mb-4">
               <TabsTrigger value="my">Мои группы</TabsTrigger>
               <TabsTrigger value="all">Все группы (Суперадмин)</TabsTrigger>
+              <TabsTrigger value="test">Тестовые группы</TabsTrigger>
             </TabsList>
             <TabsContent value="my" className="m-0">
-              <GroupsTable endpoint="/admin/groups/installed" />
+              <GroupsTable endpoint="/admin/groups/installed" filterFn={(g) => !g.is_test} />
             </TabsContent>
             <TabsContent value="all" className="m-0">
-              <GroupsTable endpoint="/admin/groups/all" />
+              <GroupsTable endpoint="/admin/groups/all" filterFn={(g) => !g.is_test} />
+            </TabsContent>
+            <TabsContent value="test" className="m-0">
+              <GroupsTable endpoint="/admin/groups/all" filterFn={(g) => !!g.is_test} />
             </TabsContent>
           </Tabs>
         </div>

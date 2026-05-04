@@ -26,7 +26,7 @@ func dashboardStatsHandler(w http.ResponseWriter, r *http.Request) {
 	err := database.QueryRow(`
 		SELECT COUNT(1), COALESCE(SUM(members_count), 0) 
 		FROM groups 
-		WHERE is_active = ?
+		WHERE is_active = ? AND is_test = false
 	`, true).Scan(&totalGroups, &totalSubscribers)
 
 	if err != nil {
@@ -45,7 +45,7 @@ func dashboardStatsHandler(w http.ResponseWriter, r *http.Request) {
 			COALESCE(SUM(CASE WHEN health_status IS NULL OR health_status = '' OR health_status = 'unknown' THEN 1 ELSE 0 END), 0),
 			MAX(last_check_at)
 		FROM groups
-		WHERE is_active = ?
+		WHERE is_active = ? AND is_test = false
 	`, true).Scan(&groupsOK, &groupsError, &groupsUnknown, &lastGroupCheck)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load group health stats"})
@@ -64,7 +64,7 @@ func dashboardStatsHandler(w http.ResponseWriter, r *http.Request) {
 			COALESCE(SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END), 0) as scheduled,
 			COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) as failed
 		FROM posts
-		WHERE created_at >= NOW() - INTERVAL '7 days'
+		WHERE created_at >= NOW() - INTERVAL '7 days' AND group_id IN (SELECT id FROM groups WHERE is_test = false)
 	`
 	database.QueryRow(postsQuery).Scan(&postsTotal, &postsPending, &postsPublished, &postsRejected, &postsScheduled, &postsFailed)
 
@@ -72,7 +72,7 @@ func dashboardStatsHandler(w http.ResponseWriter, r *http.Request) {
 	database.QueryRow(`
 		SELECT COUNT(1)
 		FROM posts
-		WHERE created_at >= date_trunc('day', NOW())
+		WHERE created_at >= date_trunc('day', NOW()) AND group_id IN (SELECT id FROM groups WHERE is_test = false)
 	`).Scan(&postsToday)
 
 	// Исторические данные (за последние 30 дней)
