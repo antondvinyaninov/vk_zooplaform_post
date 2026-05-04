@@ -1,0 +1,8 @@
+---
+import AppLayout from '../layouts/AppLayout.astro';
+import { AppUsersPage } from '@/components/pages/app-users-page';
+---
+
+<AppLayout title="Пользователи Приложения">
+	<AppUsersPage client:load />
+</AppLayout>

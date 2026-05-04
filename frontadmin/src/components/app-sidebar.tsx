@@ -45,6 +45,11 @@ const data = {
       icon: <IconUsers />,
     },
     {
+      title: "Пользователи приложения",
+      url: "/app-users",
+      icon: <IconUsers />,
+    },
+    {
       title: "Посты",
       url: "/posts",
       icon: <IconListDetails />,
