@@ -100,72 +100,74 @@ export function AppUsersTable() {
         ) : users.length === 0 ? (
           <div className="flex justify-center p-8 text-muted-foreground border border-dashed rounded-lg">Пользователи не найдены</div>
         ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[60px]">Аватар</TableHead>
-                  <TableHead>Пользователь</TableHead>
-                  <TableHead>VK ID</TableHead>
-                  <TableHead>Город</TableHead>
-                  <TableHead>Последний визит</TableHead>
-                  <TableHead>Первый визит</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <Avatar>
-                        <AvatarImage src={user.photo_200} alt={user.first_name} />
-                        <AvatarFallback>{user.first_name?.[0]}</AvatarFallback>
-                      </Avatar>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <a href={`https://vk.com/id${user.vk_user_id}`} target="_blank" rel="noopener noreferrer" className="hover:underline text-primary">
-                        {user.first_name} {user.last_name}
-                      </a>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{user.vk_user_id}</TableCell>
-                    <TableCell>{user.city_title || <span className="text-muted-foreground">Не указан</span>}</TableCell>
-                    <TableCell>
-                      {format(new Date(user.updated_at), "d MMM yyyy, HH:mm", { locale: ru })}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {format(new Date(user.created_at), "d MMM yyyy", { locale: ru })}
-                    </TableCell>
+          <>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[60px]">Аватар</TableHead>
+                    <TableHead>Пользователь</TableHead>
+                    <TableHead>VK ID</TableHead>
+                    <TableHead>Город</TableHead>
+                    <TableHead>Последний визит</TableHead>
+                    <TableHead>Первый визит</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {total > limit && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Показано {(page - 1) * limit + 1} - {Math.min(page * limit, total)} из {total}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                >
-                  Назад
-                </Button>
-                <div className="text-sm font-medium px-2">{page}</div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={page * limit >= total}
-                >
-                  Вперед
-                </Button>
-              </div>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <Avatar>
+                          <AvatarImage src={user.photo_200} alt={user.first_name} />
+                          <AvatarFallback>{user.first_name?.[0]}</AvatarFallback>
+                        </Avatar>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <a href={`https://vk.com/id${user.vk_user_id}`} target="_blank" rel="noopener noreferrer" className="hover:underline text-primary">
+                          {user.first_name} {user.last_name}
+                        </a>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{user.vk_user_id}</TableCell>
+                      <TableCell>{user.city_title || <span className="text-muted-foreground">Не указан</span>}</TableCell>
+                      <TableCell>
+                        {format(new Date(user.updated_at), "d MMM yyyy, HH:mm", { locale: ru })}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {format(new Date(user.created_at), "d MMM yyyy", { locale: ru })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          )}
+
+            {total > limit && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Показано {(page - 1) * limit + 1} - {Math.min(page * limit, total)} из {total}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    Назад
+                  </Button>
+                  <div className="text-sm font-medium px-2">{page}</div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={page * limit >= total}
+                  >
+                    Вперед
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
