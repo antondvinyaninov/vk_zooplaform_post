@@ -15,9 +15,9 @@ import {
   Link,
 } from '@vkontakte/vkui';
 import { 
-  Icon28CheckShieldOutline, 
-  Icon28WriteOutline, 
-  Icon28ListPlayOutline,
+  Icon28ArticleOutline,
+  Icon28Notifications,
+  Icon28FavoriteOutline,
   Icon56ErrorOutline
 } from '@vkontakte/icons';
 
@@ -118,37 +118,37 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
         <Title level="1" weight="1" style={{ fontSize: 32, marginBottom: 8, textAlign: 'center' }}>
           ЗооПлатформа
         </Title>
-        <Text style={{ fontSize: 16, color: 'var(--vkui--color_text_secondary)', textAlign: 'center', marginBottom: 32, maxWidth: 340 }}>
-          Удобный инструмент для приема и публикации постов от ваших подписчиков.
+        <Text style={{ fontSize: 16, color: 'var(--vkui--color_text_secondary)', textAlign: 'center', marginBottom: 32, maxWidth: 360, lineHeight: 1.5 }}>
+          Удобный и продуманный инструмент для эффективного общения с вашими подписчиками. Принимайте, обрабатывайте и публикуйте посты быстро и без лишних усилий — всё для того, чтобы ваша помощь животным стала ещё результативнее.
         </Text>
 
         {/* Блок преимуществ */}
-        <Group style={{ width: '100%', maxWidth: 400, marginBottom: 32, border: 'none' }} separator="hide">
+        <Group style={{ width: '100%', maxWidth: 460, marginBottom: 32, border: 'none' }} separator="hide">
           <SimpleCell
             disabled
-            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28WriteOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
-            subtitle="Пользователям легко предлагать посты, прикреплять фото и видео прямо с телефона."
+            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28ArticleOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
+            subtitle="Посты сохраняются у авторов — больше не нужно каждый раз писать текст заново для публикации в разных группах. Открытые статусы показывают, на какой стадии находится объявление, а удобная обратная связь помогает быстро исправить недочёты. Забудьте о «глухом молчании» — теперь каждый автор всегда в курсе!"
             multiline
           >
-            <span style={{ fontWeight: 600 }}>Для подписчиков</span>
+            <span style={{ fontWeight: 600 }}>Забота о подписчиках</span>
           </SimpleCell>
           
           <SimpleCell
             disabled
-            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28CheckShieldOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
-            subtitle="Защита от спама и полная модерация контента перед публикацией в ленту."
+            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28Notifications fill="var(--vkui--color_icon_accent)" /></Avatar>}
+            subtitle="Забудьте о постоянном обновлении «предложки» каждые 5 минут. Получайте мгновенные уведомления о новых заявках, проверяйте их, редактируйте прямо в интерфейсе или отправляйте на доработку. А главное — выбирайте удобное время для публикации, чтобы посты выходили именно тогда, когда нужно."
             multiline
           >
-            <span style={{ fontWeight: 600 }}>Полный контроль</span>
+            <span style={{ fontWeight: 600 }}>Комфорт администратора</span>
           </SimpleCell>
 
           <SimpleCell
             disabled
-            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28ListPlayOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
-            subtitle="Автоматическая публикация по заданному графику для максимальных охватов."
+            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28FavoriteOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
+            subtitle="Это первая версия платформы — и впереди нас ждёт множество мощных дополнений. Мы стремимся сделать работу зооволонтёров и администраторов максимально комфортной, а помощь животным — системной, прозрачной и эффективной. Присоединяйтесь к нам и станьте частью большого дела!"
             multiline
           >
-            <span style={{ fontWeight: 600 }}>Умная очередь</span>
+            <span style={{ fontWeight: 600 }}>Всё только начинается</span>
           </SimpleCell>
         </Group>
 
