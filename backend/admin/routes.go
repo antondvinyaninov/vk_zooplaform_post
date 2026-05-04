@@ -23,6 +23,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/vk/connection", middleware.CORSFunc(vkConnectionHandler))
 	mux.HandleFunc("/api/admin/logs", middleware.CORSFunc(logsHandler))
 	mux.HandleFunc("/api/admin/app-users", middleware.CORSFunc(appUsersHandler))
+	mux.HandleFunc("/api/admin/posts", middleware.CORSFunc(adminPostsHandler))
 	mux.HandleFunc("/api/settings/snippet", middleware.CORSFunc(snippetHandler))
 
 	log.Printf("[Admin] Registering VK API routes...")

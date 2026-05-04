@@ -56,8 +56,20 @@ function PostStatusBadge({ status }: { status: PostStatus }) {
 }
 
 export function RecentPostsTable() {
-  // Fetch pending posts for moderation/recent view
-  const { data: posts, error, isLoading } = useSWR<ApiPost[]>("/app/posts", fetcher)
+  // Custom fetcher that injects the auth token
+  const authFetcher = async (url: string) => {
+    const token = localStorage.getItem("auth_token");
+    const res = await fetch(`${import.meta.env.PUBLIC_API_URL || "/api"}${url}`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    if (!res.ok) throw new Error("Failed to fetch");
+    const data = await res.json();
+    return data.data || data;
+  };
+
+  const { data: posts, error, isLoading } = useSWR<ApiPost[]>("/admin/posts", authFetcher)
 
   const displayPosts = posts || []
 
