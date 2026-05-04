@@ -5,14 +5,11 @@ import {
   Panel,
   Button,
   NavIdProps,
-  Title,
-  Text,
   Div,
-  Group,
-  SimpleCell,
   Avatar,
   Placeholder,
   Link,
+  Text,
 } from '@vkontakte/vkui';
 import { 
   Icon28ArticleOutline,
@@ -110,47 +107,101 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
         background: 'var(--vkui--color_background_content)',
       }}>
         
+        <style>{`
+          .onboarding-title {
+            font-size: clamp(28px, 5vw, 40px);
+            font-weight: 700;
+            margin-bottom: 12px;
+            text-align: center;
+            color: var(--vkui--color_text_primary);
+          }
+          .onboarding-subtitle {
+            font-size: clamp(15px, 2.5vw, 17px);
+            color: var(--vkui--color_text_primary);
+            opacity: 0.85;
+            text-align: center;
+            margin-bottom: 40px;
+            max-width: 700px;
+            line-height: 1.5;
+          }
+          .onboarding-features {
+            width: 100%;
+            max-width: 700px;
+            margin-bottom: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+          }
+          .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            text-align: left;
+          }
+          .feature-title {
+            font-weight: 600;
+            font-size: 17px;
+            color: var(--vkui--color_text_primary);
+            margin-bottom: 4px;
+          }
+          .feature-desc {
+            font-size: 15px;
+            color: var(--vkui--color_text_primary);
+            opacity: 0.8;
+            line-height: 1.45;
+          }
+        `}</style>
+
         {/* Логотип */}
         <div style={{ marginBottom: 24, marginTop: 16 }}>
           <PawLogo />
         </div>
 
-        <Title level="1" weight="1" style={{ fontSize: 32, marginBottom: 8, textAlign: 'center' }}>
+        <div className="onboarding-title">
           ЗооПлатформа
-        </Title>
-        <Text style={{ fontSize: 16, color: 'var(--vkui--color_text_secondary)', textAlign: 'center', marginBottom: 32, maxWidth: 360, lineHeight: 1.5 }}>
+        </div>
+        <div className="onboarding-subtitle">
           Удобный и продуманный инструмент для эффективного общения с вашими подписчиками. Принимайте, обрабатывайте и публикуйте посты быстро и без лишних усилий — всё для того, чтобы ваша помощь животным стала ещё результативнее.
-        </Text>
+        </div>
 
         {/* Блок преимуществ */}
-        <Group style={{ width: '100%', maxWidth: 460, marginBottom: 32, border: 'none' }} separator="hide">
-          <SimpleCell
-            disabled
-            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28ArticleOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
-            subtitle="Посты сохраняются у авторов — больше не нужно каждый раз писать текст заново для публикации в разных группах. Открытые статусы показывают, на какой стадии находится объявление, а удобная обратная связь помогает быстро исправить недочёты. Забудьте о «глухом молчании» — теперь каждый автор всегда в курсе!"
-            multiline
-          >
-            <span style={{ fontWeight: 600 }}>Забота о подписчиках</span>
-          </SimpleCell>
+        <div className="onboarding-features">
+          <div className="feature-item">
+            <Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)', flexShrink: 0 }}>
+              <Icon28ArticleOutline fill="var(--vkui--color_icon_accent)" />
+            </Avatar>
+            <div>
+              <div className="feature-title">Забота о подписчиках</div>
+              <div className="feature-desc">
+                Посты сохраняются у авторов — больше не нужно каждый раз писать текст заново для публикации в разных группах. Открытые статусы показывают, на какой стадии находится объявление, а удобная обратная связь помогает быстро исправить недочёты. Забудьте о «глухом молчании» — теперь каждый автор всегда в курсе!
+              </div>
+            </div>
+          </div>
           
-          <SimpleCell
-            disabled
-            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28Notifications fill="var(--vkui--color_icon_accent)" /></Avatar>}
-            subtitle="Забудьте о постоянном обновлении «предложки» каждые 5 минут. Получайте мгновенные уведомления о новых заявках, проверяйте их, редактируйте прямо в интерфейсе или отправляйте на доработку. А главное — выбирайте удобное время для публикации, чтобы посты выходили именно тогда, когда нужно."
-            multiline
-          >
-            <span style={{ fontWeight: 600 }}>Комфорт администратора</span>
-          </SimpleCell>
+          <div className="feature-item">
+            <Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)', flexShrink: 0 }}>
+              <Icon28Notifications fill="var(--vkui--color_icon_accent)" />
+            </Avatar>
+            <div>
+              <div className="feature-title">Комфорт администратора</div>
+              <div className="feature-desc">
+                Забудьте о постоянном обновлении «предложки» каждые 5 минут. Получайте мгновенные уведомления о новых заявках, проверяйте их, редактируйте прямо в интерфейсе или отправляйте на доработку. А главное — выбирайте удобное время для публикации, чтобы посты выходили именно тогда, когда нужно.
+              </div>
+            </div>
+          </div>
 
-          <SimpleCell
-            disabled
-            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28FavoriteOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
-            subtitle="Это первая версия платформы — и впереди нас ждёт множество мощных дополнений. Мы стремимся сделать работу зооволонтёров и администраторов максимально комфортной, а помощь животным — системной, прозрачной и эффективной. Присоединяйтесь к нам и станьте частью большого дела!"
-            multiline
-          >
-            <span style={{ fontWeight: 600 }}>Всё только начинается</span>
-          </SimpleCell>
-        </Group>
+          <div className="feature-item">
+            <Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)', flexShrink: 0 }}>
+              <Icon28FavoriteOutline fill="var(--vkui--color_icon_accent)" />
+            </Avatar>
+            <div>
+              <div className="feature-title">Всё только начинается</div>
+              <div className="feature-desc">
+                Это первая версия платформы — и впереди нас ждёт множество мощных дополнений. Мы стремимся сделать работу зооволонтёров и администраторов максимально комфортной, а помощь животным — системной, прозрачной и эффективной. Присоединяйтесь к нам и станьте частью большого дела!
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Кнопка действия */}
         <Div style={{ width: '100%', maxWidth: 400, padding: 0 }}>
