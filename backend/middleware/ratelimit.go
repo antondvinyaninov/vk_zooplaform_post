@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -86,6 +87,12 @@ func getIP(r *http.Request) string {
 // RateLimit is a middleware that enforces request limits per IP address
 func RateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Bypass rate limiting for frontend static assets
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		ip := getIP(r)
 		limiter := getVisitor(ip)
 
