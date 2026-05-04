@@ -274,7 +274,8 @@ func listPostsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if ctx.GroupID == 0 {
-		utils.RespondError(w, http.StatusBadRequest, "vk_group_id is required")
+		// Если приложение открыто не из группы, просто возвращаем пустой список (без ошибок)
+		utils.RespondSuccess(w, []interface{}{})
 		return
 	}
 
@@ -533,6 +534,11 @@ func myPostsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if ctx.UserID == 0 {
 		utils.RespondError(w, http.StatusBadRequest, "vk_user_id is required")
+		return
+	}
+
+	if ctx.GroupID == 0 {
+		utils.RespondSuccess(w, []interface{}{})
 		return
 	}
 
