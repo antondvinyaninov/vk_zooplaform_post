@@ -35,8 +35,14 @@ func Init(dbURL string) error {
 		return fmt.Errorf("database connection failed: %v", err)
 	}
 
+	// Настраиваем пул соединений базы данных (Connection Pooling)
+	// Это защитит PostgreSQL от ошибки "too many clients already" при высоких нагрузках
+	db.SetMaxOpenConns(25)                 // Максимальное количество одновременно открытых соединений
+	db.SetMaxIdleConns(5)                  // Сколько соединений держать "в режиме ожидания" для быстрого ответа
+	db.SetConnMaxLifetime(5 * time.Minute) // Время жизни соединения (помогает очищать память)
+
 	DB = db
-	log.Printf("Database connected (pgx)")
+	log.Printf("Database connected (pgx) with Connection Pooling enabled")
 
 	// Создаем таблицы
 	if err := createTables(); err != nil {

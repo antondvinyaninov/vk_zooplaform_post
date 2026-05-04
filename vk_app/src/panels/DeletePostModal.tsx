@@ -46,6 +46,7 @@ export const DeletePostModal: FC<DeletePostModalProps> = ({ id, onConfirm }) => 
         
         window.dispatchEvent(new CustomEvent('postDeleted', { detail: { postId } }));
         
+        setIsSubmitting(false);
         closeModal();
       } catch (error) {
         console.error('Failed to delete post:', error);

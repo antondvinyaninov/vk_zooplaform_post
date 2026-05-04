@@ -5,11 +5,16 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-04-26
 
 ### Added
+- **Backend / Stability**: Implemented Database Connection Pooling (`SetMaxOpenConns`, `SetMaxIdleConns`) to prevent PostgreSQL "too many clients" exhaustion under heavy concurrent load.
+- **Backend / Security**: Implemented a Token Bucket `RateLimiter` Middleware to protect endpoints from DDoS and brute-force attacks (max 60 requests/min per IP).
+- **Backend / Security**: Performed a comprehensive Security Audit and Dependency Update, upgrading `pgx/v5` and `aws-sdk-go-v2` to latest secure versions.
+- **Backend / Audit**: Integrated Business Audit Logging (`models.LogInfo`) across all major handlers to record user actions (logins, post creation/deletion, VK account connection) into `system_logs`.
 - **Backend / Stability**: Implemented a global Panic Recovery Middleware that gracefully catches runtime panics, logs stack traces to `system_logs` table, and returns a 500 JSON response instead of crashing the process.
 - **Backend / VK API**: Added Context Timeouts for all VK API requests, utilizing distinct durations (e.g., 15s for data, 10m for video uploads) instead of a global rigid `http.Client` 30s timeout.
 - **Backend / VK API**: Implemented Exponential Backoff Automatic Retries (up to 3 attempts) for VK API limits (`ErrorCode 6`, `ErrorCode 9`) and internal 5xx errors to prevent temporary network issues from aborting transactions.
 - **Backend / Posts**: Implemented soft-delete mechanism for posts (`status = 'deleted'`) to retain post analytics instead of hard physical deletion.
 - **Backend / Posts**: Added `delete_reason` and `delete_comment` columns to capture user feedback upon post deletion.
+- **Frontend / Posts**: Fixed a state-persistence bug in `DeletePostModal` where the delete button would remain permanently frozen ("loading") upon attempting to delete a second post.
 - **Frontend / Posts**: Added `DeletePostModal` UI component to collect deletion reasons and optional comments when users delete their own posts.
 - **Frontend / Core Architecture**: Bootstrapped and migrated the entire legacy admin panel to a modern Astro 4.0 architecture using React 18, Tailwind CSS, and shadcn/ui components (`frontadmin` module).
 - **Frontend / Design System**: Implemented a comprehensive design system featuring light/dark mode theming, CSS variables, and modern accessible UI components.

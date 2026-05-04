@@ -7,6 +7,7 @@ import (
 	"backend/vk"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -413,6 +414,8 @@ func disconnectGroupHandler(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+
+	models.LogInfo("GROUP_DISCONNECTED", "Сообщество отключено от платформы", nil, fmt.Sprintf("Group ID: %d", req.GroupID))
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }

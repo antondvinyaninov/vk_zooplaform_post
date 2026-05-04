@@ -444,6 +444,8 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL))
 	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", group.Name, appURL))
 
+	models.LogInfo("POST_CREATED", "Пользователь предложил новую запись", &user.ID, fmt.Sprintf("Group ID: %d, Post ID: %d", group.ID, post.ID))
+
 	response, err := serializePost(post, group.ID)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -924,11 +926,13 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), messageToPost, attachments, true, publishUnix)
 		if err != nil {
 			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
+			models.LogWarning("PUBLISH_FAILED", "Не удалось опубликовать запись во ВКонтакте", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, Error: %v", group.VKGroupID, postID, err))
 			utils.RespondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		currentPub.VKPostID = vkPostID
 		currentPub.Status = req.Status
+		models.LogInfo("POST_PUBLISHED", "Запись успешно опубликована на стене сообщества", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, VK Post ID: %d", group.ID, postID, vkPostID))
 
 	case "rejected":
 		currentPub.Status = "rejected"
@@ -2246,6 +2250,8 @@ func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 
 	log.Printf("[deletePostHandler] Successfully deleted post %d by user %d", postID, user.ID)
+
+	models.LogInfo("POST_DELETED", "Пользователь удалил свой пост", &user.ID, fmt.Sprintf("Post ID: %d, Reason: %s", postID, reqBody.Reason))
 
 	utils.RespondSuccess(w, map[string]string{"status": "deleted"})
 }

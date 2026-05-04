@@ -200,7 +200,7 @@ func main() {
 
 	// Применяем middleware
 	log.Printf("Applying middleware...")
-	handler := middleware.Recovery(middleware.Logger(middleware.CORS(middleware.Gzip(mux))))
+	handler := middleware.RateLimit(middleware.Recovery(middleware.Logger(middleware.CORS(middleware.Gzip(mux)))))
 
 	// Запускаем сервер
 	addr := ":" + cfg.Port

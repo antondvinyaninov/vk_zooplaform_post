@@ -2,8 +2,10 @@ package admin
 
 import (
 	"backend/database"
+	"backend/models"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -92,6 +94,8 @@ func saveVKAccountHandler(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load VK connections"})
 		return
 	}
+
+	models.LogInfo("VK_ACCOUNT_CONNECTED", "Администратор подключил новый аккаунт ВКонтакте", nil, fmt.Sprintf("User: %s (ID: %d)", req.UserName, req.VKUserID))
 
 	respondJSON(w, http.StatusOK, conn)
 }
