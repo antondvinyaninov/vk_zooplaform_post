@@ -447,7 +447,7 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	models.LogInfo("POST_CREATED", "Пользователь предложил новую запись", &user.ID, fmt.Sprintf("Group ID: %d, Post ID: %d", group.ID, post.ID))
 
-	response, err := serializePost(post, group.ID)
+	response, err := serializePost(post, group.ID, nil)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -512,7 +512,7 @@ func suggestExistingPostHandler(w http.ResponseWriter, r *http.Request, postID i
 	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию в новое сообщество. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL))
 	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил существующий пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", group.Name, appURL))
 
-	response, err := serializePost(post, group.ID)
+	response, err := serializePost(post, group.ID, nil)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -641,7 +641,7 @@ func getPostByIDHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		groupID = ctx.GroupID
 	}
 
-	response, err := serializePost(post, groupID)
+	response, err := serializePost(post, groupID, nil)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -738,7 +738,7 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		}
 	}
 
-	response, err := serializePost(post, group.ID)
+	response, err := serializePost(post, group.ID, nil)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -978,7 +978,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 	}
 
-	response, err := serializePost(post, group.ID)
+	response, err := serializePost(post, group.ID, nil)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1158,9 +1158,25 @@ func fetchVKGroupData(vkGroupID int) (*models.Group, error) {
 }
 
 func serializePosts(posts []*models.Post, contextGroupID int) ([]postResponse, error) {
+	if len(posts) == 0 {
+		return []postResponse{}, nil
+	}
+
+	userIDs := make([]int, 0)
+	for _, post := range posts {
+		if post.UserID != 0 {
+			userIDs = append(userIDs, post.UserID)
+		}
+	}
+
+	usersMap, err := getUsersMapByIDs(userIDs)
+	if err != nil {
+		return nil, err
+	}
+
 	result := make([]postResponse, 0, len(posts))
 	for _, post := range posts {
-		item, err := serializePost(post, contextGroupID)
+		item, err := serializePost(post, contextGroupID, usersMap)
 		if err != nil {
 			return nil, err
 		}
@@ -1169,13 +1185,14 @@ func serializePosts(posts []*models.Post, contextGroupID int) ([]postResponse, e
 	return result, nil
 }
 
-func serializePost(post *models.Post, contextGroupID int) (postResponse, error) {
-	var (
-		user  *models.User
-		err   error
-	)
+func serializePost(post *models.Post, contextGroupID int, usersMap map[int]*models.User) (postResponse, error) {
+	var user *models.User
 
-	if post.UserID != 0 {
+	if post.UserID != 0 && usersMap != nil {
+		user = usersMap[post.UserID]
+	} else if post.UserID != 0 {
+		// Fallback for single post serialization
+		var err error
 		user, err = getUserByID(post.UserID)
 		if err != nil {
 			return postResponse{}, err
@@ -1259,9 +1276,71 @@ func userFacingGroup(group *models.Group) *groupSummary {
 }
 
 func populateAttachmentURLs(posts []postResponse) []postResponse {
-	// Получаем токен один раз для всех видео-запросов
-	adminToken, tokenErr := getActiveVKToken()
+	var videoIDs []string
+	
+	// First pass: collect all VK video IDs that need thumbnails
+	for _, p := range posts {
+		if p.Attachments != "" {
+			var parts []string
+			if strings.HasPrefix(p.Attachments, "[") {
+				json.Unmarshal([]byte(p.Attachments), &parts)
+			} else {
+				parts = strings.Split(p.Attachments, ",")
+			}
 
+			for _, part := range parts {
+				idAndUrl := strings.SplitN(part, "|", 2)
+				id := strings.TrimSpace(idAndUrl[0])
+				if id == "" {
+					continue
+				}
+				
+				var mediaURL string
+				if len(idAndUrl) > 1 {
+					mediaURL = idAndUrl[1]
+				}
+
+				if strings.HasPrefix(id, "video") && mediaURL == "" {
+					videoIDs = append(videoIDs, id)
+				}
+			}
+		}
+	}
+
+	// Batch fetch video thumbnails
+	videoThumbnails := make(map[string]string)
+	if len(videoIDs) > 0 {
+		adminToken, tokenErr := getActiveVKToken()
+		if tokenErr == nil && adminToken != "" {
+			vkClient := vk.NewVKClient(adminToken)
+			
+			// Deduplicate IDs
+			uniqueIDs := make(map[string]bool)
+			var batch []string
+			for _, id := range videoIDs {
+				if !uniqueIDs[id] {
+					uniqueIDs[id] = true
+					batch = append(batch, id)
+				}
+			}
+			
+			if thumbs, err := vkClient.GetVideoThumbnails(batch); err == nil {
+				videoThumbnails = thumbs
+			} else {
+				log.Printf("[populateAttachmentURLs] GetVideoThumbnails failed for %d videos: %v", len(batch), err)
+			}
+		}
+	}
+
+	// Create S3 client exactly once
+	var s3 *s3client.Client
+	if s3C, err := s3client.New(); err == nil {
+		s3 = s3C
+	} else {
+		log.Printf("[populateAttachmentURLs] S3 not configured: %v", err)
+	}
+
+	// Second pass: populate URLs
 	for i, p := range posts {
 		var urls []AttachmentURL
 
@@ -1287,14 +1366,14 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 				if strings.HasPrefix(id, "photo") {
 					urls = append(urls, AttachmentURL{ID: id, Type: "photo", URL: mediaURL})
 				} else if strings.HasPrefix(id, "video") {
-					// Если URL превью ещё не сохранён — запрашиваем из VK
-					if mediaURL == "" && tokenErr == nil && adminToken != "" {
-						vkClient := vk.NewVKClient(adminToken)
-						thumb, err := vkClient.GetVideoThumbnail(id)
-						if err != nil {
-							log.Printf("[populateAttachmentURLs] video.get failed for %s: %v", id, err)
-						} else {
-							mediaURL = thumb
+					if mediaURL == "" {
+						raw := strings.TrimPrefix(id, "video")
+						partsRaw := strings.SplitN(raw, "_", 3)
+						if len(partsRaw) >= 2 {
+							baseID := fmt.Sprintf("video%s_%s", partsRaw[0], partsRaw[1])
+							if t, ok := videoThumbnails[baseID]; ok {
+								mediaURL = t
+							}
 						}
 					}
 					urls = append(urls, AttachmentURL{ID: id, Type: "vk_video", URL: mediaURL})
@@ -1302,34 +1381,28 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 			}
 		}
 
-		if p.S3VideoKey != "" {
-			s3, err := s3client.New()
-			if err == nil {
-				keys := strings.Split(p.S3VideoKey, ",")
-				for _, key := range keys {
-					key = strings.TrimSpace(key)
-					if key == "" {
-						continue
-					}
-					presignedURL, err := s3.PresignGetURL(context.Background(), key, time.Hour*24)
-					if err != nil {
-						log.Printf("[populateAttachmentURLs] failed to presign S3 URL for %s: %v", key, err)
-					} else {
-						ext := strings.ToLower(filepath.Ext(key))
-						attType := "s3_image"
-						if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
-							attType = "s3_video"
-						}
-						urls = append(urls, AttachmentURL{ID: "s3:" + key, Type: attType, URL: presignedURL})
-					}
+		if p.S3VideoKey != "" && s3 != nil {
+			keys := strings.Split(p.S3VideoKey, ",")
+			for _, key := range keys {
+				key = strings.TrimSpace(key)
+				if key == "" {
+					continue
 				}
-			} else {
-				log.Printf("[populateAttachmentURLs] S3 not configured: %v", err)
+				presignedURL, err := s3.PresignGetURL(context.Background(), key, time.Hour*24)
+				if err != nil {
+					log.Printf("[populateAttachmentURLs] failed to presign S3 URL for %s: %v", key, err)
+				} else {
+					ext := strings.ToLower(filepath.Ext(key))
+					attType := "s3_image"
+					if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
+						attType = "s3_video"
+					}
+					urls = append(urls, AttachmentURL{ID: "s3:" + key, Type: attType, URL: presignedURL})
+				}
 			}
 		}
 
 		posts[i].AttachmentURLs = urls
-		log.Printf("[populateAttachmentURLs] Post ID %d attachments: %+v", p.ID, urls)
 	}
 	return posts
 }
@@ -1518,6 +1591,60 @@ func getUserByID(id int) (*models.User, error) {
 		FROM users WHERE id = ?
 	`, id)
 	return scanUser(row)
+}
+
+func getUsersMapByIDs(ids []int) (map[int]*models.User, error) {
+	if len(ids) == 0 {
+		return make(map[int]*models.User), nil
+	}
+
+	idSet := make(map[int]struct{})
+	var uniqueIDs []int
+	for _, id := range ids {
+		if _, exists := idSet[id]; !exists {
+			idSet[id] = struct{}{}
+			uniqueIDs = append(uniqueIDs, id)
+		}
+	}
+
+	args := make([]interface{}, len(uniqueIDs))
+	for i, id := range uniqueIDs {
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, vk_user_id, first_name, last_name, photo_200, city_id, city_title, role, created_at, updated_at
+		FROM users
+		WHERE id IN (%s)
+	`, buildInPlaceholders(len(uniqueIDs)))
+
+	rows, err := database.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	usersMap := make(map[int]*models.User)
+	for rows.Next() {
+		user := &models.User{}
+		if err := rows.Scan(
+			&user.ID,
+			&user.VKUserID,
+			&user.FirstName,
+			&user.LastName,
+			&user.Photo200,
+			&user.CityID,
+			&user.CityTitle,
+			&user.Role,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		usersMap[user.ID] = user
+	}
+
+	return usersMap, nil
 }
 
 func getUserByVKUserID(vkUserID int) (*models.User, error) {
@@ -1767,14 +1894,90 @@ func getPublicationsForPost(postID int) ([]models.PostPublication, error) {
 	return pubs, nil
 }
 
+func buildInPlaceholders(n int) string {
+	if n == 0 {
+		return ""
+	}
+	placeholders := make([]string, n)
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+	return strings.Join(placeholders, ", ")
+}
+
 func populatePublicationsForPosts(posts []*models.Post) error {
-	for _, post := range posts {
-		pubs, err := getPublicationsForPost(post.ID)
-		if err != nil {
+	if len(posts) == 0 {
+		return nil
+	}
+
+	args := make([]interface{}, len(posts))
+	for i, post := range posts {
+		args[i] = post.ID
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, post_id, group_id, vk_post_id, status, reject_reason, delete_reason, delete_comment, publish_date, created_at, updated_at
+		FROM post_publications
+		WHERE post_id IN (%s)
+		ORDER BY id DESC
+	`, buildInPlaceholders(len(posts)))
+
+	rows, err := database.Query(query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	pubsMap := make(map[int][]models.PostPublication)
+	for rows.Next() {
+		var pub models.PostPublication
+		var dbVKPostID sql.NullInt64
+		var rejectReason, deleteReason, deleteComment sql.NullString
+		var publishDate sql.NullTime
+
+		if err := rows.Scan(
+			&pub.ID,
+			&pub.PostID,
+			&pub.GroupID,
+			&dbVKPostID,
+			&pub.Status,
+			&rejectReason,
+			&deleteReason,
+			&deleteComment,
+			&publishDate,
+			&pub.CreatedAt,
+			&pub.UpdatedAt,
+		); err != nil {
 			return err
 		}
-		post.Publications = pubs
+
+		if dbVKPostID.Valid {
+			pub.VKPostID = int(dbVKPostID.Int64)
+		}
+		if rejectReason.Valid {
+			pub.RejectReason = rejectReason.String
+		}
+		if deleteReason.Valid {
+			pub.DeleteReason = deleteReason.String
+		}
+		if deleteComment.Valid {
+			pub.DeleteComment = deleteComment.String
+		}
+		if publishDate.Valid {
+			pub.PublishDate = publishDate.Time
+		}
+
+		pubsMap[pub.PostID] = append(pubsMap[pub.PostID], pub)
 	}
+
+	for _, post := range posts {
+		if pubs, ok := pubsMap[post.ID]; ok {
+			post.Publications = pubs
+		} else {
+			post.Publications = []models.PostPublication{}
+		}
+	}
+
 	return nil
 }
 

@@ -436,26 +436,26 @@ func bestImage(items []struct {
 	return best.URL
 }
 
-// GetVideoThumbnail получает URL превью для видео-вложения.
-// attachmentID — строка вида "video-12345_67890" или "video-12345_67890_accesskey".
-func (c *VKClient) GetVideoThumbnail(attachmentID string) (string, error) {
-	raw := strings.TrimPrefix(attachmentID, "video")
-	partsRaw := strings.SplitN(raw, "_", 3)
-	if len(partsRaw) < 2 {
-		return "", fmt.Errorf("invalid video attachment id: %s", attachmentID)
+// GetVideoThumbnails получает URL превью для списка видео-вложений.
+// attachmentIDs — строки вида "video-12345_67890" или "video-12345_67890_accesskey".
+func (c *VKClient) GetVideoThumbnails(attachmentIDs []string) (map[string]string, error) {
+	if len(attachmentIDs) == 0 {
+		return make(map[string]string), nil
+	}
+
+	var videos []string
+	for _, attachmentID := range attachmentIDs {
+		raw := strings.TrimPrefix(attachmentID, "video")
+		videos = append(videos, raw)
 	}
 
 	params := map[string]string{
-		"videos": fmt.Sprintf("%s_%s", partsRaw[0], partsRaw[1]),
-		"count":  "1",
-	}
-	if len(partsRaw) == 3 {
-		params["access_key"] = partsRaw[2]
+		"videos": strings.Join(videos, ","),
 	}
 
 	resp, err := c.CallMethod("video.get", params)
 	if err != nil {
-		return "", fmt.Errorf("video.get failed: %w", err)
+		return nil, fmt.Errorf("video.get failed: %w", err)
 	}
 
 	var result struct {
@@ -463,42 +463,54 @@ func (c *VKClient) GetVideoThumbnail(attachmentID string) (string, error) {
 		Items []VideoInfo `json:"items"`
 	}
 	if err := json.Unmarshal(resp, &result); err != nil {
-		return "", fmt.Errorf("failed to parse video.get response: %w", err)
-	}
-	if len(result.Items) == 0 {
-		return "", fmt.Errorf("video not found: %s", attachmentID)
+		return nil, fmt.Errorf("failed to parse video.get response: %w", err)
 	}
 
-	v := result.Items[0]
+	thumbnails := make(map[string]string)
+	for _, v := range result.Items {
+		id := fmt.Sprintf("video%d_%d", v.OwnerID, v.ID)
+		
+		url := ""
+		if best := bestImage(v.FirstFrame, false); best != "" {
+			url = best
+		} else if best := bestImage(v.Image, true); best != "" {
+			url = best
+		} else if v.Photo800 != "" {
+			url = v.Photo800
+		} else if v.Photo320 != "" {
+			url = v.Photo320
+		} else if v.Photo130 != "" {
+			url = v.Photo130
+		} else if best := bestImage(v.Image, false); best != "" {
+			url = best
+		}
+		
+		if url != "" {
+			thumbnails[id] = url
+		}
+	}
 
-	// 1. first_frame — статичные JPEG кадры, наиболее надёжные
-	if url := bestImage(v.FirstFrame, false); url != "" {
+	return thumbnails, nil
+}
+
+// GetVideoThumbnail получает URL превью для одного видео-вложения.
+func (c *VKClient) GetVideoThumbnail(attachmentID string) (string, error) {
+	thumbs, err := c.GetVideoThumbnails([]string{attachmentID})
+	if err != nil {
+		return "", err
+	}
+	
+	raw := strings.TrimPrefix(attachmentID, "video")
+	partsRaw := strings.SplitN(raw, "_", 3)
+	if len(partsRaw) < 2 {
+		return "", fmt.Errorf("invalid video attachment id: %s", attachmentID)
+	}
+	baseID := fmt.Sprintf("video%s_%s", partsRaw[0], partsRaw[1])
+	
+	if url, ok := thumbs[baseID]; ok {
 		return url, nil
 	}
-
-	// 2. image[] без анимированных URL (userapi.com, sun*.vk.com и т..д.)
-	if url := bestImage(v.Image, true); url != "" {
-		return url, nil
-	}
-
-	// 3. Устаревшие поля
-	if v.Photo800 != "" {
-		return v.Photo800, nil
-	}
-	if v.Photo320 != "" {
-		return v.Photo320, nil
-	}
-	if v.Photo130 != "" {
-		return v.Photo130, nil
-	}
-
-	// 4. Последний резерв: анимированная версия (может не отобразиться как <img>)
-	if url := bestImage(v.Image, false); url != "" {
-		log.Printf("[GetVideoThumbnail] only animated preview available for %s: %s", attachmentID, url)
-		return url, nil
-	}
-
-	return "", nil
+	return "", fmt.Errorf("video not found: %s", attachmentID)
 }
 
 // UploadVideo загружает видео
