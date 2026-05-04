@@ -31,19 +31,23 @@ interface AppUser {
 
 export function AppUsersTable() {
   const [users, setUsers] = useState<AppUser[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 20;
 
   useEffect(() => {
     fetchUsers();
-  }, [search]);
+  }, [search, page]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem("auth_token");
-      let url = "/api/admin/app-users?limit=100";
+      const offset = (page - 1) * limit;
+      let url = `/api/admin/app-users?limit=${limit}&offset=${offset}`;
       if (search) {
         url += `&search=${encodeURIComponent(search)}`;
       }
@@ -51,8 +55,14 @@ export function AppUsersTable() {
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const data = response.data.data || response.data;
-      setUsers(Array.isArray(data) ? data : []);
+      const responseData = response.data.data || response.data;
+      if (responseData && typeof responseData === 'object' && !Array.isArray(responseData)) {
+        setUsers(responseData.users || []);
+        setTotal(responseData.total || 0);
+      } else {
+        setUsers(Array.isArray(responseData) ? responseData : []);
+        setTotal(Array.isArray(responseData) ? responseData.length : 0);
+      }
     } catch (error) {
       console.error("Failed to fetch users", error);
     } finally {
@@ -129,6 +139,33 @@ export function AppUsersTable() {
               </TableBody>
             </Table>
           </div>
+
+          {total > limit && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-muted-foreground">
+                Показано {(page - 1) * limit + 1} - {Math.min(page * limit, total)} из {total}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Назад
+                </Button>
+                <div className="text-sm font-medium px-2">{page}</div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={page * limit >= total}
+                >
+                  Вперед
+                </Button>
+              </div>
+            </div>
+          )}
         )}
       </CardContent>
     </Card>

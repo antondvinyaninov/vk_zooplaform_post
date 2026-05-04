@@ -86,10 +86,26 @@ func appUsersHandler(w http.ResponseWriter, r *http.Request) {
 		users = append(users, u)
 	}
 
+	countQuery := `SELECT COUNT(*) FROM users`
+	var countArgs []interface{}
+	if search != "" {
+		countQuery += ` WHERE first_name ILIKE ? OR last_name ILIKE ?`
+		countArgs = append(countArgs, "%"+search+"%", "%"+search+"%")
+	}
+
+	var total int
+	if err := database.QueryRow(countQuery, countArgs...).Scan(&total); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Failed to count users: "+err.Error())
+		return
+	}
+
 	// Отдаём пустой массив вместо null
 	if users == nil {
 		users = []models.User{}
 	}
 
-	utils.RespondSuccess(w, users)
+	utils.RespondSuccess(w, map[string]interface{}{
+		"users": users,
+		"total": total,
+	})
 }
