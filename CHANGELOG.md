@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-04-26
 
 ### Added
+- **Backend / Stability**: Implemented a global Panic Recovery Middleware that gracefully catches runtime panics, logs stack traces to `system_logs` table, and returns a 500 JSON response instead of crashing the process.
+- **Backend / VK API**: Added Context Timeouts for all VK API requests, utilizing distinct durations (e.g., 15s for data, 10m for video uploads) instead of a global rigid `http.Client` 30s timeout.
+- **Backend / VK API**: Implemented Exponential Backoff Automatic Retries (up to 3 attempts) for VK API limits (`ErrorCode 6`, `ErrorCode 9`) and internal 5xx errors to prevent temporary network issues from aborting transactions.
 - **Backend / Posts**: Implemented soft-delete mechanism for posts (`status = 'deleted'`) to retain post analytics instead of hard physical deletion.
 - **Backend / Posts**: Added `delete_reason` and `delete_comment` columns to capture user feedback upon post deletion.
 - **Frontend / Posts**: Added `DeletePostModal` UI component to collect deletion reasons and optional comments when users delete their own posts.
@@ -25,6 +28,8 @@ All notable changes to this project will be documented in this file.
 - **Frontend / Settings**: Implemented `CustomSelect` city autocomplete with debounce for efficient VK API querying.
 
 ### Changed
+- **Backend / Posts**: Modified `deletePostHandler` to execute soft-deletions using atomic database transactions (`BEGIN`/`COMMIT`/`ROLLBACK`), ensuring `posts` and `post_publications` tables remain perfectly synchronized.
+- **Backend / VK API**: Deprecated `http.PostForm` and `http.NewRequest` across all VK integration endpoints in favor of `http.NewRequestWithContext`.
 - **Frontend / Architecture**: Migrated all remaining mocked components (`UsersManagementCard`, `GroupSelector`, `SiteHeader`) to fetch live data from PostgreSQL backend via API endpoints.
 - **Frontend / UI**: Replaced standard Radix UI `DropdownMenuTrigger` configurations with Base UI `render` pattern to resolve TypeScript strict typing errors.
 - **Frontend / UX**: Replaced native file picker UI with VKUI File and `HorizontalScroll` gallery for attached media with custom deletion handlers.
@@ -34,6 +39,8 @@ All notable changes to this project will be documented in this file.
 - **Documentation**: Restructured project documentation, created `PROJECT_MAPPING.md` to map out the separation between legacy projects and the current ZooPlatform architecture.
 
 ### Fixed
+- **Backend / Posts**: Fixed critical 500 Internal Server Errors caused by unhandled `NULL` values in PostgreSQL `s3_video_key` and `attachments` columns by mapping them to `sql.NullString` during database scans.
+- **Backend / Feed**: Fixed an issue where deleted records would still appear in the user's feed, by implementing `COALESCE(status, '') != 'deleted'` filter across `GetByUserID` queries.
 - **Backend / S3 Integration**: Fixed `SignatureDoesNotMatch` errors causing pseudo-CORS "Network Errors" by enforcing safe ASCII suffixes for presigned URLs to handle Cyrillic filenames.
 - **Backend / S3 Cleanup**: Added automatic garbage collection in S3 to delete orphaned media objects when a post is soft-deleted.
 - **Frontend / Media Attachments**: Fixed iOS WKWebView freezes and crashes by disabling heavy synchronous local video thumbnail generation in `CreateAd` and `AdDetail`.
