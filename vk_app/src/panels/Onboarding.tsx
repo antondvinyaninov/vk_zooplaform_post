@@ -5,22 +5,56 @@ import {
   Panel,
   Button,
   NavIdProps,
-  Link,
   Title,
   Text,
   Div,
+  Group,
+  SimpleCell,
+  Avatar,
+  Placeholder,
+  Link,
 } from '@vkontakte/vkui';
+import { 
+  Icon28CheckShieldOutline, 
+  Icon28WriteOutline, 
+  Icon28ListPlayOutline,
+  Icon56ErrorOutline
+} from '@vkontakte/icons';
+
+const PawLogo = () => (
+  <svg width="86" height="86" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <mask id="mask0_753_4189" style={{ maskType: 'luminance' }} maskUnits="userSpaceOnUse" x="0" y="0" width="56" height="56">
+      <path d="M56 0H0V56H56V0Z" fill="white"/>
+    </mask>
+    <g mask="url(#mask0_753_4189)">
+      <mask id="mask1_753_4189" style={{ maskType: 'luminance' }} maskUnits="userSpaceOnUse" x="0" y="0" width="56" height="56">
+        <path d="M56 0H0V56H56V0Z" fill="white"/>
+      </mask>
+      <g mask="url(#mask1_753_4189)">
+        <mask id="mask2_753_4189" style={{ maskType: 'luminance' }} maskUnits="userSpaceOnUse" x="0" y="0" width="56" height="57">
+          <path d="M56 0.00292969H0V56.0029H56V0.00292969Z" fill="white"/>
+        </mask>
+        <g mask="url(#mask2_753_4189)">
+          <g clipPath="url(#clip0_753_4189)">
+            <path d="M28.0001 52.0828C14.7011 52.0828 3.92008 41.3019 3.92008 28.0028C3.92008 14.7038 14.7011 3.92285 28.0001 3.92285C41.2991 3.92285 52.0801 14.7038 52.0801 28.0028C52.0801 41.3019 41.2991 52.0828 28.0001 52.0828Z" fill="#3C8AFF"/>
+            <path d="M37.0156 21.1149C37.0156 21.9549 36.7636 22.7669 36.3156 23.4669C36.1476 23.7189 35.9516 23.9429 35.7556 24.1389L29.0916 30.8029C28.5876 31.3069 27.7476 31.3069 27.2436 30.8029L20.5796 24.1389C20.3836 23.9429 20.1876 23.7189 20.0196 23.4669C18.7316 21.5069 19.2636 18.8749 21.2236 17.5589C22.6796 16.6069 24.5556 16.6069 25.9836 17.5869L27.4396 18.5669C27.8876 18.8749 28.4756 18.8749 28.9236 18.5669L30.1836 17.6989C31.8916 16.5229 34.5516 16.6909 35.9516 18.2309C36.6236 19.0429 37.0156 20.0509 37.0156 21.1149Z" fill="#BB2D49"/>
+            <path d="M28 0.00292969C12.544 0.00292969 0 12.5469 0 28.0029C0 43.4589 12.544 56.0029 28 56.0029C43.456 56.0029 56 43.4589 56 28.0029C55.972 12.5469 43.456 0.0309297 28 0.00292969ZM29.82 4.23093C42.924 5.23893 52.752 16.6629 51.772 29.7669C51.464 33.8829 50.12 37.8029 47.852 41.1909C47.376 41.9189 46.62 42.4229 45.752 42.5629C44.52 42.8149 43.26 42.9829 41.972 43.0949C40.04 43.2629 38.108 43.1229 36.232 42.6749C34.524 42.2829 32.984 41.3589 31.836 40.0429C30.772 38.7549 30.184 37.1309 30.156 35.4509V34.8909C30.156 34.4989 30.296 34.1349 30.576 33.8549L37.1 27.3589C37.492 26.9669 37.828 26.5469 38.108 26.0989C40.208 22.9069 39.788 18.6789 37.1 15.9909C34.776 13.6669 31.248 12.9949 28.252 14.3109C28.14 14.3669 28 14.3669 27.86 14.3109C23.772 12.5749 19.04 14.4789 17.304 18.5669C16.24 21.0309 16.492 23.8869 17.976 26.1269C18.284 26.5749 18.62 26.9949 19.012 27.3869L25.508 33.8549C25.788 34.1349 25.928 34.4989 25.928 34.8909V35.5909C25.872 37.2429 25.284 38.8109 24.248 40.0709C23.1 41.3589 21.56 42.2829 19.88 42.6749C18.004 43.1229 16.072 43.2629 14.14 43.0949C12.824 42.9829 11.536 42.8149 10.248 42.5629C9.38 42.3949 8.624 41.8909 8.148 41.1629C0.868 30.1869 3.892 15.4029 14.84 8.12293C19.264 5.21093 24.528 3.83893 29.82 4.23093ZM29.008 29.4589L28.56 29.9069C28.28 30.1869 27.804 30.1869 27.524 29.9069L22.008 24.3629C20.524 22.8789 20.524 20.4429 22.008 18.9589C22.736 18.2589 23.688 17.8389 24.696 17.8389C25.452 17.8389 26.208 18.0629 26.852 18.5109L27.636 19.0429C27.888 19.2109 28.224 19.2109 28.476 19.0429L29.26 18.5109C31.024 17.3349 33.376 17.7829 34.552 19.5469C35.56 21.0589 35.392 23.0749 34.104 24.3629L29.008 29.4589ZM15.008 47.9669C14.868 47.8549 14.812 47.6589 14.924 47.5189C14.98 47.4349 15.092 47.3789 15.204 47.3789C15.904 47.4069 16.632 47.3789 17.36 47.3229C18.564 47.2669 19.768 47.0709 20.972 46.7629C22.204 46.4269 23.38 45.9509 24.472 45.3069C25.62 44.6349 26.628 43.7949 27.496 42.7869C27.748 42.4789 28.224 42.4509 28.532 42.7029C28.56 42.7309 28.588 42.7589 28.616 42.7869C29.484 43.7949 30.492 44.6349 31.64 45.3069C32.76 45.9509 33.936 46.4269 35.168 46.7629C36.344 47.0709 37.548 47.2669 38.78 47.3229C39.452 47.3789 40.152 47.3789 40.824 47.3789C41.02 47.3789 41.16 47.5189 41.16 47.7149C41.16 47.8269 41.104 47.9389 41.02 47.9949C33.096 53.1189 22.904 53.1189 15.008 47.9669Z" fill="white"/>
+          </g>
+        </g>
+      </g>
+    </g>
+    <defs>
+      <clipPath id="clip0_753_4189">
+        <rect width="56" height="56" fill="white" transform="matrix(-1 0 0 1 56 0.00292969)"/>
+      </clipPath>
+    </defs>
+  </svg>
+);
 
 export const Onboarding: FC<NavIdProps> = ({ id }) => {
   const [isOutsideVK, setIsOutsideVK] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Анимация плавного появления в стиле Apple
-    requestAnimationFrame(() => {
-      setTimeout(() => setIsVisible(true), 100);
-    });
-
     const checkVKEnvironment = () => {
       const hasVKParams = window.vkLaunchParams && Object.keys(window.vkLaunchParams).length > 0;
       const hasVKBridge = vkBridge && typeof (vkBridge as { send?: unknown }).send === 'function';
@@ -29,8 +63,7 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
         setIsOutsideVK(true);
       }
     };
-
-    setTimeout(checkVKEnvironment, 1000);
+    checkVKEnvironment();
   }, []);
 
   const installToCommunity = () => {
@@ -44,137 +77,96 @@ export const Onboarding: FC<NavIdProps> = ({ id }) => {
     }
   };
 
-  const containerStyle = {
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'radial-gradient(circle at center, var(--vkui--color_background_content) 0%, var(--vkui--color_background_page) 100%)',
-    opacity: isVisible ? 1 : 0,
-    transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-    transition: 'opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1)',
-    padding: '0 24px',
-    textAlign: 'center' as const,
-  };
-
   if (isOutsideVK) {
     return (
       <Panel id={id}>
-        <div style={containerStyle}>
-          <div style={{ marginBottom: 32 }}>
-            <svg width="48" height="48" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16 2C8.268 2 2 8.268 2 16s6.268 14 14 14 14-6.268 14-14S23.732 2 16 2zm0 26C9.383 28 4 22.617 4 16S9.383 4 16 4s12 5.383 12 12-5.383 12-12 12zm-1-18h2v10h-2zm0 12h2v2h-2z" fill="var(--vkui--color_icon_negative)"/>
-            </svg>
-          </div>
-          <Title level="1" weight="1" style={{ fontSize: 28, letterSpacing: '-0.02em', marginBottom: 16 }}>
-            Доступно только в VK
-          </Title>
-          <Text style={{ fontSize: 16, color: 'var(--vkui--color_text_secondary)', lineHeight: 1.5, marginBottom: 32, maxWidth: 320 }}>
-            Это мини-приложение создано для безупречной работы внутри экосистемы ВКонтакте.
-          </Text>
-          <Link href="https://vk.com/apps" target="_blank">
-            <Button size="l" mode="secondary" stretched={false}>
-              Открыть каталог приложений
-            </Button>
-          </Link>
-        </div>
+        <Placeholder
+          icon={<Icon56ErrorOutline />}
+          action={
+            <Link href="https://vk.com/apps" target="_blank">
+              <Button size="l" mode="secondary">
+                Открыть каталог приложений
+              </Button>
+            </Link>
+          }
+        >
+          <Placeholder.Title>Доступно только в VK</Placeholder.Title>
+          <Placeholder.Description>
+            Это мини-приложение создано для работы внутри ВКонтакте.
+          </Placeholder.Description>
+        </Placeholder>
       </Panel>
     );
   }
 
   return (
     <Panel id={id}>
-      <div style={containerStyle}>
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '32px 16px',
+        background: 'var(--vkui--color_background_content)',
+      }}>
         
-        {/* Glow-эффект под логотипом */}
-        <div style={{
-          position: 'relative',
-          marginBottom: 40,
-        }}>
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 120,
-            height: 120,
-            background: 'var(--vkui--color_background_accent_themed)',
-            filter: 'blur(40px)',
-            opacity: 0.2,
-            borderRadius: '50%',
-            zIndex: 0
-          }} />
-          
-          <img 
-            src="/logo.svg" 
-            alt="ZooPlatforma Logo" 
-            style={{ 
-              width: 86, 
-              height: 86, 
-              position: 'relative', 
-              zIndex: 1,
-              filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.1))'
-            }} 
-          />
+        {/* Логотип */}
+        <div style={{ marginBottom: 24, marginTop: 16 }}>
+          <PawLogo />
         </div>
 
-        <Title level="1" weight="1" style={{ 
-          fontSize: 40, 
-          lineHeight: 1.1,
-          letterSpacing: '-0.04em', 
-          marginBottom: 16,
-          background: 'linear-gradient(135deg, var(--vkui--color_text_primary) 0%, var(--vkui--color_text_secondary) 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          color: 'var(--vkui--color_text_primary)' // fallback
-        }}>
-          ЗооПлатформа.
+        <Title level="1" weight="1" style={{ fontSize: 32, marginBottom: 8, textAlign: 'center' }}>
+          ЗооПлатформа
         </Title>
-        <Title level="2" weight="3" style={{ fontSize: 24, letterSpacing: '-0.02em', color: 'var(--vkui--color_text_primary)', marginBottom: 24 }}>
-          Это меняет всё.
-        </Title>
+        <Text style={{ fontSize: 16, color: 'var(--vkui--color_text_secondary)', textAlign: 'center', marginBottom: 32, maxWidth: 340 }}>
+          Удобный инструмент для приема и публикации постов от ваших подписчиков.
+        </Text>
 
-        <Div style={{ maxWidth: 380, padding: 0, marginBottom: 48 }}>
-          <Text style={{ 
-            fontSize: 17, 
-            color: 'var(--vkui--color_text_secondary)', 
-            lineHeight: 1.5,
-            letterSpacing: '-0.01em'
-          }}>
-            Установите мини-приложение в своё сообщество. Безупречная модерация, умная очередь и абсолютный контроль над контентом. Всё просто работает.
-          </Text>
-        </Div>
+        {/* Блок преимуществ */}
+        <Group style={{ width: '100%', maxWidth: 400, marginBottom: 32, border: 'none' }} separator="hide">
+          <SimpleCell
+            disabled
+            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28WriteOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
+            subtitle="Пользователям легко предлагать посты, прикреплять фото и видео прямо с телефона."
+            multiline
+          >
+            <span style={{ fontWeight: 600 }}>Для подписчиков</span>
+          </SimpleCell>
+          
+          <SimpleCell
+            disabled
+            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28CheckShieldOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
+            subtitle="Защита от спама и полная модерация контента перед публикацией в ленту."
+            multiline
+          >
+            <span style={{ fontWeight: 600 }}>Полный контроль</span>
+          </SimpleCell>
 
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: 16,
-          width: '100%',
-          maxWidth: 320
-        }}>
+          <SimpleCell
+            disabled
+            before={<Avatar size={48} style={{ background: 'var(--vkui--color_background_secondary)' }}><Icon28ListPlayOutline fill="var(--vkui--color_icon_accent)" /></Avatar>}
+            subtitle="Автоматическая публикация по заданному графику для максимальных охватов."
+            multiline
+          >
+            <span style={{ fontWeight: 600 }}>Умная очередь</span>
+          </SimpleCell>
+        </Group>
+
+        {/* Кнопка действия */}
+        <Div style={{ width: '100%', maxWidth: 400, padding: 0 }}>
           <Button 
             size="l" 
+            mode="primary" 
             stretched 
             onClick={installToCommunity}
-            style={{
-              padding: '16px 32px',
-              borderRadius: 14,
-              fontSize: 17,
-              fontWeight: 500,
-              letterSpacing: '-0.01em',
-              background: 'var(--vkui--color_background_accent_themed)',
-              boxShadow: '0 4px 14px 0 rgba(0, 119, 255, 0.2)'
-            }}
+            style={{ borderRadius: 12, padding: '12px 0' }}
           >
-            Установить в сообщество
+            Добавить в сообщество
           </Button>
-          
-          <Text style={{ fontSize: 13, color: 'var(--vkui--color_text_subhead)', marginTop: 8 }}>
-            Требуются права администратора
+          <Text style={{ fontSize: 13, color: 'var(--vkui--color_text_subhead)', textAlign: 'center', marginTop: 16 }}>
+            Требуются права администратора сообщества
           </Text>
-        </div>
-
+        </Div>
       </div>
     </Panel>
   );
