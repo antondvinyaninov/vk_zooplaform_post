@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-04-26
 
 ### Added
+- **Backend / Database**: Added `is_test` boolean flag to `groups` table to segregate testing communities from production metrics.
+- **Frontend / Admin**: Added "Тестовые группы" tab in the `Groups` management page to separate test environments from real connected communities.
 - **Backend / Stability**: Implemented Database Connection Pooling (`SetMaxOpenConns`, `SetMaxIdleConns`) to prevent PostgreSQL "too many clients" exhaustion under heavy concurrent load.
 - **Backend / Security**: Implemented a Token Bucket `RateLimiter` Middleware to protect endpoints from DDoS and brute-force attacks (max 60 requests/min per IP).
 - **Backend / Security**: Performed a comprehensive Security Audit and Dependency Update, upgrading `pgx/v5` and `aws-sdk-go-v2` to latest secure versions.
@@ -33,6 +35,8 @@ All notable changes to this project will be documented in this file.
 - **Frontend / Settings**: Implemented `CustomSelect` city autocomplete with debounce for efficient VK API querying.
 
 ### Changed
+- **Backend / Dashboard**: Modified global metrics queries (groups count, subscribers count, and post moderation stats) to strictly exclude communities marked with `is_test = true`.
+- **Frontend / VK App**: Redesigned the `Onboarding` panel with a responsive, high-contrast custom layout, integrated the official brand logo, and updated copywriting to emphasize admin benefits.
 - **Backend / Posts**: Modified `deletePostHandler` to execute soft-deletions using atomic database transactions (`BEGIN`/`COMMIT`/`ROLLBACK`), ensuring `posts` and `post_publications` tables remain perfectly synchronized.
 - **Backend / VK API**: Deprecated `http.PostForm` and `http.NewRequest` across all VK integration endpoints in favor of `http.NewRequestWithContext`.
 - **Frontend / Architecture**: Migrated all remaining mocked components (`UsersManagementCard`, `GroupSelector`, `SiteHeader`) to fetch live data from PostgreSQL backend via API endpoints.
