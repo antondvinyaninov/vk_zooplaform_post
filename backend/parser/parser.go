@@ -168,8 +168,8 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 				}
 
 				for _, detail := range details {
-					// Check members count
-					if detail.MembersCount < 500 {
+					// Check members count - lowered to 50 for smaller cities
+					if detail.MembersCount < 50 {
 						continue
 					}
 
