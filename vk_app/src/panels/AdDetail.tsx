@@ -200,7 +200,9 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                           <Button 
                             mode="tertiary" 
                             size="s" 
-                            onClick={() => window.open(`https://vk.com/wall-${pub.group.vk_group_id}_${pub.vk_post_id}`, '_blank')}
+                            href={`https://vk.com/wall-${pub.group.vk_group_id}_${pub.vk_post_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                           >
                             ВКонтакте
                           </Button>
