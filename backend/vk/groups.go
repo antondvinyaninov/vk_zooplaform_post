@@ -235,3 +235,35 @@ func (c *VKClient) DatabaseGetCitiesById(cityIds []int) ([]DatabaseGetCitiesById
 
 	return cities, nil
 }
+
+// DatabaseGetCitiesResponse response for getCities
+type DatabaseGetCitiesResponse struct {
+	Count int `json:"count"`
+	Items []struct {
+		ID     int    `json:"id"`
+		Title  string `json:"title"`
+		Region string `json:"region"`
+	} `json:"items"`
+}
+
+// DatabaseGetCities searches cities by query
+func (c *VKClient) DatabaseGetCities(query string) (*DatabaseGetCitiesResponse, error) {
+	params := map[string]string{
+		"q":          query,
+		"country_id": "1", // Russia
+		"need_all":   "1",
+		"count":      "20",
+	}
+
+	resp, err := c.CallMethod("database.getCities", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var cities DatabaseGetCitiesResponse
+	if err := json.Unmarshal(resp, &cities); err != nil {
+		return nil, fmt.Errorf("failed to parse database.getCities response: %w", err)
+	}
+
+	return &cities, nil
+}

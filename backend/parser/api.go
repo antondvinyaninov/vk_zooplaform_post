@@ -21,6 +21,37 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/parser/blacklist", middleware.CORSFunc(BlacklistGroupHandler))
 	mux.HandleFunc("/api/admin/parser/add-manual", middleware.CORSFunc(AddManualGroupHandler))
 	mux.HandleFunc("/api/admin/parser/clear", middleware.CORSFunc(ClearMasterListHandler))
+	mux.HandleFunc("/api/admin/parser/cities", middleware.CORSFunc(GetCitiesHandler))
+}
+
+func GetCitiesHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"items": []interface{}{}})
+		return
+	}
+
+	token, err := getActiveVKToken()
+	if err != nil {
+		http.Error(w, "No active VK token found", http.StatusInternalServerError)
+		return
+	}
+
+	client := vk.NewVKClient(token)
+	citiesResp, err := client.DatabaseGetCities(query)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(citiesResp)
 }
 
 func ClearMasterListHandler(w http.ResponseWriter, r *http.Request) {

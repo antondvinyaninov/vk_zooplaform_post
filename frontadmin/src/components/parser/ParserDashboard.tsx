@@ -11,12 +11,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { ParserResultsTable } from "./ParserResultsTable"
+import { CitySelect, type City } from "./CitySelect"
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 export function ParserDashboard() {
   const [keywords, setKeywords] = useState("приют для животных, приют собак, приют кошек, бездомные животные, помощь бездомным, помощь животным, спасение животных, зоозащита, защита животных, волонтеры животные, потеряшки животные, потеряшки собаки, потеряшки кошки, передержка животных, передержка собак, передержка кошек, в добрые руки животные, в добрые руки собаки, в добрые руки кошки, ищут дом животные, хвостики приют, помощь хвостикам, благотворительный фонд животные, бездомыши")
-  const [cities, setCities] = useState("60, 41, 125, 36, 91") // Ижевск, Глазов, Сарапул, Воткинск, Можга
+  const [selectedCities, setSelectedCities] = useState<City[]>([])
   const [manualLink, setManualLink] = useState("")
   
   // Poll status every 3 seconds if running
@@ -25,11 +26,17 @@ export function ParserDashboard() {
   })
 
   const handleStart = async () => {
+    if (selectedCities.length === 0) {
+      toast.error("Выберите хотя бы один город")
+      return
+    }
+
     try {
+      const citiesString = selectedCities.map(c => c.id.toString()).join(", ")
       const res = await fetch('/api/admin/parser/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywords, cities })
+        body: JSON.stringify({ keywords, cities: citiesString })
       })
       const data = await res.json()
       if (data.success) {
@@ -124,15 +131,13 @@ export function ParserDashboard() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cities">ID городов VK (через запятую)</Label>
-              <Input 
-                id="cities" 
-                value={cities}
-                onChange={(e) => setCities(e.target.value)}
-                placeholder="60, 41, 125..."
+              <Label>Города для поиска</Label>
+              <CitySelect 
+                selectedCities={selectedCities}
+                onChange={setSelectedCities}
                 disabled={isRunning}
               />
-              <p className="text-xs text-muted-foreground">Пример: Удмуртия (Ижевск: 60, Глазов: 41, Сарапул: 125, Воткинск: 36, Можга: 91)</p>
+              <p className="text-xs text-muted-foreground mt-1">Можно выбрать несколько городов. Парсер пройдет по каждому из них.</p>
             </div>
             
             <div className="flex gap-2 pt-2">
