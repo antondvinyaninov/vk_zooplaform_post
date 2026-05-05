@@ -107,6 +107,7 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 
 	client := vk.NewVKClient(token)
 	totalFound := 0
+	processedGroups := make(map[int]bool)
 
 	for _, city := range cities {
 		select {
@@ -200,7 +201,10 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 					`, taskID, detail.ID, detail.Name, detail.ScreenName, cityTitle, detail.MembersCount, detail.Description, string(contactsStr), string(linksStr))
 					
 					if err == nil {
-						totalFound++
+						if !processedGroups[detail.ID] {
+							processedGroups[detail.ID] = true
+							totalFound++
+						}
 					} else {
 						log.Printf("UPSERT error for group %d: %v", detail.ID, err)
 					}
@@ -289,7 +293,8 @@ func isRelevantGroup(g vk.Group, currentCityID int, currentCityTitle string) boo
 
 	animalPrefixes := []string{
 		"собак", "собач", "кошк", "кошач", "щено", "щенк", "животн", "питомц", "хвостик",
-		"четвероног", "дворняж", "котят", "котик", "зверюшк",
+		"четвероног", "дворняж", "котят", "котик", "зверюшк", 
+		"зоо", "ветклиник", "ветеринар", "груминг", "грумер", "любимц", "любимец", "корм",
 	}
 	animalExacts := []string{
 		"кот", "кота", "коту", "котом", "коте", "коты", "котов", "котам", "котами", "котах",
