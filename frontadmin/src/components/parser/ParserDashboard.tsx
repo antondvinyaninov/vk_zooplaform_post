@@ -316,11 +316,13 @@ export function ParserDashboard() {
                   </div>
                   
                   {audienceStatus.status !== 'running' && audienceStatus.unique_members > 0 && (
-                     <Button asChild variant="outline" className="w-full mt-2">
-                        <a href={`/api/admin/audience/export?task_id=${audienceStatus.id}`} download={`audience_${audienceStatus.city_title}.txt`}>
-                          <IconDownload className="mr-2 h-4 w-4" /> Скачать TXT базу ВК
-                        </a>
-                     </Button>
+                     <a 
+                       href={`/api/admin/audience/export?task_id=${audienceStatus.id}`} 
+                       download={`audience_${audienceStatus.city_title}.txt`}
+                       className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 w-full mt-2"
+                     >
+                       <IconDownload className="mr-2 h-4 w-4" /> Скачать TXT базу ВК
+                     </a>
                   )}
                 </div>
               ) : (

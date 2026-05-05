@@ -28,9 +28,10 @@ interface CitySelectProps {
   selectedCities: City[]
   onChange: (cities: City[]) => void
   disabled?: boolean
+  maxCount?: number
 }
 
-export function CitySelect({ selectedCities, onChange, disabled }: CitySelectProps) {
+export function CitySelect({ selectedCities, onChange, disabled, maxCount }: CitySelectProps) {
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [options, setOptions] = React.useState<City[]>([])
@@ -65,7 +66,12 @@ export function CitySelect({ selectedCities, onChange, disabled }: CitySelectPro
     if (exists) {
       onChange(selectedCities.filter((c) => c.id !== city.id))
     } else {
-      onChange([...selectedCities, city])
+      if (maxCount && selectedCities.length >= maxCount) {
+        // Replace the last one or clear and set
+        onChange([city])
+      } else {
+        onChange([...selectedCities, city])
+      }
     }
   }
 
