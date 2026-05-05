@@ -274,7 +274,7 @@ func isRelevantGroup(g vk.Group, currentCityID int, currentCityTitle string) boo
 	stopPhrases := []string{
 		"детская одежда", "женская одежда", "мужская одежда",
 		"отдам даром вещи", "доска объявлений", "продажа авто",
-		"дети африки", "стрижка собак", "политическая партия",
+		"дети африки", "политическая партия",
 		"у нас выигрывают", "отцы и дети", "помощь детям", "детский дом", "сбор макулатуры",
 	}
 
@@ -297,6 +297,7 @@ func isRelevantGroup(g vk.Group, currentCityID int, currentCityTitle string) boo
 		"собак", "собач", "кошк", "кошач", "щено", "щенк", "животн", "питомц", "хвостик",
 		"четвероног", "дворняж", "котят", "котик", "зверюшк", 
 		"зоо", "ветклиник", "ветеринар", "груминг", "грумер", "любимц", "любимец", "корм",
+		"кинолог", "дрессиров", "зоонян", "догситер", "догситтер", "передержк", "сббж", "ветцентр", "лапк", "стрижк",
 	}
 	animalExacts := []string{
 		"кот", "кота", "коту", "котом", "коте", "коты", "котов", "котам", "котами", "котах",
@@ -308,11 +309,11 @@ func isRelevantGroup(g vk.Group, currentCityID int, currentCityTitle string) boo
 		return false
 	}
 
-	salesPrefixes := []string{"купит", "продам", "продаж", "скидк", "питомник", "груминг", "зоомагазин", "вязк", "барахолк"}
+	salesPrefixes := []string{"купит", "продам", "продаж", "скидк", "вязк", "барахолк"}
 	salesPhrases := []string{"продаются щенки", "продаются котята", "в продаже", "наша цена"}
-	if hasPrefixInWords(salesPrefixes) || containsPhrase(salesPhrases) || hasExactInWords([]string{"доставка", "магазин", "магазины", "цена", "цены"}) {
-		allowedSalesPrefixes := []string{"приют", "спасен", "благотворительн", "волонтер", "пожертв"}
-		if !hasPrefixInWords(allowedSalesPrefixes) && !containsPhrase([]string{"помощь бездомным"}) && !hasExactInWords([]string{"сбор", "фонд"}) {
+	if hasPrefixInWords(salesPrefixes) || containsPhrase(salesPhrases) || hasExactInWords([]string{"доставка", "цена", "цены"}) {
+		allowedSalesPrefixes := []string{"приют", "спасен", "благотворительн", "волонтер", "пожертв", "зоо", "питомник", "вет", "грум"}
+		if !hasPrefixInWords(allowedSalesPrefixes) && !containsPhrase([]string{"помощь бездомным"}) && !hasExactInWords([]string{"сбор", "фонд", "магазин", "магазины"}) {
 			return false
 		}
 	}
