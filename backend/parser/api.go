@@ -22,6 +22,39 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/parser/add-manual", middleware.CORSFunc(AddManualGroupHandler))
 	mux.HandleFunc("/api/admin/parser/clear", middleware.CORSFunc(ClearMasterListHandler))
 	mux.HandleFunc("/api/admin/parser/cities", middleware.CORSFunc(GetCitiesHandler))
+	mux.HandleFunc("/api/admin/parser/blacklisted", middleware.CORSFunc(GetBlacklistedHandler))
+}
+
+func GetBlacklistedHandler(w http.ResponseWriter, r *http.Request) {
+	rows, err := database.Query(`
+		SELECT id, vk_group_id, name, screen_name, city_title, members_count, is_manual
+		FROM parsed_groups
+		WHERE is_blacklisted = TRUE OR is_manual = TRUE
+	`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var result []map[string]interface{}
+	for rows.Next() {
+		var id, vkGroupID int64
+		var name, screenName, cityTitle sql.NullString
+		var membersCount int
+		var isManual bool
+
+		rows.Scan(&id, &vkGroupID, &name, &screenName, &cityTitle, &membersCount, &isManual)
+		result = append(result, map[string]interface{}{
+			"id": id,
+			"vk_group_id": vkGroupID,
+			"name": name.String,
+			"screen_name": screenName.String,
+			"is_manual": isManual,
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
 
 func GetCitiesHandler(w http.ResponseWriter, r *http.Request) {
