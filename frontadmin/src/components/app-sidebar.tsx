@@ -59,6 +59,11 @@ const data = {
       url: "/logs",
       icon: <IconReport />,
     },
+    {
+      title: "Парсер",
+      url: "/parser",
+      icon: <IconSearch />,
+    },
   ],
   navSecondary: [
     {

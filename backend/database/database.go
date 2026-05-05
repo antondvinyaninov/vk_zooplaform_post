@@ -233,6 +233,34 @@ const postgresSchema = `
 
 	CREATE INDEX IF NOT EXISTS idx_system_logs_level ON system_logs(level);
 	CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON system_logs(created_at);
+
+	CREATE TABLE IF NOT EXISTS parser_tasks (
+		id BIGSERIAL PRIMARY KEY,
+		keywords TEXT NOT NULL,
+		cities TEXT,
+		status TEXT DEFAULT 'running',
+		total_found INTEGER DEFAULT 0,
+		current_city TEXT,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS parsed_groups (
+		id BIGSERIAL PRIMARY KEY,
+		task_id BIGINT REFERENCES parser_tasks(id) ON DELETE CASCADE,
+		vk_group_id BIGINT NOT NULL,
+		name TEXT,
+		screen_name TEXT,
+		city_title TEXT,
+		members_count INTEGER DEFAULT 0,
+		description TEXT,
+		contacts TEXT,
+		links TEXT,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(task_id, vk_group_id)
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_parsed_groups_task_id ON parsed_groups(task_id);
 `
 
 func migratePostsTable() error {

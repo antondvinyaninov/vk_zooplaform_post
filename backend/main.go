@@ -5,6 +5,7 @@ import (
 	"backend/config"
 	"backend/database"
 	"backend/middleware"
+	"backend/parser"
 	"backend/site"
 	vkapp "backend/vk-app"
 	"context"
@@ -52,6 +53,8 @@ func main() {
 	// Регистрируем маршруты для каждого модуля (только API)
 	log.Printf("Registering admin routes...")
 	admin.RegisterRoutes(mux)
+	log.Printf("Registering parser routes...")
+	parser.RegisterRoutes(mux)
 	log.Printf("Registering vk-app routes...")
 	vkapp.RegisterRoutes(mux)
 	log.Printf("Registering site routes...")

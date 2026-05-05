@@ -21,6 +21,22 @@ type Group struct {
 	Photo100     string `json:"photo_100"`
 	Photo200     string `json:"photo_200"`
 	MembersCount int    `json:"members_count"`
+	Description  string `json:"description"`
+	City         *struct {
+		ID    int    `json:"id"`
+		Title string `json:"title"`
+	} `json:"city"`
+	Contacts []struct {
+		UserID int    `json:"user_id"`
+		Desc   string `json:"desc"`
+		Phone  string `json:"phone"`
+		Email  string `json:"email"`
+	} `json:"contacts"`
+	Links []struct {
+		URL  string `json:"url"`
+		Name string `json:"name"`
+		Desc string `json:"desc"`
+	} `json:"links"`
 }
 
 // GroupsGetByID получает информацию о группе по ID.
@@ -132,3 +148,57 @@ func (c *VKClient) GetUserByID(userID int, fields []string) (*User, error) {
 
 	return &users[0], nil
 }
+
+// GroupsSearchResponse ответ на поиск групп
+type GroupsSearchResponse struct {
+	Count int     `json:"count"`
+	Items []Group `json:"items"`
+}
+
+// GroupsSearch ищет группы по строке запроса
+func (c *VKClient) GroupsSearch(query string, cityID int, offset int, count int) (*GroupsSearchResponse, error) {
+	params := map[string]string{
+		"q":      query,
+		"offset": strconv.Itoa(offset),
+		"count":  strconv.Itoa(count),
+	}
+
+	if cityID > 0 {
+		params["city_id"] = strconv.Itoa(cityID)
+	}
+
+	resp, err := c.CallMethod("groups.search", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var searchResp GroupsSearchResponse
+	if err := json.Unmarshal(resp, &searchResp); err != nil {
+		return nil, fmt.Errorf("failed to parse groups.search response: %w", err)
+	}
+
+	return &searchResp, nil
+}
+
+// GroupsGetByIds получает расширенную информацию о группах по списку ID
+func (c *VKClient) GroupsGetByIds(groupIds []string, fields string) ([]Group, error) {
+	params := map[string]string{
+		"group_ids": joinStrings(groupIds, ","),
+	}
+	if fields != "" {
+		params["fields"] = fields
+	}
+
+	resp, err := c.CallMethod("groups.getById", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var groups []Group
+	if err := json.Unmarshal(resp, &groups); err != nil {
+		return nil, fmt.Errorf("failed to parse groups.getById response: %w", err)
+	}
+
+	return groups, nil
+}
+
