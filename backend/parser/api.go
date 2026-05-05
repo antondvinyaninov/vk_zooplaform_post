@@ -254,14 +254,19 @@ func GetParserResultsHandler(w http.ResponseWriter, r *http.Request) {
 			var contactsParsed string
 			if contacts.Valid && contacts.String != "" {
 				var cnts []struct {
-					Desc  string `json:"desc"`
-					Phone string `json:"phone"`
-					Email string `json:"email"`
+					UserID int    `json:"user_id"`
+					Desc   string `json:"desc"`
+					Phone  string `json:"phone"`
+					Email  string `json:"email"`
 				}
 				if err := json.Unmarshal([]byte(contacts.String), &cnts); err == nil {
 					var cStrs []string
 					for _, c := range cnts {
-						cStrs = append(cStrs, c.Desc+" "+c.Phone+" "+c.Email)
+						cStr := c.Desc + " " + c.Phone + " " + c.Email
+						if c.UserID > 0 {
+							cStr += " (https://vk.com/id" + fmt.Sprintf("%d", c.UserID) + ")"
+						}
+						cStrs = append(cStrs, strings.TrimSpace(cStr))
 					}
 					contactsParsed = strings.Join(cStrs, ", ")
 				}

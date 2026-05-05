@@ -66,12 +66,31 @@ export function ParserResultsTable() {
           <TableBody>
             {data.items.map((group: any) => {
               // Parse contacts if needed
-              let contactsInfo = ""
+              let contactsContent: React.ReactNode = "—"
               try {
                 if (group.contacts) {
                   const c = JSON.parse(group.contacts)
                   if (Array.isArray(c)) {
-                    contactsInfo = c.map((cnt: any) => `${cnt.desc ? cnt.desc + ':' : ''} ${cnt.phone || ''} ${cnt.email || ''}`).join(', ')
+                    contactsContent = (
+                      <div className="flex flex-col space-y-1">
+                        {c.map((cnt: any, idx: number) => (
+                          <div key={idx} className="text-sm">
+                            {cnt.desc && <span className="text-muted-foreground mr-1">{cnt.desc}:</span>}
+                            {cnt.user_id ? (
+                              <a 
+                                href={`https://vk.com/id${cnt.user_id}`} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="text-blue-500 hover:underline mr-1"
+                              >
+                                [Профиль]
+                              </a>
+                            ) : null}
+                            <span>{cnt.phone || ''} {cnt.email || ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )
                   }
                 }
               } catch (e) {}
@@ -81,7 +100,7 @@ export function ParserResultsTable() {
                   <TableCell className="font-medium max-w-[200px] truncate" title={group.name}>{group.name}</TableCell>
                   <TableCell>{group.city_title || '—'}</TableCell>
                   <TableCell>{group.members_count}</TableCell>
-                  <TableCell className="max-w-[200px] truncate" title={contactsInfo}>{contactsInfo || '—'}</TableCell>
+                  <TableCell>{contactsContent}</TableCell>
                   <TableCell>
                     <a 
                       href={`https://vk.com/${group.screen_name || 'club'+group.vk_group_id}`} 
