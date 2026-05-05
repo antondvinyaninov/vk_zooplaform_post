@@ -202,3 +202,36 @@ func (c *VKClient) GroupsGetByIds(groupIds []string, fields string) ([]Group, er
 	return groups, nil
 }
 
+// DatabaseGetCitiesByIdResponse response for getCitiesById
+type DatabaseGetCitiesByIdResponse struct {
+	ID    int    `json:"id"`
+	Title string `json:"title"`
+}
+
+// DatabaseGetCitiesById gets cities by IDs
+func (c *VKClient) DatabaseGetCitiesById(cityIds []int) ([]DatabaseGetCitiesByIdResponse, error) {
+	if len(cityIds) == 0 {
+		return nil, nil
+	}
+
+	var strIds []string
+	for _, id := range cityIds {
+		strIds = append(strIds, strconv.Itoa(id))
+	}
+
+	params := map[string]string{
+		"city_ids": joinStrings(strIds, ","),
+	}
+
+	resp, err := c.CallMethod("database.getCitiesById", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var cities []DatabaseGetCitiesByIdResponse
+	if err := json.Unmarshal(resp, &cities); err != nil {
+		return nil, fmt.Errorf("failed to parse database.getCitiesById response: %w", err)
+	}
+
+	return cities, nil
+}

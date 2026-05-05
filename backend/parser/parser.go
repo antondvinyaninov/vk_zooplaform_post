@@ -120,6 +120,14 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 		var cityID int
 		fmt.Sscanf(city, "%d", &cityID)
 
+		var cityTitle string
+		if cityID > 0 {
+			citiesResp, err := client.DatabaseGetCitiesById([]int{cityID})
+			if err == nil && len(citiesResp) > 0 {
+				cityTitle = citiesResp[0].Title
+			}
+		}
+
 		for _, keyword := range keywords {
 			select {
 			case <-ctx.Done():
@@ -168,13 +176,8 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 				}
 
 				for _, detail := range details {
-					// Check members count - lowered to 50 for smaller cities
-					if detail.MembersCount < 50 {
-						continue
-					}
-
 					// Smart filtering
-					if !isRelevantGroup(detail, cityID) {
+					if !isRelevantGroup(detail, cityID, cityTitle) {
 						continue
 					}
 
@@ -210,7 +213,7 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 	}
 }
 
-func isRelevantGroup(g vk.Group, currentCityID int) bool {
+func isRelevantGroup(g vk.Group, currentCityID int, currentCityTitle string) bool {
 	text := strings.ToLower(g.Name + " " + g.Description)
 
 	// Custom split by non-letters/numbers
@@ -267,29 +270,21 @@ func isRelevantGroup(g vk.Group, currentCityID int) bool {
 		"дети африки", "стрижка собак", "политическая партия",
 	}
 
-	// Exceptions to stop phrases: "доска объявлений" is allowed if there are clear animal markers.
-	if containsPhrase([]string{"доска объявлений"}) {
-		// Only check other stop conditions
-		if hasPrefixInWords(stopPrefixes) || hasExactInWords([]string{"магия", "маги", "бизнес", "психолог", "спектакль", "концерт", "прайс", "смартфон", "айфон", "пряжа", "наука", "фильм", "сериал", "театр", "игры"}) {
-			return false
-		}
-	} else {
-		if hasPrefixInWords(stopPrefixes) || containsPhrase(stopPhrases) || hasExactInWords([]string{"магия", "маги", "бизнес", "психолог", "спектакль", "концерт", "прайс", "смартфон", "айфон", "пряжа", "наука", "фильм", "сериал", "театр", "игры"}) {
-			return false
-		}
+	if hasPrefixInWords(stopPrefixes) || containsPhrase(stopPhrases) || hasExactInWords([]string{"магия", "маги", "бизнес", "психолог", "спектакль", "концерт", "прайс", "смартфон", "айфон", "пряжа", "наука", "фильм", "сериал", "театр", "игры"}) {
+		return false
 	}
 
+	// Жесткая проверка города:
 	if g.City != nil && g.City.ID != 0 && currentCityID != 0 && g.City.ID != currentCityID {
 		return false
 	}
 
-	// === CATEGORY 1: Vet Clinics ===
-	isVet := hasPrefixInWords([]string{"ветклиник", "ветеринар", "ветврач", "ветуслуг", "ветпомощ", "ветцентр", "веткабинет"})
+	if g.City == nil || g.City.ID == 0 {
+		if !strings.Contains(text, strings.ToLower(currentCityTitle)) {
+			return false
+		}
+	}
 
-	// === CATEGORY 2: Pet Stores ===
-	isPetStore := hasPrefixInWords([]string{"зоомагазин", "зоотовар", "зооцентр", "зооаптек"})
-
-	// === CATEGORY 3: Animal Welfare ===
 	animalPrefixes := []string{
 		"собак", "собач", "кошк", "кошач", "щено", "щенк", "животн", "питомц", "хвостик",
 		"четвероног", "дворняж", "котят", "котик", "зверюшк",
@@ -298,6 +293,19 @@ func isRelevantGroup(g vk.Group, currentCityID int) bool {
 		"кот", "кота", "коту", "котом", "коте", "коты", "котов", "котам", "котами", "котах",
 		"пес", "пёс", "пса", "псу", "псом", "псе", "псы", "псов", "псам", "псами", "псах",
 		"зверь", "зверя", "зверю", "зверем", "звери", "зверям", "зверями", "зверях",
+	}
+
+	if !hasPrefixInWords(animalPrefixes) && !hasExactInWords(animalExacts) {
+		return false
+	}
+
+	salesPrefixes := []string{"купит", "продам", "продаж", "скидк", "питомник", "груминг", "зоомагазин", "вязк", "барахолк"}
+	salesPhrases := []string{"продаются щенки", "продаются котята", "в продаже", "наша цена"}
+	if hasPrefixInWords(salesPrefixes) || containsPhrase(salesPhrases) || hasExactInWords([]string{"доставка", "магазин", "магазины", "цена", "цены"}) {
+		allowedSalesPrefixes := []string{"приют", "спасен", "благотворительн", "волонтер", "пожертв"}
+		if !hasPrefixInWords(allowedSalesPrefixes) && !containsPhrase([]string{"помощь бездомным"}) && !hasExactInWords([]string{"сбор", "фонд"}) {
+			return false
+		}
 	}
 
 	requiredPrefixes := []string{
@@ -310,26 +318,8 @@ func isRelevantGroup(g vk.Group, currentCityID int) bool {
 	}
 	requiredExacts := []string{"помощь", "помочь", "помогать", "спасти"}
 
-	hasAnimalBase := hasPrefixInWords(animalPrefixes) || hasExactInWords(animalExacts)
-	hasWelfareMarker := hasPrefixInWords(requiredPrefixes) || containsPhrase(requiredPhrases) || hasExactInWords(requiredExacts)
-	
-	isWelfare := hasAnimalBase && hasWelfareMarker
-
-	// If it doesn't fit ANY category, reject it
-	if !isVet && !isPetStore && !isWelfare {
+	if !hasPrefixInWords(requiredPrefixes) && !containsPhrase(requiredPhrases) && !hasExactInWords(requiredExacts) {
 		return false
-	}
-
-	// For welfare groups, we don't want breeders or random sales groups
-	if isWelfare && !isVet && !isPetStore {
-		salesPrefixes := []string{"купит", "продам", "продаж", "скидк", "питомник", "груминг", "зоомагазин", "вязк", "барахолк"}
-		salesPhrases := []string{"продаются щенки", "продаются котята", "в продаже", "наша цена"}
-		if hasPrefixInWords(salesPrefixes) || containsPhrase(salesPhrases) || hasExactInWords([]string{"доставка", "магазин", "магазины", "цена", "цены"}) {
-			allowedSalesPrefixes := []string{"приют", "спасен", "благотворительн", "волонтер", "пожертв"}
-			if !hasPrefixInWords(allowedSalesPrefixes) && !containsPhrase([]string{"помощь бездомным"}) && !hasExactInWords([]string{"сбор", "фонд"}) {
-				return false
-			}
-		}
 	}
 
 	return true
