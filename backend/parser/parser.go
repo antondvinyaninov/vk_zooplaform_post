@@ -117,7 +117,6 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 
 		database.Exec(`UPDATE parser_tasks SET current_city = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, city, taskID)
 
-		// Получаем CityID, если это число (ID). Если это строка, то в идеале нужно найти ID, но пока будем считать что передают ID.
 		var cityID int
 		fmt.Sscanf(city, "%d", &cityID)
 
@@ -129,7 +128,6 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 			}
 
 			offset := 0
-			// VK API limit is 1000 per search, groups.search count max is 1000.
 			fetchCount := 1000
 
 			searchResp, err := client.GroupsSearch(keyword, cityID, offset, fetchCount)
@@ -144,7 +142,6 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 				continue
 			}
 
-			// Для каждой найденной группы получаем подробную инфу порциями по 500 (лимит getById)
 			var groupIDs []string
 			for _, g := range searchResp.Items {
 				groupIDs = append(groupIDs, fmt.Sprintf("%d", g.ID))
@@ -170,8 +167,17 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 					continue
 				}
 
-				// Сохраняем в БД
 				for _, detail := range details {
+					// Check members count
+					if detail.MembersCount < 500 {
+						continue
+					}
+
+					// Smart filtering
+					if !isRelevantGroup(detail, cityID) {
+						continue
+					}
+
 					var cityTitle string
 					if detail.City != nil {
 						cityTitle = detail.City.Title
@@ -180,10 +186,14 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 					contactsStr, _ := json.Marshal(detail.Contacts)
 					linksStr, _ := json.Marshal(detail.Links)
 
+					// UPSERT query for master list
 					_, err := database.Exec(`
 						INSERT INTO parsed_groups (task_id, vk_group_id, name, screen_name, city_title, members_count, description, contacts, links)
 						VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-						ON CONFLICT (task_id, vk_group_id) DO NOTHING
+						ON CONFLICT (vk_group_id) DO UPDATE SET 
+							members_count = EXCLUDED.members_count,
+							task_id = EXCLUDED.task_id,
+							updated_at = CURRENT_TIMESTAMP
 					`, taskID, detail.ID, detail.Name, detail.ScreenName, cityTitle, detail.MembersCount, detail.Description, string(contactsStr), string(linksStr))
 					
 					if err == nil {
@@ -198,4 +208,119 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 			time.Sleep(1 * time.Second) // rate limit
 		}
 	}
+}
+
+func isRelevantGroup(g vk.Group, currentCityID int) bool {
+	text := strings.ToLower(g.Name + " " + g.Description)
+
+	// Custom split by non-letters/numbers
+	f := func(c rune) bool {
+		return !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= 'а' && c <= 'я') || (c >= 'А' && c <= 'Я') || (c >= '0' && c <= '9'))
+	}
+	words := strings.FieldsFunc(text, f)
+
+	wordSet := make(map[string]bool)
+	for _, w := range words {
+		wordSet[w] = true
+	}
+
+	hasPrefixInWords := func(prefixes []string) bool {
+		for _, w := range words {
+			for _, p := range prefixes {
+				if strings.HasPrefix(w, p) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	hasExactInWords := func(exacts []string) bool {
+		for _, e := range exacts {
+			if wordSet[e] {
+				return true
+			}
+		}
+		return false
+	}
+
+	containsPhrase := func(phrases []string) bool {
+		for _, p := range phrases {
+			if strings.Contains(text, p) {
+				return true
+			}
+		}
+		return false
+	}
+
+	stopPrefixes := []string{
+		"авторынок", "недвижимост", "грузоперевозк",
+		"эзотерик", "космоэнергетик", "астролог", "гадан", "таро",
+		"целител", "заработок", "инвестици",
+		"депутат", "аниме", "наруто",
+		"кинопоказ", "ксго", "dota",
+	}
+
+	stopPhrases := []string{
+		"детская одежда", "женская одежда", "мужская одежда",
+		"отдам даром вещи", "доска объявлений", "продажа авто",
+		"дети африки", "стрижка собак", "политическая партия",
+	}
+
+	// Exceptions to stop phrases: "доска объявлений" is allowed if there are clear animal markers.
+	if containsPhrase([]string{"доска объявлений"}) {
+		// Only check other stop conditions
+		if hasPrefixInWords(stopPrefixes) || hasExactInWords([]string{"магия", "маги", "бизнес", "психолог", "спектакль", "концерт", "прайс", "смартфон", "айфон", "пряжа", "наука", "фильм", "сериал", "театр", "игры"}) {
+			return false
+		}
+	} else {
+		if hasPrefixInWords(stopPrefixes) || containsPhrase(stopPhrases) || hasExactInWords([]string{"магия", "маги", "бизнес", "психолог", "спектакль", "концерт", "прайс", "смартфон", "айфон", "пряжа", "наука", "фильм", "сериал", "театр", "игры"}) {
+			return false
+		}
+	}
+
+	if g.City != nil && g.City.ID != 0 && currentCityID != 0 && g.City.ID != currentCityID {
+		return false
+	}
+
+	animalPrefixes := []string{
+		"собак", "собач", "кошк", "кошач", "щено", "щенк", "животн", "питомц", "хвостик",
+		"четвероног", "дворняж", "котят", "котик", "зверюшк",
+	}
+	animalExacts := []string{
+		"кот", "кота", "коту", "котом", "коте", "коты", "котов", "котам", "котами", "котах",
+		"пес", "пёс", "пса", "псу", "псом", "псе", "псы", "псов", "псам", "псами", "псах",
+		"зверь", "зверя", "зверю", "зверем", "звери", "зверям", "зверями", "зверях",
+	}
+
+	if !hasPrefixInWords(animalPrefixes) && !hasExactInWords(animalExacts) {
+		return false
+	}
+
+	salesPrefixes := []string{"купит", "продам", "продаж", "скидк", "питомник", "груминг", "зоомагазин", "вязк", "барахолк"}
+	salesPhrases := []string{"продаются щенки", "продаются котята", "в продаже", "наша цена"}
+	if hasPrefixInWords(salesPrefixes) || containsPhrase(salesPhrases) || hasExactInWords([]string{"доставка", "магазин", "магазины", "цена", "цены"}) {
+		allowedSalesPrefixes := []string{"приют", "спасен", "благотворительн", "волонтер", "пожертв"}
+		if !hasPrefixInWords(allowedSalesPrefixes) && !containsPhrase([]string{"помощь бездомным"}) && !hasExactInWords([]string{"сбор", "фонд"}) {
+			return false
+		}
+	}
+
+	requiredPrefixes := []string{
+		"приют", "зоозащит", "бездомн", "спасени", "спасаем", "потеряшк",
+		"передержк", "благотворительн", "фонд",
+	}
+	requiredPhrases := []string{
+		"ищут дом", "в добрые руки", "помощь животн", "помощь бездомн",
+		"помощь собакам", "помощь кошкам", "освв",
+	}
+	requiredExacts := []string{"помощь", "помочь", "помогать", "спасти"}
+
+	// "доска объявлений" is only allowed if it explicitly asks for help or relates to shelter activities based on requirements.
+	// We allow it if the required prefixes pass.
+	if !hasPrefixInWords(requiredPrefixes) && !containsPhrase(requiredPhrases) && !hasExactInWords(requiredExacts) {
+		return false
+	}
+
+	return true
 }

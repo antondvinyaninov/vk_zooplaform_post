@@ -15,8 +15,9 @@ import { ParserResultsTable } from "./ParserResultsTable"
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
 export function ParserDashboard() {
-  const [keywords, setKeywords] = useState("животные, ветклиники, зоомагазины, фонды, аношки, приюты, группы помощи")
+  const [keywords, setKeywords] = useState("приют для животных, приют собак, приют кошек, бездомные животные, помощь бездомным, помощь животным, спасение животных, зоозащита, защита животных, волонтеры животные, потеряшки животные, передержка животных, в добрые руки животные, ищут дом животные, хвостики приют, помощь хвостикам, благотворительный фонд животные, бездомыши")
   const [cities, setCities] = useState("60, 41, 125, 36, 91") // Ижевск, Глазов, Сарапул, Воткинск, Можга
+  const [manualLink, setManualLink] = useState("")
   
   // Poll status every 3 seconds if running
   const { data: status, mutate: mutateStatus } = useSWR('/api/admin/parser/status', fetcher, {
@@ -55,6 +56,28 @@ export function ParserDashboard() {
     }
   }
 
+  const handleAddManual = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!manualLink) return
+    try {
+      const res = await fetch('/api/admin/parser/add-manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link_or_id: manualLink })
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success("Группа успешно добавлена")
+        setManualLink("")
+        // Need to re-trigger table fetch, but we can't easily without passing a prop or using global swr mutate, but SWR handles it if they share keys or we can just let it be.
+      } else {
+        toast.error("Ошибка: Группа не найдена или недоступна")
+      }
+    } catch (e) {
+      toast.error("Ошибка сети")
+    }
+  }
+
   const isRunning = status?.status === 'running'
 
   return (
@@ -63,7 +86,7 @@ export function ParserDashboard() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Парсер ВКонтакте</h1>
           <p className="text-muted-foreground text-sm">
-            Сбор групп по ключевым словам и городам (Внимание: используется API ВКонтакте)
+            Сбор и ведение глобального справочника групп
           </p>
         </div>
       </div>
@@ -72,7 +95,7 @@ export function ParserDashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Настройки парсинга</CardTitle>
-            <CardDescription>Укажите параметры для поиска групп.</CardDescription>
+            <CardDescription>Укажите параметры для автоматического поиска.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -83,6 +106,7 @@ export function ParserDashboard() {
                 onChange={(e) => setKeywords(e.target.value)}
                 placeholder="животные, приюты, ветклиники..."
                 disabled={isRunning}
+                className="h-24"
               />
             </div>
             <div className="space-y-2">
@@ -111,68 +135,79 @@ export function ParserDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Статус</CardTitle>
-            <CardDescription>Текущее состояние парсера</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {status ? (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center border-b pb-2">
-                  <span className="text-sm font-medium">Состояние</span>
-                  <Badge variant={status.status === 'running' ? 'default' : (status.status === 'error' ? 'destructive' : 'secondary')}>
-                    {status.status === 'running' ? 'В процессе' : (status.status === 'completed' ? 'Завершен' : 'Ошибка')}
-                  </Badge>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Статус парсера</CardTitle>
+              <CardDescription>Текущее состояние</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {status ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-sm font-medium">Состояние</span>
+                    <Badge variant={status.status === 'running' ? 'default' : (status.status === 'error' ? 'destructive' : 'secondary')}>
+                      {status.status === 'running' ? 'В процессе' : (status.status === 'completed' ? 'Завершен' : 'Ошибка')}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-sm font-medium">Найдено групп за сессию</span>
+                    <span className="font-bold text-lg">{status.total_found || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-sm font-medium">Текущий город (ID)</span>
+                    <span className="text-sm">{status.current_city || '—'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Начат</span>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(status.created_at).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center border-b pb-2">
-                  <span className="text-sm font-medium">Найдено групп</span>
-                  <span className="font-bold text-lg">{status.total_found || 0}</span>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground text-sm">
+                  Нет активных задач
                 </div>
-                <div className="flex justify-between items-center border-b pb-2">
-                  <span className="text-sm font-medium">Текущий город (ID)</span>
-                  <span className="text-sm">{status.current_city || '—'}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">Начат</span>
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(status.created_at).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                Нет активных задач
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Добавить вручную</CardTitle>
+              <CardDescription>Вставьте ID группы или ссылку</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleAddManual} className="flex gap-2">
+                <Input 
+                  value={manualLink}
+                  onChange={e => setManualLink(e.target.value)}
+                  placeholder="https://vk.com/club123456" 
+                />
+                <Button type="submit" variant="secondary">Добавить</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Результаты</CardTitle>
-            <CardDescription>Собранные данные по последней задаче</CardDescription>
+            <CardTitle>Справочник групп</CardTitle>
+            <CardDescription>Все собранные группы (кроме черного списка)</CardDescription>
           </div>
-          {status && status.id && (
-            <a 
-              href={`/api/admin/parser/results?task_id=${status.id}&export=csv`} 
-              download={`parsed_groups_${status.id}.csv`}
-              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground text-[0.8rem] h-7 px-2.5 font-medium transition-all"
-            >
-              <IconDownload className="mr-2 h-4 w-4" /> Скачать CSV
-            </a>
-          )}
+          <a 
+            href={`/api/admin/parser/results?export=csv`} 
+            download={`parsed_groups_master.csv`}
+            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground text-[0.8rem] h-7 px-2.5 font-medium transition-all"
+          >
+            <IconDownload className="mr-2 h-4 w-4" /> Скачать CSV
+          </a>
         </CardHeader>
         <CardContent>
-          {status?.id ? (
-            <ParserResultsTable taskId={status.id} />
-          ) : (
-            <div className="text-center py-8 text-muted-foreground text-sm border rounded-md">
-              Нет данных для отображения
-            </div>
-          )}
+          <ParserResultsTable />
         </CardContent>
       </Card>
     </div>

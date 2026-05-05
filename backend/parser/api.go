@@ -3,6 +3,7 @@ package parser
 import (
 	"backend/database"
 	"backend/middleware"
+	"backend/vk"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,8 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/parser/stop", middleware.CORSFunc(StopParserHandler))
 	mux.HandleFunc("/api/admin/parser/status", middleware.CORSFunc(GetParserStatusHandler))
 	mux.HandleFunc("/api/admin/parser/results", middleware.CORSFunc(GetParserResultsHandler))
+	mux.HandleFunc("/api/admin/parser/blacklist", middleware.CORSFunc(BlacklistGroupHandler))
+	mux.HandleFunc("/api/admin/parser/add-manual", middleware.CORSFunc(AddManualGroupHandler))
 }
 
 // API handlers for Parser
@@ -109,13 +112,6 @@ func GetParserStatusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetParserResultsHandler(w http.ResponseWriter, r *http.Request) {
-	taskIDStr := r.URL.Query().Get("task_id")
-	if taskIDStr == "" {
-		http.Error(w, "task_id required", http.StatusBadRequest)
-		return
-	}
-	taskID, _ := strconv.ParseInt(taskIDStr, 10, 64)
-
 	export := r.URL.Query().Get("export")
 
 	var rows *sql.Rows
@@ -125,9 +121,9 @@ func GetParserResultsHandler(w http.ResponseWriter, r *http.Request) {
 		rows, err = database.Query(`
 			SELECT id, vk_group_id, name, screen_name, city_title, members_count, description, contacts, links, created_at
 			FROM parsed_groups
-			WHERE task_id = $1
-			ORDER BY id ASC
-		`, taskID)
+			WHERE is_blacklisted = FALSE
+			ORDER BY members_count DESC
+		`)
 	} else {
 		pageStr := r.URL.Query().Get("page")
 		page, _ := strconv.Atoi(pageStr)
@@ -140,10 +136,10 @@ func GetParserResultsHandler(w http.ResponseWriter, r *http.Request) {
 		rows, err = database.Query(`
 			SELECT id, vk_group_id, name, screen_name, city_title, members_count, description, contacts, links, created_at
 			FROM parsed_groups
-			WHERE task_id = $1
-			ORDER BY id ASC
-			LIMIT $2 OFFSET $3
-		`, taskID, limit, offset)
+			WHERE is_blacklisted = FALSE
+			ORDER BY members_count DESC
+			LIMIT $1 OFFSET $2
+		`, limit, offset)
 	}
 	
 	if err != nil {
@@ -154,11 +150,9 @@ func GetParserResultsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if export == "csv" {
 		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", "attachment; filename=parsed_groups.csv")
+		w.Header().Set("Content-Disposition", "attachment; filename=parsed_groups_master.csv")
 		
-		// Write BOM for Excel UTF-8 compatibility
 		w.Write([]byte{0xEF, 0xBB, 0xBF})
-		
 		w.Write([]byte("ID,VK Group ID,Название,Screen Name,Город,Подписчики,Контакты,Ссылка\n"))
 		
 		for rows.Next() {
@@ -173,7 +167,6 @@ func GetParserResultsHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			// Format row for CSV
 			n := strings.ReplaceAll(name.String, "\"", "\"\"")
 			c := strings.ReplaceAll(cityTitle.String, "\"", "\"\"")
 			
@@ -227,7 +220,7 @@ func GetParserResultsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var total int
-	database.QueryRow(`SELECT COUNT(1) FROM parsed_groups WHERE task_id = $1`, taskID).Scan(&total)
+	database.QueryRow(`SELECT COUNT(1) FROM parsed_groups WHERE is_blacklisted = FALSE`).Scan(&total)
 
 	pageStr := r.URL.Query().Get("page")
 	page, _ := strconv.Atoi(pageStr)
@@ -242,4 +235,91 @@ func GetParserResultsHandler(w http.ResponseWriter, r *http.Request) {
 		"page":  page,
 		"limit": 100,
 	})
+}
+
+type BlacklistRequest struct {
+	ID int64 `json:"id"`
+}
+
+func BlacklistGroupHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req BlacklistRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	_, err := database.Exec(`UPDATE parsed_groups SET is_blacklisted = TRUE WHERE id = $1`, req.ID)
+	if err != nil {
+		http.Error(w, "Failed to update", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+type AddManualRequest struct {
+	LinkOrID string `json:"link_or_id"`
+}
+
+func AddManualGroupHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req AddManualRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	groupIDStr := req.LinkOrID
+	// Extract screen_name or ID
+	groupIDStr = strings.TrimPrefix(groupIDStr, "https://vk.com/")
+	groupIDStr = strings.TrimPrefix(groupIDStr, "vk.com/")
+	groupIDStr = strings.TrimPrefix(groupIDStr, "club")
+	groupIDStr = strings.TrimPrefix(groupIDStr, "public")
+
+	token, err := getActiveVKToken()
+	if err != nil || token == "" {
+		http.Error(w, "No active VK token", http.StatusInternalServerError)
+		return
+	}
+
+	client := vk.NewVKClient(token)
+	details, err := client.GroupsGetByIds([]string{groupIDStr}, "city,contacts,description,members_count,links")
+	if err != nil || len(details) == 0 {
+		http.Error(w, "Group not found or API error", http.StatusBadRequest)
+		return
+	}
+
+	detail := details[0]
+	var cityTitle string
+	if detail.City != nil {
+		cityTitle = detail.City.Title
+	}
+
+	contactsStr, _ := json.Marshal(detail.Contacts)
+	linksStr, _ := json.Marshal(detail.Links)
+
+	_, err = database.Exec(`
+		INSERT INTO parsed_groups (vk_group_id, name, screen_name, city_title, members_count, description, contacts, links, is_manual)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+		ON CONFLICT (vk_group_id) DO UPDATE SET 
+			is_blacklisted = FALSE,
+			members_count = EXCLUDED.members_count,
+			updated_at = CURRENT_TIMESTAMP
+	`, detail.ID, detail.Name, detail.ScreenName, cityTitle, detail.MembersCount, detail.Description, string(contactsStr), string(linksStr))
+
+	if err != nil {
+		http.Error(w, "DB error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }

@@ -12,12 +12,32 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 
+import { IconTrash } from "@tabler/icons-react"
+import { toast } from "sonner"
+
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
-export function ParserResultsTable({ taskId }: { taskId: number }) {
+export function ParserResultsTable() {
   const [page, setPage] = useState(1)
   
-  const { data, isLoading } = useSWR(`/api/admin/parser/results?task_id=${taskId}&page=${page}`, fetcher)
+  const { data, isLoading, mutate } = useSWR(`/api/admin/parser/results?page=${page}`, fetcher)
+
+  const handleBlacklist = async (id: number) => {
+    if (!confirm("Добавить группу в черный список? Она больше не будет парситься.")) return;
+    try {
+      const res = await fetch('/api/admin/parser/blacklist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      })
+      if (res.ok) {
+        toast.success("Добавлено в черный список")
+        mutate()
+      }
+    } catch (e) {
+      toast.error("Ошибка сети")
+    }
+  }
 
   if (isLoading) return <div className="p-4 text-center">Загрузка результатов...</div>
   if (!data || !data.items || data.items.length === 0) return <div className="p-4 text-center text-muted-foreground">Нет данных</div>
@@ -33,6 +53,7 @@ export function ParserResultsTable({ taskId }: { taskId: number }) {
               <TableHead>Подписчики</TableHead>
               <TableHead>Контакты</TableHead>
               <TableHead>Ссылка</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -63,6 +84,11 @@ export function ParserResultsTable({ taskId }: { taskId: number }) {
                     >
                       Перейти
                     </a>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="icon" onClick={() => handleBlacklist(group.id)} title="В черный список">
+                      <IconTrash className="h-4 w-4 text-destructive" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               )

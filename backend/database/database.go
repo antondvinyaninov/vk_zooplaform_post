@@ -87,6 +87,10 @@ func createTables() error {
 		return err
 	}
 
+	if err := migrateParsedGroupsTable(); err != nil {
+		return err
+	}
+
 	log.Println("Database tables created successfully")
 	return nil
 }
@@ -245,10 +249,14 @@ const postgresSchema = `
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 
+	-- To apply new schema safely, we will just add columns if they don't exist
+	-- We should also drop the UNIQUE constraint on (task_id, vk_group_id) if we can, but Postgres doesn't have CREATE OR REPLACE TABLE.
+	-- We will just use ALTER TABLE below to add new fields.
+
 	CREATE TABLE IF NOT EXISTS parsed_groups (
 		id BIGSERIAL PRIMARY KEY,
-		task_id BIGINT REFERENCES parser_tasks(id) ON DELETE CASCADE,
-		vk_group_id BIGINT NOT NULL,
+		task_id BIGINT REFERENCES parser_tasks(id) ON DELETE SET NULL,
+		vk_group_id BIGINT NOT NULL UNIQUE,
 		name TEXT,
 		screen_name TEXT,
 		city_title TEXT,
@@ -256,12 +264,25 @@ const postgresSchema = `
 		description TEXT,
 		contacts TEXT,
 		links TEXT,
-		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(task_id, vk_group_id)
+		is_blacklisted BOOLEAN DEFAULT FALSE,
+		is_manual BOOLEAN DEFAULT FALSE,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_parsed_groups_task_id ON parsed_groups(task_id);
+	CREATE INDEX IF NOT EXISTS idx_parsed_groups_vk_group_id ON parsed_groups(vk_group_id);
 `
+
+func migrateParsedGroupsTable() error {
+	if err := addColumnIfMissing("parsed_groups", "is_blacklisted", "BOOLEAN DEFAULT FALSE"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("parsed_groups", "is_manual", "BOOLEAN DEFAULT FALSE"); err != nil {
+		return err
+	}
+	// Try to add UNIQUE constraint on vk_group_id if it doesn't exist
+	_, _ = DB.Exec(`ALTER TABLE parsed_groups ADD CONSTRAINT parsed_groups_vk_group_id_key UNIQUE (vk_group_id)`)
+	return nil
+}
 
 func migratePostsTable() error {
 	if err := addColumnIfMissing("groups", "health_status", "TEXT DEFAULT 'unknown'"); err != nil {
