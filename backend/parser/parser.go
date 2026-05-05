@@ -201,6 +201,8 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 					
 					if err == nil {
 						totalFound++
+					} else {
+						log.Printf("UPSERT error for group %d: %v", detail.ID, err)
 					}
 				}
 				

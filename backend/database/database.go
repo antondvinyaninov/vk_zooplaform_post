@@ -279,8 +279,14 @@ func migrateParsedGroupsTable() error {
 	if err := addColumnIfMissing("parsed_groups", "is_manual", "BOOLEAN DEFAULT FALSE"); err != nil {
 		return err
 	}
-	// Try to add UNIQUE constraint on vk_group_id if it doesn't exist
-	_, _ = DB.Exec(`ALTER TABLE parsed_groups ADD CONSTRAINT parsed_groups_vk_group_id_key UNIQUE (vk_group_id)`)
+	if err := addColumnIfMissing("parsed_groups", "updated_at", "TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP"); err != nil {
+		return err
+	}
+	
+	// Add unique constraint for vk_group_id to allow ON CONFLICT to work
+	DB.Exec(`ALTER TABLE parsed_groups DROP CONSTRAINT IF EXISTS parsed_groups_task_id_vk_group_id_key`)
+	DB.Exec(`ALTER TABLE parsed_groups ADD CONSTRAINT parsed_groups_vk_group_id_key UNIQUE (vk_group_id)`)
+	
 	return nil
 }
 
