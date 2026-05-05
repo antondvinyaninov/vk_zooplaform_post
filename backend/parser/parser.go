@@ -283,6 +283,13 @@ func isRelevantGroup(g vk.Group, currentCityID int) bool {
 		return false
 	}
 
+	// === CATEGORY 1: Vet Clinics ===
+	isVet := hasPrefixInWords([]string{"ветклиник", "ветеринар", "ветврач", "ветуслуг", "ветпомощ", "ветцентр", "веткабинет"})
+
+	// === CATEGORY 2: Pet Stores ===
+	isPetStore := hasPrefixInWords([]string{"зоомагазин", "зоотовар", "зооцентр", "зооаптек"})
+
+	// === CATEGORY 3: Animal Welfare ===
 	animalPrefixes := []string{
 		"собак", "собач", "кошк", "кошач", "щено", "щенк", "животн", "питомц", "хвостик",
 		"четвероног", "дворняж", "котят", "котик", "зверюшк",
@@ -291,19 +298,6 @@ func isRelevantGroup(g vk.Group, currentCityID int) bool {
 		"кот", "кота", "коту", "котом", "коте", "коты", "котов", "котам", "котами", "котах",
 		"пес", "пёс", "пса", "псу", "псом", "псе", "псы", "псов", "псам", "псами", "псах",
 		"зверь", "зверя", "зверю", "зверем", "звери", "зверям", "зверями", "зверях",
-	}
-
-	if !hasPrefixInWords(animalPrefixes) && !hasExactInWords(animalExacts) {
-		return false
-	}
-
-	salesPrefixes := []string{"купит", "продам", "продаж", "скидк", "питомник", "груминг", "зоомагазин", "вязк", "барахолк"}
-	salesPhrases := []string{"продаются щенки", "продаются котята", "в продаже", "наша цена"}
-	if hasPrefixInWords(salesPrefixes) || containsPhrase(salesPhrases) || hasExactInWords([]string{"доставка", "магазин", "магазины", "цена", "цены"}) {
-		allowedSalesPrefixes := []string{"приют", "спасен", "благотворительн", "волонтер", "пожертв"}
-		if !hasPrefixInWords(allowedSalesPrefixes) && !containsPhrase([]string{"помощь бездомным"}) && !hasExactInWords([]string{"сбор", "фонд"}) {
-			return false
-		}
 	}
 
 	requiredPrefixes := []string{
@@ -316,10 +310,26 @@ func isRelevantGroup(g vk.Group, currentCityID int) bool {
 	}
 	requiredExacts := []string{"помощь", "помочь", "помогать", "спасти"}
 
-	// "доска объявлений" is only allowed if it explicitly asks for help or relates to shelter activities based on requirements.
-	// We allow it if the required prefixes pass.
-	if !hasPrefixInWords(requiredPrefixes) && !containsPhrase(requiredPhrases) && !hasExactInWords(requiredExacts) {
+	hasAnimalBase := hasPrefixInWords(animalPrefixes) || hasExactInWords(animalExacts)
+	hasWelfareMarker := hasPrefixInWords(requiredPrefixes) || containsPhrase(requiredPhrases) || hasExactInWords(requiredExacts)
+	
+	isWelfare := hasAnimalBase && hasWelfareMarker
+
+	// If it doesn't fit ANY category, reject it
+	if !isVet && !isPetStore && !isWelfare {
 		return false
+	}
+
+	// For welfare groups, we don't want breeders or random sales groups
+	if isWelfare && !isVet && !isPetStore {
+		salesPrefixes := []string{"купит", "продам", "продаж", "скидк", "питомник", "груминг", "зоомагазин", "вязк", "барахолк"}
+		salesPhrases := []string{"продаются щенки", "продаются котята", "в продаже", "наша цена"}
+		if hasPrefixInWords(salesPrefixes) || containsPhrase(salesPhrases) || hasExactInWords([]string{"доставка", "магазин", "магазины", "цена", "цены"}) {
+			allowedSalesPrefixes := []string{"приют", "спасен", "благотворительн", "волонтер", "пожертв"}
+			if !hasPrefixInWords(allowedSalesPrefixes) && !containsPhrase([]string{"помощь бездомным"}) && !hasExactInWords([]string{"сбор", "фонд"}) {
+				return false
+			}
+		}
 	}
 
 	return true
