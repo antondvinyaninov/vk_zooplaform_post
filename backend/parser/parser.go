@@ -195,6 +195,11 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 						INSERT INTO parsed_groups (task_id, vk_group_id, name, screen_name, city_title, members_count, description, contacts, links)
 						VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 						ON CONFLICT (vk_group_id) DO UPDATE SET 
+							name = EXCLUDED.name,
+							screen_name = EXCLUDED.screen_name,
+							description = EXCLUDED.description,
+							contacts = EXCLUDED.contacts,
+							links = EXCLUDED.links,
 							members_count = EXCLUDED.members_count,
 							task_id = EXCLUDED.task_id,
 							updated_at = CURRENT_TIMESTAMP
