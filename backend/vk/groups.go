@@ -12,6 +12,33 @@ type GroupsGetResponse struct {
 	Items []Group `json:"items"`
 }
 
+// GroupsGetMembersResponse ответ на получение участников группы
+type GroupsGetMembersResponse struct {
+	Count int   `json:"count"`
+	Items []int `json:"items"`
+}
+
+// GroupsGetMembers получает список участников группы
+func (c *VKClient) GroupsGetMembers(groupID int, offset int, count int) (*GroupsGetMembersResponse, error) {
+	params := map[string]string{
+		"group_id": strconv.Itoa(groupID),
+		"offset":   strconv.Itoa(offset),
+		"count":    strconv.Itoa(count),
+	}
+
+	resp, err := c.CallMethod("groups.getMembers", params)
+	if err != nil {
+		return nil, err
+	}
+
+	var membersResp GroupsGetMembersResponse
+	if err := json.Unmarshal(resp, &membersResp); err != nil {
+		return nil, fmt.Errorf("failed to parse groups.getMembers response: %w", err)
+	}
+
+	return &membersResp, nil
+}
+
 // Group группа
 type Group struct {
 	ID           int    `json:"id"`

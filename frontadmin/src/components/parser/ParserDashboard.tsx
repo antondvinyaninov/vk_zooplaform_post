@@ -19,11 +19,57 @@ export function ParserDashboard() {
   const [keywords, setKeywords] = useState("приют для животных, приют собак, приют кошек, бездомные животные, помощь бездомным, помощь животным, спасение животных, зоозащита, защита животных, волонтеры животные, потеряшки животные, потеряшки собаки, потеряшки кошки, передержка животных, передержка собак, передержка кошек, в добрые руки животные, в добрые руки собаки, в добрые руки кошки, ищут дом животные, хвостики приют, помощь хвостикам, благотворительный фонд животные, бездомыши")
   const [selectedCities, setSelectedCities] = useState<City[]>([])
   const [manualLink, setManualLink] = useState("")
+
+  const [audienceCity, setAudienceCity] = useState<City[]>([])
   
   // Poll status every 3 seconds if running
   const { data: status, mutate: mutateStatus } = useSWR('/api/admin/parser/status', fetcher, {
     refreshInterval: (data) => (data?.status === 'running' ? 3000 : 0)
   })
+
+  // Poll audience status every 3 seconds if running
+  const { data: audienceStatus, mutate: mutateAudienceStatus } = useSWR('/api/admin/audience/status', fetcher, {
+    refreshInterval: (data) => (data?.status === 'running' ? 3000 : 0)
+  })
+
+  const isAudienceRunning = audienceStatus?.status === 'running'
+
+  const handleStartAudience = async () => {
+    if (audienceCity.length === 0) {
+      toast.error("Выберите город для сбора аудитории")
+      return
+    }
+
+    try {
+      const res = await fetch('/api/admin/audience/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ city_title: audienceCity[0].title })
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success("Сбор аудитории запущен")
+        mutateAudienceStatus()
+      } else {
+        toast.error(data.error || "Ошибка запуска")
+      }
+    } catch (e) {
+      toast.error("Ошибка сети")
+    }
+  }
+
+  const handleStopAudience = async () => {
+    try {
+      const res = await fetch('/api/admin/audience/stop', { method: 'POST' })
+      const data = await res.json()
+      if (data.success) {
+        toast.success("Сбор аудитории остановлен")
+        mutateAudienceStatus()
+      }
+    } catch (e) {
+      toast.error("Ошибка сети")
+    }
+  }
 
   const handleStart = async () => {
     if (selectedCities.length === 0) {
@@ -210,6 +256,82 @@ export function ParserDashboard() {
           </Card>
         </div>
       </div>
+
+      <Card className="border-primary/20">
+        <CardHeader>
+          <CardTitle>Сбор аудитории (Ретаргетинг)</CardTitle>
+          <CardDescription>Выгрузка уникальных подписчиков из всех чистых групп города</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Выберите город для выгрузки</Label>
+              <CitySelect 
+                selectedCities={audienceCity}
+                onChange={setAudienceCity}
+                disabled={isAudienceRunning}
+                maxCount={1}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Выберите один город. Парсер соберет базу ID подписчиков, отфильтруя дубликаты.
+              </p>
+              
+              <div className="flex gap-2 pt-2">
+                {!isAudienceRunning ? (
+                  <Button onClick={handleStartAudience} className="w-full">
+                    <IconPlayerPlay className="mr-2 h-4 w-4" /> Начать сбор
+                  </Button>
+                ) : (
+                  <Button variant="destructive" onClick={handleStopAudience} className="w-full">
+                    <IconPlayerStop className="mr-2 h-4 w-4" /> Остановить
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-muted rounded-lg p-4 flex flex-col justify-center space-y-4">
+              {audienceStatus ? (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-sm border-b border-border pb-1">
+                    <span>Город</span>
+                    <span className="font-medium">{audienceStatus.city_title}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm border-b border-border pb-1">
+                    <span>Обработано групп</span>
+                    <span className="font-medium">{audienceStatus.groups_processed} / {audienceStatus.groups_total}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm border-b border-border pb-1">
+                    <span>Всего подписчиков</span>
+                    <span className="font-medium">{audienceStatus.total_members}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm font-bold border-b border-border pb-1">
+                    <span>Уникальных (без дублей)</span>
+                    <span className="text-primary">{audienceStatus.unique_members}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span>Статус</span>
+                    <Badge variant={audienceStatus.status === 'running' ? 'default' : (audienceStatus.status === 'error' ? 'destructive' : 'secondary')}>
+                      {audienceStatus.status === 'running' ? 'Собирается...' : (audienceStatus.status === 'completed' ? 'Завершено' : 'Ошибка')}
+                    </Badge>
+                  </div>
+                  
+                  {audienceStatus.status !== 'running' && audienceStatus.unique_members > 0 && (
+                     <Button asChild variant="outline" className="w-full mt-2">
+                        <a href={`/api/admin/audience/export?task_id=${audienceStatus.id}`} download={`audience_${audienceStatus.city_title}.txt`}>
+                          <IconDownload className="mr-2 h-4 w-4" /> Скачать TXT базу ВК
+                        </a>
+                     </Button>
+                  )}
+                </div>
+              ) : (
+                 <div className="text-center text-muted-foreground text-sm">
+                   Сбор еще не запускался
+                 </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

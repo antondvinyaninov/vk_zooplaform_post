@@ -91,7 +91,38 @@ func createTables() error {
 		return err
 	}
 
+	if err := migrateAudienceTables(); err != nil {
+		return err
+	}
+
 	log.Println("Database tables created successfully")
+	return nil
+}
+
+func migrateAudienceTables() error {
+	_, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS audience_tasks (
+			id BIGSERIAL PRIMARY KEY,
+			city_title TEXT NOT NULL,
+			groups_total INTEGER DEFAULT 0,
+			groups_processed INTEGER DEFAULT 0,
+			status TEXT DEFAULT 'running',
+			total_members INTEGER DEFAULT 0,
+			unique_members INTEGER DEFAULT 0,
+			created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE TABLE IF NOT EXISTS audience_members (
+			task_id BIGINT REFERENCES audience_tasks(id) ON DELETE CASCADE,
+			vk_user_id BIGINT,
+			PRIMARY KEY (task_id, vk_user_id)
+		);
+	`)
+	if err != nil {
+		log.Printf("Error migrating audience tables: %v", err)
+		return err
+	}
 	return nil
 }
 

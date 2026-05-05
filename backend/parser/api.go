@@ -23,6 +23,11 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/parser/clear", middleware.CORSFunc(ClearMasterListHandler))
 	mux.HandleFunc("/api/admin/parser/cities", middleware.CORSFunc(GetCitiesHandler))
 	mux.HandleFunc("/api/admin/parser/blacklisted", middleware.CORSFunc(GetBlacklistedHandler))
+	
+	mux.HandleFunc("/api/admin/audience/start", middleware.CORSFunc(StartAudienceHandler))
+	mux.HandleFunc("/api/admin/audience/stop", middleware.CORSFunc(StopAudienceHandler))
+	mux.HandleFunc("/api/admin/audience/status", middleware.CORSFunc(GetAudienceStatusHandler))
+	mux.HandleFunc("/api/admin/audience/export", middleware.CORSFunc(GetAudienceExportHandler))
 }
 
 func GetBlacklistedHandler(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +60,114 @@ func GetBlacklistedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+func StartAudienceHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		CityTitle string `json:"city_title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	taskID, err := StartAudienceCollection(req.CityTitle)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"task_id": taskID,
+	})
+}
+
+func StopAudienceHandler(w http.ResponseWriter, r *http.Request) {
+	StopAudienceCollection()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func GetAudienceStatusHandler(w http.ResponseWriter, r *http.Request) {
+	audienceTaskMutex.Lock()
+	tid := currentAudienceTask
+	audienceTaskMutex.Unlock()
+
+	var task struct {
+		ID              int64  `json:"id"`
+		CityTitle       string `json:"city_title"`
+		GroupsTotal     int    `json:"groups_total"`
+		GroupsProcessed int    `json:"groups_processed"`
+		Status          string `json:"status"`
+		TotalMembers    int    `json:"total_members"`
+		UniqueMembers   int    `json:"unique_members"`
+		CreatedAt       string `json:"created_at"`
+		UpdatedAt       string `json:"updated_at"`
+	}
+
+	if tid > 0 {
+		err := database.DB.QueryRow(`
+			SELECT id, city_title, groups_total, groups_processed, status, total_members, unique_members, created_at, updated_at
+			FROM audience_tasks
+			WHERE id = $1
+		`, tid).Scan(&task.ID, &task.CityTitle, &task.GroupsTotal, &task.GroupsProcessed, &task.Status, &task.TotalMembers, &task.UniqueMembers, &task.CreatedAt, &task.UpdatedAt)
+		if err != nil {
+			http.Error(w, "Error fetching task status", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		err := database.DB.QueryRow(`
+			SELECT id, city_title, groups_total, groups_processed, status, total_members, unique_members, created_at, updated_at
+			FROM audience_tasks
+			ORDER BY id DESC LIMIT 1
+		`).Scan(&task.ID, &task.CityTitle, &task.GroupsTotal, &task.GroupsProcessed, &task.Status, &task.TotalMembers, &task.UniqueMembers, &task.CreatedAt, &task.UpdatedAt)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(nil)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(task)
+}
+
+func GetAudienceExportHandler(w http.ResponseWriter, r *http.Request) {
+	taskIDStr := r.URL.Query().Get("task_id")
+	if taskIDStr == "" {
+		http.Error(w, "task_id is required", http.StatusBadRequest)
+		return
+	}
+
+	rows, err := database.DB.Query(`
+		SELECT vk_user_id
+		FROM audience_members
+		WHERE task_id = $1
+	`, taskIDStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=audience_%s.txt", taskIDStr))
+
+	for rows.Next() {
+		var uid int64
+		if err := rows.Scan(&uid); err == nil {
+			w.Write([]byte(fmt.Sprintf("%d\n", uid)))
+		}
+	}
 }
 
 func GetCitiesHandler(w http.ResponseWriter, r *http.Request) {
