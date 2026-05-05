@@ -41,8 +41,11 @@ export function ParserResultsTable() {
     }
   }
 
-  // If no data and not loading, show empty
-  if (!isLoading && (!data || !data.items || data.items.length === 0)) {
+  if (isLoading && !data) {
+    return <div className="p-4 text-center">Загрузка результатов...</div>
+  }
+
+  if (!data || !data.items || data.items.length === 0) {
     return <div className="p-4 text-center text-muted-foreground">Нет данных</div>
   }
 
