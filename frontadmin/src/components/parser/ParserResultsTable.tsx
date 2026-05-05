@@ -20,7 +20,9 @@ const fetcher = (url: string) => fetch(url).then(res => res.json())
 export function ParserResultsTable() {
   const [page, setPage] = useState(1)
   
-  const { data, isLoading, mutate } = useSWR(`/api/admin/parser/results?page=${page}`, fetcher)
+  const { data, isLoading, mutate } = useSWR(`/api/admin/parser/results?page=${page}`, fetcher, {
+    keepPreviousData: true
+  })
 
   const handleBlacklist = async (id: number) => {
     if (!confirm("Добавить группу в черный список? Она больше не будет парситься.")) return;
@@ -39,8 +41,10 @@ export function ParserResultsTable() {
     }
   }
 
-  if (isLoading) return <div className="p-4 text-center">Загрузка результатов...</div>
-  if (!data || !data.items || data.items.length === 0) return <div className="p-4 text-center text-muted-foreground">Нет данных</div>
+  // If no data and not loading, show empty
+  if (!isLoading && (!data || !data.items || data.items.length === 0)) {
+    return <div className="p-4 text-center text-muted-foreground">Нет данных</div>
+  }
 
   return (
     <div className="space-y-4">

@@ -20,6 +20,23 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/admin/parser/results", middleware.CORSFunc(GetParserResultsHandler))
 	mux.HandleFunc("/api/admin/parser/blacklist", middleware.CORSFunc(BlacklistGroupHandler))
 	mux.HandleFunc("/api/admin/parser/add-manual", middleware.CORSFunc(AddManualGroupHandler))
+	mux.HandleFunc("/api/admin/parser/clear", middleware.CORSFunc(ClearMasterListHandler))
+}
+
+func ClearMasterListHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	_, err := database.Exec(`TRUNCATE TABLE parsed_groups RESTART IDENTITY`)
+	if err != nil {
+		http.Error(w, "Failed to clear table", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 // API handlers for Parser

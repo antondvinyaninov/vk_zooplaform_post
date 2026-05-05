@@ -69,9 +69,23 @@ export function ParserDashboard() {
       if (data.success) {
         toast.success("Группа успешно добавлена")
         setManualLink("")
-        // Need to re-trigger table fetch, but we can't easily without passing a prop or using global swr mutate, but SWR handles it if they share keys or we can just let it be.
       } else {
         toast.error("Ошибка: Группа не найдена или недоступна")
+      }
+    } catch (e) {
+      toast.error("Ошибка сети")
+    }
+  }
+
+  const handleClear = async () => {
+    if (!confirm("Вы уверены, что хотите полностью очистить весь справочник? Это удалит все ранее собранные группы.")) return
+    try {
+      const res = await fetch('/api/admin/parser/clear', { method: 'POST' })
+      if (res.ok) {
+        toast.success("Справочник очищен")
+        mutateStatus() // To trigger some revalidation if needed
+        // Ideally we should mutate the table, but since they don't share a key easily, user will see the table update soon or can refresh
+        window.location.reload()
       }
     } catch (e) {
       toast.error("Ошибка сети")
@@ -198,13 +212,18 @@ export function ParserDashboard() {
             <CardTitle>Справочник групп</CardTitle>
             <CardDescription>Все собранные группы (кроме черного списка)</CardDescription>
           </div>
-          <a 
-            href={`/api/admin/parser/results?export=csv`} 
-            download={`parsed_groups_master.csv`}
-            className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground text-[0.8rem] h-7 px-2.5 font-medium transition-all"
-          >
-            <IconDownload className="mr-2 h-4 w-4" /> Скачать CSV
-          </a>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleClear} className="text-destructive border-destructive hover:bg-destructive hover:text-white">
+              Очистить базу
+            </Button>
+            <a 
+              href={`/api/admin/parser/results?export=csv`} 
+              download={`parsed_groups_master.csv`}
+              className="inline-flex shrink-0 items-center justify-center rounded-lg border border-border bg-background hover:bg-muted hover:text-foreground text-[0.8rem] h-8 px-3 font-medium transition-all"
+            >
+              <IconDownload className="mr-2 h-4 w-4" /> Скачать CSV
+            </a>
+          </div>
         </CardHeader>
         <CardContent>
           <ParserResultsTable />
