@@ -534,11 +534,12 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
         <Group header={<Header>Автор публикации</Header>}>
           <SimpleCell
             before={<Avatar src={post.author.photo_200} size={48} />}
-            subtitle="Написать автору"
             after={
               <Button 
                 mode="tertiary" 
-                onClick={() => window.open(`https://vk.com/id${post.author.vk_user_id}`, '_blank')}
+                href={`https://vk.com/id${post.author.vk_user_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 Профиль
               </Button>
