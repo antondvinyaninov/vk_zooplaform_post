@@ -230,3 +230,50 @@ func TestSuggestExistingPostForbidden(t *testing.T) {
 
 	require.Equal(t, http.StatusForbidden, wSuggest.Result().StatusCode, "User 2 should not be able to suggest User 1's post")
 }
+
+func TestCreatePostWithMedia(t *testing.T) {
+	clearDB(t)
+
+	vkUserID := 201
+	vkGroupID := 301
+	setupMockUser(t, vkUserID)
+
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	writer.WriteField("message", "Post with media")
+	writer.WriteField("post_type_id", "cat_media")
+	writer.WriteField("custom_fields", `[{"id":"field1","value":"test"}]`)
+	
+	// Simulate S3 media keys
+	writer.WriteField("s3_media_keys", "test-video-123.mp4,test-image-123.jpg")
+	
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/api/app/posts", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=member", vkUserID, vkGroupID))
+
+	w := httptest.NewRecorder()
+	createPostHandler(w, req)
+
+	res := w.Result()
+	require.Equal(t, http.StatusOK, res.StatusCode, "Expected 200 OK, got: %s", w.Body.String())
+
+	var createResp map[string]interface{}
+	json.NewDecoder(res.Body).Decode(&createResp)
+	postID := int(createResp["id"].(float64))
+
+	// Verify DB state
+	var s3Keys string
+	err := database.DB.QueryRow("SELECT s3_video_key FROM posts WHERE id = $1", postID).Scan(&s3Keys)
+	require.NoError(t, err)
+
+	var customFields string
+	err = database.DB.QueryRow("SELECT custom_fields::text FROM post_publications WHERE post_id = $1", postID).Scan(&customFields)
+	require.NoError(t, err)
+
+	require.Equal(t, "test-video-123.mp4,test-image-123.jpg", s3Keys)
+	require.Contains(t, customFields, "field1")
+}
+
+
