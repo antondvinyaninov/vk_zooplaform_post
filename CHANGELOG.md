@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - **Frontend & Backend / Community Settings**: Implemented a comprehensive "Post Types & Category Moderators" system. Admins can define custom post categories with specific colors, attach dynamic required/optional form fields, and assign specific moderators to handle posts for each category.
+- **Frontend / Community Settings**: Added support for unique `var_name` properties on dynamic form fields, including real-time auto-transliteration from cyrillic labels to english variable keys.
 - **Frontend / Create Post**: Integrated dynamic form rendering in `CreateAd.tsx` based on the selected community category, automatically compiling structured questionnaire data into the post message.
 - **Frontend / Moderation**: Added inline text editing capabilities for moderators directly within `ModerationDetail`.
 - **Frontend / UI**: Redesigned publication statuses in `AdDetail` to display multiple community placements within a unified `<Group>` structure utilizing `<SimpleCell>`, `Avatar`, and VK wall post links.
@@ -14,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - **Backend / Posts**: Removed `pending`, `draft`, and `rejected` constraints in `updatePostContentHandler` for post authors, enabling unconditional post editing across all statuses and groups.
 - **Frontend / Posts**: Decoupled editing authorization in `AdDetail` from current group publication status, prioritizing root author ownership.
 - **Frontend / Settings**: Implemented conditional rendering in `CommunitySettings` to completely hide the categories and questionnaires configuration block when the `enablePostTypes` toggle is disabled.
+- **Frontend & Backend / Settings**: Replaced the `checkbox` dynamic field type with `number` (numeric input type) to allow data collection like age and counts instead of binary boolean flags.
 
 
 ## [Unreleased] - 2026-04-26
