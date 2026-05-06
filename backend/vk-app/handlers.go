@@ -1078,7 +1078,14 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			}
 		}
 
-		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), messageToPost, attachments, true, publishUnix)
+		var vkPostID int
+		var err error
+		if os.Getenv("IS_TESTING") == "true" {
+			vkPostID = 99999
+		} else {
+			vkPostID, err = client.WallPost("-"+strconv.Itoa(group.VKGroupID), messageToPost, attachments, true, publishUnix)
+		}
+		
 		if err != nil {
 			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
 			models.LogWarning("PUBLISH_FAILED", "Не удалось опубликовать запись во ВКонтакте", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, Error: %v", group.VKGroupID, post.ID, err))
