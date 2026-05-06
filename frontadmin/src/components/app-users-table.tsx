@@ -13,8 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { IconSearch } from '@tabler/icons-react';
+import { IconSearch, IconBell, IconBellOff } from '@tabler/icons-react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 
 interface AppUser {
   id: number;
@@ -25,6 +26,7 @@ interface AppUser {
   city_id: number | null;
   city_title: string | null;
   role: string;
+  is_messages_allowed?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -107,6 +109,7 @@ export function AppUsersTable() {
                   <TableRow>
                     <TableHead className="w-[60px]">Аватар</TableHead>
                     <TableHead>Пользователь</TableHead>
+                    <TableHead>Уведомления</TableHead>
                     <TableHead>VK ID</TableHead>
                     <TableHead>Город</TableHead>
                     <TableHead>Последний визит</TableHead>
@@ -126,6 +129,19 @@ export function AppUsersTable() {
                         <a href={`https://vk.com/id${user.vk_user_id}`} target="_blank" rel="noopener noreferrer" className="hover:underline text-primary">
                           {user.first_name} {user.last_name}
                         </a>
+                      </TableCell>
+                      <TableCell>
+                        {user.is_messages_allowed ? (
+                          <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200 gap-1 px-2 py-0.5 whitespace-nowrap">
+                            <IconBell className="w-3.5 h-3.5" />
+                            Разрешены
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-gray-500 bg-gray-50 border-gray-200 gap-1 px-2 py-0.5 whitespace-nowrap">
+                            <IconBellOff className="w-3.5 h-3.5" />
+                            Запрещены
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{user.vk_user_id}</TableCell>
                       <TableCell>{user.city_title || <span className="text-muted-foreground">Не указан</span>}</TableCell>

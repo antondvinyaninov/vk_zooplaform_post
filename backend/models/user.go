@@ -10,8 +10,9 @@ type User struct {
 	LastName   string    `json:"last_name"`
 	Photo200   string    `json:"photo_200"`
 	CityID     *int      `json:"city_id"`
-	CityTitle  *string   `json:"city_title"`
-	Role       string    `json:"role"` // admin, user
+	CityTitle         *string   `json:"city_title"`
+	Role              string    `json:"role"` // admin, user
+	IsMessagesAllowed *bool     `json:"is_messages_allowed"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 }

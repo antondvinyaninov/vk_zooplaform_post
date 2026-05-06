@@ -290,6 +290,61 @@ func (c *VKClient) SendNotification(userIDs string, message string) error {
 	return err
 }
 
+// CheckMessagesAllowed проверяет статус подписки на сообщения для списка пользователей.
+// Использует метод execute для пакетной обработки (до 25 за один внутренний вызов).
+func (c *VKClient) CheckMessagesAllowed(groupID int, userIDs []int) (map[int]bool, error) {
+	result := make(map[int]bool)
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+
+	for i := 0; i < len(userIDs); i += 25 {
+		end := i + 25
+		if end > len(userIDs) {
+			end = len(userIDs)
+		}
+		chunk := userIDs[i:end]
+
+		var usersArray []string
+		for _, uid := range chunk {
+			usersArray = append(usersArray, strconv.Itoa(uid))
+		}
+
+		script := fmt.Sprintf(`
+			var users = [%s];
+			var res = [];
+			var i = 0;
+			while (i < users.length) {
+				res.push(API.messages.isMessagesFromGroupAllowed({group_id: %d, user_id: users[i]}));
+				i = i + 1;
+			}
+			return res;
+		`, strings.Join(usersArray, ","), groupID)
+
+		resp, err := c.CallMethod("execute", map[string]string{
+			"code": script,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var statuses []struct {
+			IsAllowed int `json:"is_allowed"`
+		}
+		if err := json.Unmarshal(resp, &statuses); err != nil {
+			return nil, err
+		}
+
+		for j, status := range statuses {
+			if j < len(chunk) {
+				result[chunk[j]] = status.IsAllowed == 1
+			}
+		}
+	}
+
+	return result, nil
+}
+
 func (c *VKClient) GetCallbackConfirmationCode(groupID int) (string, error) {
 	resp, err := c.CallMethod("groups.getCallbackConfirmationCode", map[string]string{
 		"group_id": strconv.Itoa(groupID),

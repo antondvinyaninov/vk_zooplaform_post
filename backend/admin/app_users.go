@@ -1,10 +1,13 @@
 package admin
 
 import (
+	"backend/config"
 	"backend/database"
 	"backend/models"
 	"backend/utils"
+	"backend/vk"
 	"database/sql"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -102,6 +105,25 @@ func appUsersHandler(w http.ResponseWriter, r *http.Request) {
 	// Отдаём пустой массив вместо null
 	if users == nil {
 		users = []models.User{}
+	} else {
+		var userIDs []int
+		for _, u := range users {
+			userIDs = append(userIDs, u.VKUserID)
+		}
+
+		cfg := config.Load()
+		if cfg.VKOfficialGroupToken != "" {
+			client := vk.NewVKClient(cfg.VKOfficialGroupToken)
+			allowedMap, err := client.CheckMessagesAllowed(165434330, userIDs)
+			if err == nil {
+				for i := range users {
+					allowed := allowedMap[users[i].VKUserID]
+					users[i].IsMessagesAllowed = &allowed
+				}
+			} else {
+				log.Printf("Error checking messages allowed: %v", err)
+			}
+		}
 	}
 
 	utils.RespondSuccess(w, map[string]interface{}{
