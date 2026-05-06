@@ -409,7 +409,7 @@ export const searchCities = async (query: string): Promise<{id: number, title: s
   }
 };
 
-export const updateCommunitySettings = async (payload: Partial<Pick<AppGroupSettings, 'name' | 'screen_name' | 'photo_200' | 'is_active' | 'notify_user_ids' | 'city_id' | 'city_title' | 'post_types'>>) => {
+export const updateCommunitySettings = async (payload: Partial<Pick<AppGroupSettings, 'name' | 'screen_name' | 'photo_200' | 'is_active' | 'notify_user_ids' | 'city_id' | 'city_title' | 'post_types' | 'enable_post_types'>>) => {
   return fetchJSON<AppGroupSettings>(`${API_URL}/groups/me`, {
     method: 'PATCH',
     body: JSON.stringify(payload),

@@ -381,7 +381,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
             <SimpleCell
               Component="label"
               after={<Switch checked={enablePostTypes} onChange={(e) => setEnablePostTypes(e.target.checked)} />}
-              description="Включает систему категорий и дополнительных полей анкеты для авторов постов."
+              subtitle="Включает систему категорий и дополнительных полей анкеты для авторов постов."
             >
               Использовать категории и анкеты
             </SimpleCell>
@@ -651,6 +651,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                     }
                   }}
                   disabled={!newTypeLabel.trim()}
+                >
+                  Добавить
                 </Button>
               </div>
               </div>
