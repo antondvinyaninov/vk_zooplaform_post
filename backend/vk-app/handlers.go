@@ -506,7 +506,13 @@ func suggestExistingPostHandler(w http.ResponseWriter, r *http.Request, postID i
 		return
 	}
 
-	if post.UserID != 0 && post.UserID != ctx.UserID {
+	user, err := getUserByVKUserID(ctx.UserID)
+	if err != nil || user == nil {
+		utils.RespondError(w, http.StatusForbidden, "user not synced")
+		return
+	}
+
+	if post.UserID != 0 && post.UserID != user.ID {
 		utils.RespondError(w, http.StatusForbidden, "Only the author can suggest this post to another group")
 		return
 	}
