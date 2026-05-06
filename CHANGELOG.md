@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-05-06
+
+### Added
+- **Frontend / Moderation**: Added inline text editing capabilities for moderators directly within `ModerationDetail`.
+- **Frontend / UI**: Redesigned publication statuses in `AdDetail` to display multiple community placements within a unified `<Group>` structure utilizing `<SimpleCell>`, `Avatar`, and VK wall post links.
+
+### Changed
+- **Backend / Posts**: Removed `pending`, `draft`, and `rejected` constraints in `updatePostContentHandler` for post authors, enabling unconditional post editing across all statuses and groups.
+- **Frontend / Posts**: Decoupled editing authorization in `AdDetail` from current group publication status, prioritizing root author ownership.
+- **Frontend / Settings**: Implemented conditional rendering in `CommunitySettings` to completely hide the categories and questionnaires configuration block when the `enablePostTypes` toggle is disabled.
+
+
 ## [Unreleased] - 2026-04-26
 
 ### Added
