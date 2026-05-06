@@ -385,8 +385,9 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
             >
               Использовать категории и анкеты
             </SimpleCell>
-            <FormItem top="Типы объявлений (категории)" bottom="Настройте категории и выберите модераторов для каждой из них. Если модераторы не выбраны — уведомление получат все.">
-              <div style={{ opacity: enablePostTypes ? 1 : 0.5, pointerEvents: enablePostTypes ? 'auto' : 'none', transition: 'all 0.3s ease' }}>
+            {enablePostTypes && (
+              <FormItem top="Типы объявлений (категории)" bottom="Настройте категории и выберите модераторов для каждой из них. Если модераторы не выбраны — уведомление получат все.">
+                <div>
                 <Div style={{ padding: '0 0 12px 0', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
                   {postTypes.map((pt) => (
                   <div key={pt.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
@@ -655,8 +656,9 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                   Добавить
                 </Button>
               </div>
-              </div>
-            </FormItem>
+                </div>
+              </FormItem>
+            )}
           </Group>
 
           <Div>
