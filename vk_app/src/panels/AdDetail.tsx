@@ -109,7 +109,8 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const currentPub = post.publications?.find((p: any) => p.group?.vk_group_id === currentVkGroupId);
   const role = launchParams.vk_viewer_group_role;
   const isModerator = ['admin', 'editor', 'moder'].includes(role || '');
-  const canEdit = (isModerator || isAuthor) && currentPub && (currentPub.status === 'pending' || currentPub.status === 'draft' || currentPub.status === 'rejected');
+  const canEdit = (isModerator && currentPub && (currentPub.status === 'pending' || currentPub.status === 'draft' || currentPub.status === 'rejected')) || 
+                  (isAuthor && (post.status === 'pending' || post.status === 'draft' || post.status === 'rejected'));
 
   return (
     <Panel id={id}>
@@ -124,21 +125,23 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
               <>
                 <Text weight="3" style={{ color: 'var(--vkui--color_text_accent)', marginBottom: 12 }}>
                   Статус: {(() => {
-                    if (!currentPub) return 'Не предложено в эту группу';
-                    if (currentPub.status === 'published') return '✅ Опубликовано';
-                    if (currentPub.status === 'pending') return '⏳ На модерации';
-                    if (currentPub.status === 'rejected') return '❌ Отклонено';
-                    if (currentPub.status === 'draft') return '📝 Черновик';
-                    if (currentPub.status === 'scheduled') {
-                      if (currentPub.publish_date && new Date(currentPub.publish_date).getTime() <= Date.now()) {
+                    if (!currentPub && currentVkGroupId > 0) return 'Не предложено в эту группу';
+                    const displayStatus = currentPub ? currentPub.status : post.status;
+                    if (displayStatus === 'published') return '✅ Опубликовано';
+                    if (displayStatus === 'pending') return '⏳ На модерации';
+                    if (displayStatus === 'rejected') return '❌ Отклонено';
+                    if (displayStatus === 'draft') return '📝 Черновик';
+                    if (displayStatus === 'scheduled') {
+                      const pubDate = currentPub ? currentPub.publish_date : post.publish_date;
+                      if (pubDate && new Date(pubDate).getTime() <= Date.now()) {
                         return '✅ Опубликовано (отложенный)';
                       }
-                      const dateStr = currentPub.publish_date 
-                        ? new Date(currentPub.publish_date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                      const dateStr = pubDate 
+                        ? new Date(pubDate).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
                         : '';
                       return `📅 Отложено на ${dateStr}`;
                     }
-                    return currentPub.status;
+                    return displayStatus;
                   })()}
                 </Text>
 
