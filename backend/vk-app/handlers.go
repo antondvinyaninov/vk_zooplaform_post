@@ -685,35 +685,44 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		return
 	}
 
-	group, err := ensureGroup(ctx.GroupID)
-	if err != nil || group == nil {
-		utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
-		return
-	}
+	isAuthor := (post.UserID == ctx.UserID)
 
+	var group *models.Group
 	var currentPub *models.PostPublication
-	for i, pub := range post.Publications {
-		if pub.GroupID == group.ID {
-			currentPub = &post.Publications[i]
-			break
+
+	if ctx.GroupID > 0 {
+		var err error
+		group, err = ensureGroup(ctx.GroupID)
+		if err == nil && group != nil {
+			for i, pub := range post.Publications {
+				if pub.GroupID == group.ID {
+					currentPub = &post.Publications[i]
+					break
+				}
+			}
 		}
 	}
-	if currentPub == nil {
-		utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
-		return
-	}
 
-	// Разрешаем редактировать pending, draft и rejected
-	if currentPub.Status != "pending" && currentPub.Status != "draft" && currentPub.Status != "rejected" {
-		utils.RespondError(w, http.StatusForbidden, "can only edit pending, draft or rejected posts")
-		return
-	}
+	if !isAuthor {
+		if group == nil {
+			utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
+			return
+		}
 
-	// Проверяем права: автор или модератор
-	isAuthor := (post.UserID == ctx.UserID)
-	if !isAuthor && !isModerator(ctx.GroupRole) {
-		utils.RespondError(w, http.StatusForbidden, "only author or moderator can edit the post")
-		return
+		if currentPub == nil {
+			utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
+			return
+		}
+
+		if currentPub.Status != "pending" && currentPub.Status != "draft" && currentPub.Status != "rejected" {
+			utils.RespondError(w, http.StatusForbidden, "can only edit pending, draft or rejected posts")
+			return
+		}
+
+		if !isModerator(ctx.GroupRole) {
+			utils.RespondError(w, http.StatusForbidden, "only author or moderator can edit the post")
+			return
+		}
 	}
 
 	var req struct {
@@ -737,25 +746,29 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		return
 	}
 
-	wasRejected := currentPub.Status == "rejected"
-	if wasRejected {
-		currentPub.Status = "pending"
-		currentPub.RejectReason = ""
-		if err := updatePublication(currentPub); err != nil {
-			utils.RespondError(w, http.StatusInternalServerError, err.Error())
-			return
+	if currentPub != nil {
+		wasRejected := currentPub.Status == "rejected"
+		if wasRejected {
+			currentPub.Status = "pending"
+			currentPub.RejectReason = ""
+			if err := updatePublication(currentPub); err != nil {
+				utils.RespondError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			
+			g, err := getGroupByID(currentPub.GroupID)
+			if err == nil && g != nil {
+				appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, g.VKGroupID, post.ID)
+				sendNotificationToAdmins(g.ID, fmt.Sprintf("Пользователь обновил отклоненный пост в группе \"%s\". Он снова отправлен на модерацию.\n\n[%s|Перейти к модерации поста]", g.Name, appURL))
+			}
 		}
 	}
 
-	if wasRejected {
-		g, err := getGroupByID(currentPub.GroupID)
-		if err == nil && g != nil {
-			appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, g.VKGroupID, post.ID)
-			sendNotificationToAdmins(g.ID, fmt.Sprintf("Пользователь обновил отклоненный пост в группе \"%s\". Он снова отправлен на модерацию.\n\n[%s|Перейти к модерации поста]", g.Name, appURL))
-		}
+	groupID := 0
+	if group != nil {
+		groupID = group.ID
 	}
-
-	response, err := serializePost(post, group.ID, nil)
+	response, err := serializePost(post, groupID, nil)
 	if err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return

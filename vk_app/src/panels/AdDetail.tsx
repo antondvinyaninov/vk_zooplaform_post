@@ -109,8 +109,7 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const currentPub = post.publications?.find((p: any) => p.group?.vk_group_id === currentVkGroupId);
   const role = launchParams.vk_viewer_group_role;
   const isModerator = ['admin', 'editor', 'moder'].includes(role || '');
-  const canEdit = (isModerator && currentPub && (currentPub.status === 'pending' || currentPub.status === 'draft' || currentPub.status === 'rejected')) || 
-                  (isAuthor && (post.status === 'pending' || post.status === 'draft' || post.status === 'rejected'));
+  const canEdit = (isModerator && currentPub && (currentPub.status === 'pending' || currentPub.status === 'draft' || currentPub.status === 'rejected')) || isAuthor;
 
   return (
     <Panel id={id}>
