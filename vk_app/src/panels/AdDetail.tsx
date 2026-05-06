@@ -19,6 +19,7 @@ import {
   File as VKFile,
   HorizontalScroll,
   Image,
+  Accordion,
 } from '@vkontakte/vkui';
 import { 
   Icon28CalendarOutline,
@@ -122,27 +123,64 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
           {(() => {
             return (
               <>
-                <Text weight="3" style={{ color: 'var(--vkui--color_text_accent)', marginBottom: 12 }}>
-                  Статус: {(() => {
-                    if (!currentPub && currentVkGroupId > 0) return 'Не предложено в эту группу';
-                    const displayStatus = currentPub ? currentPub.status : post.status;
-                    if (displayStatus === 'published') return '✅ Опубликовано';
-                    if (displayStatus === 'pending') return '⏳ На модерации';
-                    if (displayStatus === 'rejected') return '❌ Отклонено';
-                    if (displayStatus === 'draft') return '📝 Черновик';
-                    if (displayStatus === 'scheduled') {
-                      const pubDate = currentPub ? currentPub.publish_date : post.publish_date;
-                      if (pubDate && new Date(pubDate).getTime() <= Date.now()) {
-                        return '✅ Опубликовано (отложенный)';
-                      }
-                      const dateStr = pubDate 
-                        ? new Date(pubDate).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                        : '';
-                      return `📅 Отложено на ${dateStr}`;
-                    }
-                    return displayStatus;
-                  })()}
-                </Text>
+                {post.publications && post.publications.length > 0 ? (
+                  <Accordion>
+                    <Accordion.Summary>
+                      Статусы размещений ({post.publications.length})
+                    </Accordion.Summary>
+                    <Accordion.Content>
+                      <Div style={{ padding: '0 16px 12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {post.publications.map((pub: any) => {
+                            const groupName = pub.group ? pub.group.name : 'Неизвестная группа';
+                            
+                            let statusText = pub.status;
+                            let statusColor = 'var(--vkui--color_text_secondary)';
+                            if (pub.status === 'published') {
+                              statusText = '✅ Опубликовано';
+                              statusColor = 'var(--vkui--color_text_positive)';
+                            } else if (pub.status === 'pending') {
+                              statusText = '⏳ На модерации';
+                              statusColor = 'var(--vkui--color_text_accent)';
+                            } else if (pub.status === 'rejected') {
+                              statusText = '❌ Отклонено';
+                              statusColor = 'var(--vkui--color_text_negative)';
+                            } else if (pub.status === 'draft') {
+                              statusText = '📝 Черновик';
+                            } else if (pub.status === 'scheduled') {
+                              if (pub.publish_date && new Date(pub.publish_date).getTime() <= Date.now()) {
+                                statusText = '✅ Опубликовано (отложенный)';
+                                statusColor = 'var(--vkui--color_text_positive)';
+                              } else {
+                                const dateStr = pub.publish_date 
+                                  ? new Date(pub.publish_date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                  : '';
+                                statusText = `📅 Отложено на ${dateStr}`;
+                                statusColor = 'var(--vkui--color_text_accent_themed)';
+                              }
+                            }
+
+                            return (
+                              <div key={pub.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px', backgroundColor: 'var(--vkui--color_background_secondary)', borderRadius: 8 }}>
+                                <Text weight="2">{groupName}</Text>
+                                <Text style={{ color: statusColor, fontSize: 14 }}>{statusText}</Text>
+                                {pub.status === 'rejected' && pub.reject_reason && (
+                                  <Text style={{ fontSize: 13, color: 'var(--vkui--color_text_secondary)', marginTop: 4 }}>
+                                    Причина: {pub.reject_reason}
+                                  </Text>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </Div>
+                    </Accordion.Content>
+                  </Accordion>
+                ) : (
+                  <Text weight="3" style={{ color: 'var(--vkui--color_text_secondary)', marginBottom: 12 }}>
+                    Не предложено ни в одну группу
+                  </Text>
+                )}
 
                 {!currentPub && isAuthor && currentVkGroupId > 0 && (
                   <div style={{ marginBottom: 16 }}>
