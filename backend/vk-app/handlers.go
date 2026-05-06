@@ -1089,9 +1089,10 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		models.LogInfo("POST_PUBLISHED", "Запись успешно опубликована на стене сообщества", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, VK Post ID: %d", group.ID, post.ID, vkPostID))
 
 		if author, err := getUserByID(post.UserID); err == nil && author != nil {
-			if req.Status == "published" {
+			switch req.Status {
+			case "published":
 				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\n[%s|Открыть пост]", appURL))
-			} else if req.Status == "scheduled" {
+			case "scheduled":
 				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", currentPub.PublishDate.Format("02.01.2006 15:04"), appURL))
 			}
 		}
