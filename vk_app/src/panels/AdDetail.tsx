@@ -19,7 +19,6 @@ import {
   File as VKFile,
   HorizontalScroll,
   Image,
-  Accordion,
 } from '@vkontakte/vkui';
 import { 
   Icon28CalendarOutline,
@@ -123,78 +122,6 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
           {(() => {
             return (
               <>
-                {post.publications && post.publications.length > 0 ? (
-                  <Accordion>
-                    <Accordion.Summary>
-                      Статусы размещений ({post.publications.length})
-                    </Accordion.Summary>
-                    <Accordion.Content>
-                      <Div style={{ padding: '0 16px 12px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                          {post.publications.map((pub: any) => {
-                            const groupName = pub.group ? pub.group.name : 'Неизвестная группа';
-                            
-                            let statusText = pub.status;
-                            let statusColor = 'var(--vkui--color_text_secondary)';
-                            if (pub.status === 'published') {
-                              statusText = '✅ Опубликовано';
-                              statusColor = 'var(--vkui--color_text_positive)';
-                            } else if (pub.status === 'pending') {
-                              statusText = '⏳ На модерации';
-                              statusColor = 'var(--vkui--color_text_accent)';
-                            } else if (pub.status === 'rejected') {
-                              statusText = '❌ Отклонено';
-                              statusColor = 'var(--vkui--color_text_negative)';
-                            } else if (pub.status === 'draft') {
-                              statusText = '📝 Черновик';
-                            } else if (pub.status === 'scheduled') {
-                              if (pub.publish_date && new Date(pub.publish_date).getTime() <= Date.now()) {
-                                statusText = '✅ Опубликовано (отложенный)';
-                                statusColor = 'var(--vkui--color_text_positive)';
-                              } else {
-                                const dateStr = pub.publish_date 
-                                  ? new Date(pub.publish_date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                                  : '';
-                                statusText = `📅 Отложено на ${dateStr}`;
-                                statusColor = 'var(--vkui--color_text_accent_themed)';
-                              }
-                            }
-
-                            return (
-                              <div key={pub.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px', backgroundColor: 'var(--vkui--color_background_secondary)', borderRadius: 8 }}>
-                                <Avatar size={36} src={pub.group?.photo_200} />
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                  <Text weight="2" style={{ fontSize: 14 }}>{groupName}</Text>
-                                  <Text style={{ color: statusColor, fontSize: 13 }}>{statusText}</Text>
-                                  {pub.status === 'rejected' && pub.reject_reason && (
-                                    <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)', marginTop: 2 }}>
-                                      Причина: {pub.reject_reason}
-                                    </Text>
-                                  )}
-                                </div>
-                                {pub.vk_post_id && pub.group?.vk_group_id && (
-                                  <Button 
-                                    mode="tertiary" 
-                                    size="s" 
-                                    href={`https://vk.com/wall-${pub.group.vk_group_id}_${pub.vk_post_id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    ВКонтакте
-                                  </Button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </Div>
-                    </Accordion.Content>
-                  </Accordion>
-                ) : (
-                  <Text weight="3" style={{ color: 'var(--vkui--color_text_secondary)', marginBottom: 12 }}>
-                    Не предложено ни в одну группу
-                  </Text>
-                )}
 
                 {!currentPub && isAuthor && currentVkGroupId > 0 && (
                   <div style={{ marginBottom: 16 }}>
@@ -535,6 +462,78 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
           )}
         </Div>
       </Group>
+
+      <Group header={<Header>Размещения</Header>}>
+        {post.publications && post.publications.length > 0 ? (
+          post.publications.map((pub: any) => {
+            const groupName = pub.group ? pub.group.name : 'Неизвестная группа';
+            
+            let statusText = pub.status;
+            let statusColor = 'var(--vkui--color_text_secondary)';
+            if (pub.status === 'published') {
+              statusText = '✅ Опубликовано';
+              statusColor = 'var(--vkui--color_text_positive)';
+            } else if (pub.status === 'pending') {
+              statusText = '⏳ На модерации';
+              statusColor = 'var(--vkui--color_text_accent)';
+            } else if (pub.status === 'rejected') {
+              statusText = '❌ Отклонено';
+              statusColor = 'var(--vkui--color_text_negative)';
+            } else if (pub.status === 'draft') {
+              statusText = '📝 Черновик';
+            } else if (pub.status === 'scheduled') {
+              if (pub.publish_date && new Date(pub.publish_date).getTime() <= Date.now()) {
+                statusText = '✅ Опубликовано (отложенный)';
+                statusColor = 'var(--vkui--color_text_positive)';
+              } else {
+                const dateStr = pub.publish_date 
+                  ? new Date(pub.publish_date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                  : '';
+                statusText = `📅 Отложено на ${dateStr}`;
+                statusColor = 'var(--vkui--color_text_accent_themed)';
+              }
+            }
+
+            return (
+              <SimpleCell
+                key={pub.id}
+                before={<Avatar size={48} src={pub.group?.photo_200} />}
+                after={
+                  pub.vk_post_id && pub.group?.vk_group_id && (
+                    <Button 
+                      mode="tertiary" 
+                      href={`https://vk.com/wall-${pub.group.vk_group_id}_${pub.vk_post_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      ВКонтакте
+                    </Button>
+                  )
+                }
+                subtitle={
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 2 }}>
+                    <span style={{ color: statusColor }}>{statusText}</span>
+                    {pub.status === 'rejected' && pub.reject_reason && (
+                      <span style={{ color: 'var(--vkui--color_text_secondary)', whiteSpace: 'normal' }}>
+                        Причина: {pub.reject_reason}
+                      </span>
+                    )}
+                  </div>
+                }
+              >
+                {groupName}
+              </SimpleCell>
+            );
+          })
+        ) : (
+          <Div>
+            <Text style={{ color: 'var(--vkui--color_text_secondary)' }}>
+              Не предложено ни в одну группу
+            </Text>
+          </Div>
+        )}
+      </Group>
+
 
       <Group header={<Header>Информация</Header>}>
         <SimpleCell before={<Icon28CalendarOutline />}>
