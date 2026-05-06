@@ -178,6 +178,8 @@ const postgresSchema = `
 		reject_reason TEXT,
 		delete_reason TEXT,
 		delete_comment TEXT,
+		post_type_id TEXT,
+		custom_fields JSONB,
 		publish_date TIMESTAMPTZ,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -366,6 +368,12 @@ func migratePostsTable() error {
 		return err
 	}
 	if err := addColumnIfMissing("posts", "delete_comment", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("posts", "post_type_id", "TEXT"); err != nil {
+		return err
+	}
+	if err := addColumnIfMissing("posts", "custom_fields", "JSONB"); err != nil {
 		return err
 	}
 	return nil

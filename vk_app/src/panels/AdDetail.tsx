@@ -340,6 +340,27 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                 <Text style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
                   {post.message}
                 </Text>
+                {post.custom_fields && (() => {
+                  try {
+                    const fields = JSON.parse(post.custom_fields);
+                    if (Array.isArray(fields) && fields.length > 0) {
+                      return (
+                        <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'var(--vkui--color_background_secondary)' }}>
+                          <Text weight="2" style={{ marginBottom: 8 }}>Данные анкеты:</Text>
+                          {fields.map((f: any, i: number) => (
+                            <div key={i} style={{ display: 'flex', marginBottom: 4, gap: 8 }}>
+                              <Text style={{ color: 'var(--vkui--color_text_secondary)', width: '35%', flexShrink: 0 }}>{f.label}:</Text>
+                              <Text weight="3" style={{ flexGrow: 1 }}>
+                                {f.type === 'link' ? <a href={f.value} target="_blank" rel="noopener noreferrer">{f.value}</a> : f.value}
+                              </Text>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                  } catch (e) {}
+                  return null;
+                })()}
                 {canEdit && (
                   <Button
                     size="s"

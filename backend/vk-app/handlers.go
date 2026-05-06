@@ -445,12 +445,17 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		s3KeysStr = r.FormValue("s3_video_key") // Поддержка старых клиентов
 	}
 
+	postTypeID := r.FormValue("post_type_id")
+	customFields := r.FormValue("custom_fields")
+
 	attachmentsBytes, _ := json.Marshal(uploadedAttachments)
 	post := &models.Post{
-		UserID:      user.ID,
-		Message:     message,
-		Attachments: string(attachmentsBytes),
-		S3VideoKey:  s3KeysStr,
+		UserID:       user.ID,
+		Message:      message,
+		PostTypeID:   postTypeID,
+		CustomFields: customFields,
+		Attachments:  string(attachmentsBytes),
+		S3VideoKey:   s3KeysStr,
 	}
 	if err := createPost(post, group.ID, "pending"); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -726,9 +731,11 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	}
 
 	var req struct {
-		Message     string   `json:"message"`
-		S3VideoKeys []string `json:"s3_video_keys"`
-		Attachments string   `json:"attachments"`
+		Message      string   `json:"message"`
+		PostTypeID   string   `json:"post_type_id"`
+		CustomFields string   `json:"custom_fields"`
+		S3VideoKeys  []string `json:"s3_video_keys"`
+		Attachments  string   `json:"attachments"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -736,6 +743,10 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	}
 
 	post.Message = req.Message
+	if req.PostTypeID != "" || req.CustomFields != "" {
+		post.PostTypeID = req.PostTypeID
+		post.CustomFields = req.CustomFields
+	}
 	if req.S3VideoKeys != nil {
 		post.S3VideoKey = strings.Join(req.S3VideoKeys, ",")
 	}
@@ -950,11 +961,78 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 
 		messageToPost := post.Message
+		
+		var authorLink string
+		var authorName string
 		if post.UserID != 0 {
 			author, err := getUserByID(post.UserID)
 			if err == nil && author != nil {
-				authorLink := fmt.Sprintf("\n\nАвтор: @id%d (%s %s)", author.VKUserID, author.FirstName, author.LastName)
-				messageToPost += authorLink
+				authorLink = fmt.Sprintf("@id%d (%s %s)", author.VKUserID, author.FirstName, author.LastName)
+				authorName = fmt.Sprintf("%s %s", author.FirstName, author.LastName)
+			}
+		}
+
+		// Обработка шаблонов и дополнительных полей
+		if group.EnablePostTypes && post.PostTypeID != "" && post.CustomFields != "" {
+			var postTypes []struct {
+				ID       string `json:"id"`
+				Label    string `json:"label"`
+				Template string `json:"template"`
+			}
+			json.Unmarshal([]byte(group.PostTypes), &postTypes)
+
+			var selectedType *struct {
+				ID       string `json:"id"`
+				Label    string `json:"label"`
+				Template string `json:"template"`
+			}
+			for _, pt := range postTypes {
+				if pt.ID == post.PostTypeID {
+					selectedType = &pt
+					break
+				}
+			}
+
+			var fields []struct {
+				ID      string `json:"id"`
+				Label   string `json:"label"`
+				VarName string `json:"var_name"`
+				Value   string `json:"value"`
+			}
+			json.Unmarshal([]byte(post.CustomFields), &fields)
+
+			if selectedType != nil && selectedType.Template != "" {
+				// Компиляция по шаблону
+				compiled := selectedType.Template
+				compiled = strings.ReplaceAll(compiled, "{text}", messageToPost)
+				compiled = strings.ReplaceAll(compiled, "{author_name}", authorName)
+				compiled = strings.ReplaceAll(compiled, "{author_link}", authorLink)
+				compiled = strings.ReplaceAll(compiled, "{date}", time.Now().Format("02.01.2006"))
+
+				for _, f := range fields {
+					compiled = strings.ReplaceAll(compiled, "{"+f.VarName+"}", f.Value)
+					compiled = strings.ReplaceAll(compiled, "{"+f.ID+"}", f.Value) // Fallback for old templates
+				}
+				messageToPost = compiled
+			} else {
+				// Если шаблона нет, добавляем поля в конец перед автором
+				var fieldsText string
+				if selectedType != nil {
+					fieldsText = fmt.Sprintf("[Категория: %s]\n", selectedType.Label)
+				}
+				for _, f := range fields {
+					fieldsText += fmt.Sprintf("%s: %s\n", f.Label, f.Value)
+				}
+				messageToPost = fmt.Sprintf("%s\n\n%s", messageToPost, strings.TrimSpace(fieldsText))
+				
+				if authorLink != "" {
+					messageToPost += fmt.Sprintf("\n\nАвтор: %s", authorLink)
+				}
+			}
+		} else {
+			// Стандартное поведение без полей
+			if authorLink != "" {
+				messageToPost += fmt.Sprintf("\n\nАвтор: %s", authorLink)
 			}
 		}
 
@@ -1806,10 +1884,10 @@ func createPost(post *models.Post, groupID int, status string) error {
 	defer tx.Rollback()
 
 	if err := tx.QueryRow(database.Rebind(`
-		INSERT INTO posts (user_id, message, attachments, s3_video_key)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO posts (user_id, message, post_type_id, custom_fields, attachments, s3_video_key)
+		VALUES (?, ?, ?, ?, ?, ?)
 		RETURNING id, created_at, updated_at
-	`), post.UserID, post.Message, post.Attachments, post.S3VideoKey).Scan(&post.ID, &post.CreatedAt, &post.UpdatedAt); err != nil {
+	`), post.UserID, post.Message, post.PostTypeID, post.CustomFields, post.Attachments, post.S3VideoKey).Scan(&post.ID, &post.CreatedAt, &post.UpdatedAt); err != nil {
 		return err
 	}
 
@@ -1834,9 +1912,9 @@ func createPost(post *models.Post, groupID int, status string) error {
 func updatePost(post *models.Post) error {
 	_, err := database.Exec(`
 		UPDATE posts
-		SET message = ?, attachments = ?, s3_video_key = ?, updated_at = CURRENT_TIMESTAMP
+		SET message = ?, post_type_id = ?, custom_fields = ?, attachments = ?, s3_video_key = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, post.Message, post.Attachments, post.S3VideoKey, post.ID)
+	`, post.Message, post.PostTypeID, post.CustomFields, post.Attachments, post.S3VideoKey, post.ID)
 	if err != nil {
 		return err
 	}

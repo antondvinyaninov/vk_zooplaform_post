@@ -38,6 +38,7 @@ export interface PostType {
   color: string;
   moderator_ids: number[];
   fields?: PostTypeField[];
+  template?: string;
 }
 
 export interface AppGroupSettings extends AppGroup {
@@ -72,6 +73,8 @@ export interface AppPost {
   id: number;
   title: string;
   message: string;
+  post_type_id?: string;
+  custom_fields?: string;
   status: 'pending' | 'scheduled' | 'published' | 'rejected' | 'failed' | 'draft';
   vk_post_id?: number;
   publish_date?: string;
@@ -254,9 +257,15 @@ export const compressImage = (file: File): Promise<File> => {
   });
 };
 
-export const createPost = async (message: string, s3MediaKeys: string[] = [], videoIds: string[] = []) => {
+export const createPost = async (message: string, s3MediaKeys: string[] = [], videoIds: string[] = [], postTypeId?: string, customFields?: any[]) => {
   const formData = new FormData();
   formData.append('message', message);
+  if (postTypeId) {
+    formData.append('post_type_id', postTypeId);
+  }
+  if (customFields && customFields.length > 0) {
+    formData.append('custom_fields', JSON.stringify(customFields));
+  }
   if (videoIds.length > 0) {
     formData.append('attachments', videoIds.join(','));
   }

@@ -3,6 +3,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 )
 func main() {
@@ -14,8 +15,26 @@ func main() {
 			break
 		}
 	}
-	url := "https://api.vk.com/method/groups.getById?access_token=" + token + "&v=5.131"
-	resp, _ := http.Get(url)
+	
+	// Create VK script to check multiple users
+	script := `
+		var users = [82361623, 121703273, 165434330];
+		var res = [];
+		var i = 0;
+		while (i < users.length) {
+			res.push(API.messages.isMessagesFromGroupAllowed({group_id: 165434330, user_id: users[i]}));
+			i = i + 1;
+		}
+		return res;
+	`
+	
+	apiURL := "https://api.vk.com/method/execute"
+	data := url.Values{}
+	data.Set("code", script)
+	data.Set("access_token", strings.TrimSpace(token))
+	data.Set("v", "5.131")
+	
+	resp, _ := http.PostForm(apiURL, data)
 	body, _ := ioutil.ReadAll(resp.Body)
 	fmt.Println(string(body))
 }

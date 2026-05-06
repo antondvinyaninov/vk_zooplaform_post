@@ -80,12 +80,14 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
       return;
     }
 
-    let finalText = text;
+    let finalPostTypeId: string | undefined;
+    let finalCustomFields: any[] | undefined;
+
     if (settings?.enable_post_types && selectedPostTypeId && settings?.post_types) {
       const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
       if (pt) {
-        let fieldsText = `[Категория: ${pt.label}]\n`;
         if (pt.fields) {
+          finalCustomFields = [];
           for (const field of pt.fields) {
             const val = customFieldValues[field.id];
             if (field.required && !val) {
@@ -93,12 +95,16 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
               return;
             }
             if (val) {
-              fieldsText += `${field.label}: ${val}\n`;
+               finalCustomFields.push({
+                 id: field.id,
+                 label: field.label,
+                 var_name: field.var_name || field.id,
+                 value: val
+               });
             }
           }
         }
-        fieldsText += '\n';
-        finalText = fieldsText + text;
+        finalPostTypeId = pt.id;
       }
     }
 
@@ -139,7 +145,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
         s3MediaKeys.push(key);
       }
 
-      await createPost(finalText, s3MediaKeys, []);
+      await createPost(text, s3MediaKeys, [], finalPostTypeId, finalCustomFields);
       routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`);
     } catch (error: any) {
       alert(`Ошибка при сохранении: ${error?.message || String(error)}`);

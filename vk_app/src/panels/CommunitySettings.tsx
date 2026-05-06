@@ -18,7 +18,7 @@ import {
   Switch,
   SimpleCell,
 } from '@vkontakte/vkui';
-import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline } from '@vkontakte/icons';
+import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline, Icon24ArticleOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
 
@@ -70,6 +70,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [expandedModeratorType, setExpandedModeratorType] = useState<string | null>(null);
   const [expandedColorType, setExpandedColorType] = useState<string | null>(null);
   const [expandedFieldsType, setExpandedFieldsType] = useState<string | null>(null);
+  const [expandedTemplateType, setExpandedTemplateType] = useState<string | null>(null);
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldVarName, setNewFieldVarName] = useState('');
   const [newFieldType, setNewFieldType] = useState<'text'|'link'|'number'|'phone'>('text');
@@ -450,6 +451,15 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                       >
                         <Icon24ListAddOutline width={24} height={24} />
                       </div>
+                      <div 
+                        style={{ cursor: 'pointer', opacity: 0.5, marginLeft: 4 }} 
+                        onClick={() => {
+                          if (expandedTemplateType === pt.id) setExpandedTemplateType(null);
+                          else setExpandedTemplateType(pt.id);
+                        }}
+                      >
+                        <Icon24ArticleOutline width={24} height={24} />
+                      </div>
                       <div style={{ flexGrow: 1 }} />
                       <div 
                         style={{ cursor: 'pointer', opacity: 0.5 }} 
@@ -603,6 +613,42 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                               setNewFieldRequired(false);
                            }}>Добавить</Button>
                         </div>
+                      </div>
+                    )}
+                    {expandedTemplateType === pt.id && (
+                      <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,0,0,0.03)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Шаблон итогового поста</div>
+                        <textarea
+                          value={pt.template || ''}
+                          onChange={e => setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, template: e.target.value } : p))}
+                          placeholder="Пример: Внимание! {text}&#10;Телефон: {telefon}&#10;Автор: {author_name}"
+                          rows={4}
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            borderRadius: 6,
+                            border: '1px solid var(--vkui--color_image_border_alpha)',
+                            fontSize: 13,
+                            boxSizing: 'border-box',
+                            resize: 'vertical',
+                            fontFamily: 'monospace'
+                          }}
+                        />
+                        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                          <b>Доступные системные переменные:</b>
+                          <br />
+                          {`{text}`} — основной текст пользователя<br />
+                          {`{author_name}`} — имя автора<br />
+                          {`{author_link}`} — ссылка на страницу автора<br />
+                          {`{date}`} — дата публикации
+                        </div>
+                        {pt.fields && pt.fields.length > 0 && (
+                          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                            <b>Переменные анкеты:</b>
+                            <br />
+                            {pt.fields.map(f => `{${f.var_name || f.id}}`).join(', ')}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
