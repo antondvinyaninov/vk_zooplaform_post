@@ -382,6 +382,26 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                     </div>
                     {expandedModeratorType === pt.id && (
                       <div style={{ paddingLeft: 0, marginTop: 4 }}>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 12, marginLeft: 4 }}>
+                          {POST_TYPE_COLORS.map(c => (
+                            <div 
+                              key={c}
+                              onClick={() => {
+                                setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, color: c } : p));
+                              }}
+                              style={{ 
+                                width: 24, 
+                                height: 24, 
+                                borderRadius: '50%', 
+                                backgroundColor: c,
+                                cursor: 'pointer',
+                                border: pt.color === c ? '2px solid var(--vkui--color_icon_accent)' : '1px solid rgba(0,0,0,0.1)',
+                                transition: 'transform 0.1s ease-in-out',
+                                transform: pt.color === c ? 'scale(1.1)' : 'scale(1)'
+                              }}
+                            />
+                          ))}
+                        </div>
                         <ChipsSelect
                           value={managers.filter(m => pt.moderator_ids?.includes(m.id)).map(m => ({ value: m.id, label: `${m.first_name} ${m.last_name}` }))}
                           onChange={(options) => {
