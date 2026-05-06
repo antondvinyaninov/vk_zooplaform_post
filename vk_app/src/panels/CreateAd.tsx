@@ -12,7 +12,6 @@ import {
   HorizontalScroll,
   Image,
   Input,
-  Checkbox,
 } from '@vkontakte/vkui';
 import { Icon24Camera, Icon28CancelCircleFillRed, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -94,11 +93,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
               return;
             }
             if (val) {
-              if (field.type === 'checkbox') {
-                fieldsText += `${field.label}: Да\n`;
-              } else {
-                fieldsText += `${field.label}: ${val}\n`;
-              }
+              fieldsText += `${field.label}: ${val}\n`;
             }
           }
         }
@@ -203,27 +198,18 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
               key={field.id} 
               top={`${field.label} ${field.required ? '*' : ''}`}
             >
-              {field.type === 'checkbox' ? (
-                <Checkbox 
-                  checked={!!customFieldValues[field.id]} 
-                  onChange={(e) => setCustomFieldValues({...customFieldValues, [field.id]: e.target.checked})}
-                >
-                  Да / Нет
-                </Checkbox>
-              ) : (
-                <Input 
-                  type={field.type === 'phone' ? 'tel' : 'text'}
-                  value={(customFieldValues[field.id] as string) || ''}
-                  placeholder={field.type === 'link' ? 'https://...' : ''}
-                  onChange={(e) => {
-                    let val = e.target.value;
-                    if (field.type === 'phone') {
-                      val = applyPhoneMask(val);
-                    }
-                    setCustomFieldValues({...customFieldValues, [field.id]: val});
-                  }}
-                />
-              )}
+              <Input 
+                type={field.type === 'phone' ? 'tel' : field.type === 'number' ? 'number' : 'text'}
+                value={(customFieldValues[field.id] as string) || ''}
+                placeholder={field.type === 'link' ? 'https://...' : ''}
+                onChange={(e) => {
+                  let val = e.target.value;
+                  if (field.type === 'phone') {
+                    val = applyPhoneMask(val);
+                  }
+                  setCustomFieldValues({...customFieldValues, [field.id]: val});
+                }}
+              />
             </FormItem>
           ));
         })()}

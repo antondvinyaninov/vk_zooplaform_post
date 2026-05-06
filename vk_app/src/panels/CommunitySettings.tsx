@@ -57,7 +57,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [expandedFieldsType, setExpandedFieldsType] = useState<string | null>(null);
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldVarName, setNewFieldVarName] = useState('');
-  const [newFieldType, setNewFieldType] = useState<'text'|'link'|'checkbox'|'phone'>('text');
+  const [newFieldType, setNewFieldType] = useState<'text'|'link'|'number'|'phone'>('text');
   const [newFieldRequired, setNewFieldRequired] = useState(false);
   const [customColorInputId, setCustomColorInputId] = useState<string | null>(null);
   const [isNewCustomColorInputOpen, setIsNewCustomColorInputOpen] = useState(false);
@@ -556,7 +556,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                            >
                              <option value="text">Текст</option>
                              <option value="link">Ссылка</option>
-                             <option value="checkbox">Чек-бокс</option>
+                             <option value="number">Число</option>
                              <option value="phone">Телефон</option>
                            </select>
                            <label style={{ display: 'flex', alignItems: 'center', fontSize: 13, gap: 4, cursor: 'pointer' }}>
