@@ -86,6 +86,7 @@ type groupSettingsResponse struct {
 	HasToken   bool   `json:"has_token"`
 	NotifyUserIDs []int  `json:"notify_user_ids"`
 	PostTypes     []PostType `json:"post_types"`
+	EnablePostTypes bool   `json:"enable_post_types"`
 }
 
 type PostTypeField struct {
@@ -1038,6 +1039,7 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 			IsActive   *bool   `json:"is_active"`
 			NotifyUserIDs []int `json:"notify_user_ids"`
 			PostTypes     *[]PostType `json:"post_types"`
+			EnablePostTypes *bool `json:"enable_post_types"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -1070,6 +1072,9 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		if req.PostTypes != nil {
 			b, _ := json.Marshal(req.PostTypes)
 			group.PostTypes = string(b)
+		}
+		if req.EnablePostTypes != nil {
+			group.EnablePostTypes = *req.EnablePostTypes
 		}
 
 		if group.Name == "" {
@@ -1444,6 +1449,7 @@ func groupToSettings(group *models.Group) *groupSettingsResponse {
 		CityTitle:  group.CityTitle,
 		IsActive:   group.IsActive,
 		HasToken:   group.AccessToken != "",
+		EnablePostTypes: group.EnablePostTypes,
 	}
 	
 	if group.NotifyUserIDs != "" {
@@ -1723,9 +1729,9 @@ func createGroup(group *models.Group) error {
 func updateGroup(group *models.Group) error {
 	_, err := database.Exec(`
 		UPDATE groups
-		SET name = ?, screen_name = ?, photo_200 = ?, city_id = ?, city_title = ?, access_token = ?, is_active = ?, notify_user_ids = ?, post_types = ?, updated_at = CURRENT_TIMESTAMP
+		SET name = ?, screen_name = ?, photo_200 = ?, city_id = ?, city_title = ?, access_token = ?, is_active = ?, notify_user_ids = ?, post_types = ?, enable_post_types = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, group.Name, group.ScreenName, group.Photo200, group.CityID, group.CityTitle, group.AccessToken, group.IsActive, group.NotifyUserIDs, group.PostTypes, group.ID)
+	`, group.Name, group.ScreenName, group.Photo200, group.CityID, group.CityTitle, group.AccessToken, group.IsActive, group.NotifyUserIDs, group.PostTypes, group.EnablePostTypes, group.ID)
 	if err != nil {
 		return err
 	}
@@ -1738,7 +1744,7 @@ func updateGroup(group *models.Group) error {
 
 func getGroupByID(id int) (*models.Group, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, post_types, created_at, updated_at
+		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, post_types, enable_post_types, created_at, updated_at
 		FROM groups WHERE id = ?
 	`, id)
 	return scanGroup(row)
@@ -1746,7 +1752,7 @@ func getGroupByID(id int) (*models.Group, error) {
 
 func getGroupByVKGroupID(vkGroupID int) (*models.Group, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, post_types, created_at, updated_at
+		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, post_types, enable_post_types, created_at, updated_at
 		FROM groups WHERE vk_group_id = ?
 	`, vkGroupID)
 	return scanGroup(row)
@@ -1766,6 +1772,7 @@ func scanGroup(row *sql.Row) (*models.Group, error) {
 		&group.IsActive,
 		&group.NotifyUserIDs,
 		&group.PostTypes,
+		&group.EnablePostTypes,
 		&group.CreatedAt,
 		&group.UpdatedAt,
 	)

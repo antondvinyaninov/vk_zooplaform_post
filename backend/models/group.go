@@ -20,6 +20,7 @@ type Group struct {
 	MembersCount int       `json:"members_count"`
 	NotifyUserIDs string   `json:"notify_user_ids"`
 	PostTypes     string   `json:"post_types"`
+	EnablePostTypes bool   `json:"enable_post_types"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

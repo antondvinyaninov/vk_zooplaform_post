@@ -15,6 +15,8 @@ import {
   ChipsSelect,
   Snackbar,
   CustomSelect,
+  Switch,
+  SimpleCell,
 } from '@vkontakte/vkui';
 import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -46,6 +48,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [settings, setSettings] = useState<AppGroupSettings | null>(null);
   const [notifyUserIds, setNotifyUserIds] = useState<number[]>([]);
+  const [enablePostTypes, setEnablePostTypes] = useState(false);
   const [postTypes, setPostTypes] = useState<PostType[]>([]);
   const [newTypeLabel, setNewTypeLabel] = useState('');
   const [newTypeColor, setNewTypeColor] = useState(POST_TYPE_COLORS[0]);
@@ -76,13 +79,16 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
       try {
         setLoading(true);
         const data = await getCommunitySettings();
-        setSettings(data);
-        setNotifyUserIds(data.notify_user_ids || []);
-        setPostTypes(data.post_types || []);
-        if (data.city_id && data.city_title) {
-          setCityId(data.city_id);
-          setCityTitle(data.city_title);
-          setCityOptions([{ value: data.city_id, label: data.city_title }]);
+        if (data) {
+          setSettings(data);
+          setNotifyUserIds(data.notify_user_ids || []);
+          setPostTypes(data.post_types || []);
+          setEnablePostTypes(data.enable_post_types || false);
+          if (data.city_id && data.city_title) {
+            setCityId(data.city_id);
+            setCityTitle(data.city_title);
+            setCityOptions([{ value: data.city_id, label: data.city_title }]);
+          }
         }
 
         try {
@@ -141,6 +147,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         city_title: cityTitle,
         notify_user_ids: notifyUserIds,
         post_types: postTypes,
+        enable_post_types: enablePostTypes,
       });
       setSettings(updated);
       setSnackbar(
@@ -371,9 +378,17 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                 </Button>
               </Div>
             </FormItem>
+            <SimpleCell
+              Component="label"
+              after={<Switch checked={enablePostTypes} onChange={(e) => setEnablePostTypes(e.target.checked)} />}
+              description="Включает систему категорий и дополнительных полей анкеты для авторов постов."
+            >
+              Использовать категории и анкеты
+            </SimpleCell>
             <FormItem top="Типы объявлений (категории)" bottom="Настройте категории и выберите модераторов для каждой из них. Если модераторы не выбраны — уведомление получат все.">
-              <Div style={{ padding: '0 0 12px 0', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                {postTypes.map((pt) => (
+              <div style={{ opacity: enablePostTypes ? 1 : 0.5, pointerEvents: enablePostTypes ? 'auto' : 'none', transition: 'all 0.3s ease' }}>
+                <Div style={{ padding: '0 0 12px 0', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                  {postTypes.map((pt) => (
                   <div key={pt.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <div style={{ 
@@ -636,9 +651,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                     }
                   }}
                   disabled={!newTypeLabel.trim()}
-                >
-                  Добавить
                 </Button>
+              </div>
               </div>
             </FormItem>
           </Group>

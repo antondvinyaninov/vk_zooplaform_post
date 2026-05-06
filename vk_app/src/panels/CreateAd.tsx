@@ -82,7 +82,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
     }
 
     let finalText = text;
-    if (selectedPostTypeId && settings?.post_types) {
+    if (settings?.enable_post_types && selectedPostTypeId && settings?.post_types) {
       const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
       if (pt) {
         let fieldsText = `[Категория: ${pt.label}]\n`;
@@ -160,7 +160,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
       </PanelHeader>
 
       <Group>
-        {settings?.post_types && settings.post_types.length > 0 && (
+        {settings?.enable_post_types && settings?.post_types && settings.post_types.length > 0 && (
           <FormItem top="Категория (тип объявления)">
             <HorizontalScroll showArrows getScrollToLeft={(i) => i - 120} getScrollToRight={(i) => i + 120}>
               <div style={{ display: 'flex', gap: 8, padding: '4px 0' }}>
@@ -194,7 +194,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
           </FormItem>
         )}
 
-        {selectedPostTypeId && (() => {
+        {settings?.enable_post_types && selectedPostTypeId && (() => {
           const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
           if (!pt || !pt.fields || pt.fields.length === 0) return null;
           

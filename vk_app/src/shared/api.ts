@@ -44,6 +44,7 @@ export interface AppGroupSettings extends AppGroup {
   has_token: boolean;
   notify_user_ids: number[];
   post_types: PostType[];
+  enable_post_types: boolean;
   city_id?: number;
   city_title?: string;
 }
