@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-05-06
 
 ### Added
+- **Backend / Database Schema**: Migrated `post_type_id` and `custom_fields` out of the global `posts` table into the `post_publications` table to allow distinct custom fields per community context.
+- **Frontend / Custom Fields**: Refactored `AdDetail` and `ModerationDetail` to extract custom field metadata from the localized `currentPub` instead of the global `post` state, resolving empty field rendering during post edits.
+- **Frontend / UI**: Added VKUI `Accordion` wrapper around community-specific custom fields inside the "Размещения" tab, ensuring clean UI presentation.
 - **Frontend & Backend / Community Settings**: Implemented a comprehensive "Post Types & Category Moderators" system. Admins can define custom post categories with specific colors, attach dynamic required/optional form fields, and assign specific moderators to handle posts for each category.
 - **Frontend / Community Settings**: Added support for unique `var_name` properties on dynamic form fields, including real-time auto-transliteration from cyrillic labels to english variable keys.
 - **Frontend / Create Post**: Integrated dynamic form rendering in `CreateAd.tsx` based on the selected community category, automatically compiling structured questionnaire data into the post message.

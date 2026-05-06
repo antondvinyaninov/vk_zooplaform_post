@@ -1884,6 +1884,13 @@ func scanGroup(row *sql.Row) (*models.Group, error) {
 	return group, nil
 }
 
+func nullableJSON(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 func createPost(post *models.Post, groupID int, status string, postTypeID string, customFields string) error {
 	tx, err := database.Begin()
 	if err != nil {
@@ -1910,7 +1917,7 @@ func createPost(post *models.Post, groupID int, status string, postTypeID string
 		INSERT INTO post_publications (post_id, group_id, status, post_type_id, custom_fields)
 		VALUES (?, ?, ?, ?, ?)
 		RETURNING id, created_at, updated_at
-	`), pub.PostID, pub.GroupID, pub.Status, pub.PostTypeID, pub.CustomFields).Scan(&pub.ID, &pub.CreatedAt, &pub.UpdatedAt); err != nil {
+	`), pub.PostID, pub.GroupID, pub.Status, pub.PostTypeID, nullableJSON(pub.CustomFields)).Scan(&pub.ID, &pub.CreatedAt, &pub.UpdatedAt); err != nil {
 		return err
 	}
 
@@ -1937,7 +1944,7 @@ func updatePublication(pub *models.PostPublication) error {
 		UPDATE post_publications
 		SET status = ?, vk_post_id = ?, reject_reason = ?, delete_reason = ?, delete_comment = ?, publish_date = ?, post_type_id = ?, custom_fields = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, pub.Status, pub.VKPostID, pub.RejectReason, pub.DeleteReason, pub.DeleteComment, nullableTime(pub.PublishDate), pub.PostTypeID, pub.CustomFields, pub.ID)
+	`, pub.Status, pub.VKPostID, pub.RejectReason, pub.DeleteReason, pub.DeleteComment, nullableTime(pub.PublishDate), pub.PostTypeID, nullableJSON(pub.CustomFields), pub.ID)
 	if err != nil {
 		return err
 	}
@@ -1951,7 +1958,7 @@ func createPublication(pub *models.PostPublication) error {
 		VALUES (?, ?, ?, ?, ?)
 		RETURNING id
 	`
-	if err := database.QueryRow(query, pub.PostID, pub.GroupID, pub.Status, pub.PostTypeID, pub.CustomFields).Scan(&pub.ID); err != nil {
+	if err := database.QueryRow(query, pub.PostID, pub.GroupID, pub.Status, pub.PostTypeID, nullableJSON(pub.CustomFields)).Scan(&pub.ID); err != nil {
 		return err
 	}
 	pub.CreatedAt = time.Now()
