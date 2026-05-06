@@ -41,6 +41,7 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   const [editMessage, setEditMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -166,25 +167,152 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
 
                 {!currentPub && isAuthor && currentVkGroupId > 0 && (
                   <div style={{ marginBottom: 16 }}>
-                    <Button 
-                      size="m" 
-                      onClick={async () => {
-                        try {
-                          setIsSubmitting(true);
-                          await suggestExistingPost(post.id);
-                          const data = await getPostById(params!.id!);
-                          setPost(data);
-                        } catch(e: any) {
-                          alert("Ошибка: " + e.message);
-                        } finally {
-                          setIsSubmitting(false);
-                        }
-                      }}
-                      loading={isSubmitting}
-                      stretched
-                    >
-                      Предложить в текущую группу
-                    </Button>
+                    {!isSuggesting ? (
+                      <Button 
+                        size="m" 
+                        onClick={() => setIsSuggesting(true)}
+                        stretched
+                      >
+                        Предложить в текущую группу
+                      </Button>
+                    ) : (
+                      <div style={{ padding: '12px', backgroundColor: 'var(--vkui--color_background_secondary)', borderRadius: 12 }}>
+                        <Text weight="2" style={{ marginBottom: 12 }}>Заполните анкету для этой группы</Text>
+                        
+                        {settings?.enable_post_types && settings?.post_types && settings.post_types.length > 0 && (
+                          <FormItem top="Категория" style={{ paddingLeft: 0, paddingRight: 0 }}>
+                            <HorizontalScroll showArrows getScrollToLeft={(i) => i - 120} getScrollToRight={(i) => i + 120}>
+                              <div style={{ display: 'flex', gap: 8, padding: '4px 0' }}>
+                                {settings.post_types.map((pt: any) => {
+                                  const isSelected = selectedPostTypeId === pt.id;
+                                  return (
+                                    <div 
+                                      key={pt.id}
+                                      onClick={() => {
+                                        setSelectedPostTypeId(isSelected ? null : pt.id);
+                                        setCustomFieldValues({});
+                                      }}
+                                      style={{ 
+                                        padding: '6px 16px', 
+                                        backgroundColor: isSelected ? pt.color : 'transparent', 
+                                        borderRadius: 16, 
+                                        fontSize: 14, 
+                                        fontWeight: 500,
+                                        color: isSelected ? getContrastYIQ(pt.color) : 'var(--vkui--color_text_primary)',
+                                        border: isSelected ? `1px solid ${pt.color}` : '1px solid var(--vkui--color_image_border_alpha)',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                        transition: 'all 0.2s ease'
+                                      }}>
+                                      {pt.label}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </HorizontalScroll>
+                          </FormItem>
+                        )}
+
+                        {settings?.enable_post_types && selectedPostTypeId && (() => {
+                          const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
+                          if (!pt || !pt.fields || pt.fields.length === 0) return null;
+                          
+                          return pt.fields.map((field: any) => (
+                            <FormItem 
+                              key={field.id} 
+                              top={`${field.label} ${field.required ? '*' : ''}`}
+                              style={{ paddingLeft: 0, paddingRight: 0 }}
+                            >
+                              <Input 
+                                type={field.type === 'phone' ? 'tel' : field.type === 'number' ? 'number' : 'text'}
+                                value={(customFieldValues[field.id] as string) || ''}
+                                placeholder={field.type === 'link' ? 'https://...' : ''}
+                                onChange={(e) => {
+                                  let val = e.target.value;
+                                  if (field.type === 'phone') {
+                                    val = applyPhoneMask(val);
+                                  }
+                                  setCustomFieldValues({...customFieldValues, [field.id]: val});
+                                }}
+                              />
+                            </FormItem>
+                          ));
+                        })()}
+
+                        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                          <Button 
+                            size="m" 
+                            mode="primary"
+                            loading={isSubmitting}
+                            onClick={async () => {
+                              try {
+                                setIsSubmitting(true);
+                                
+                                // Validation
+                                if (settings?.enable_post_types) {
+                                  if (!selectedPostTypeId) {
+                                    alert('Пожалуйста, выберите категорию');
+                                    return;
+                                  }
+                                  const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
+                                  if (pt && pt.fields) {
+                                    for (const field of pt.fields) {
+                                      if (field.required && !customFieldValues[field.id]) {
+                                        alert(`Пожалуйста, заполните обязательное поле: ${field.label}`);
+                                        return;
+                                      }
+                                    }
+                                  }
+                                }
+
+                                const fieldsArr = [];
+                                if (settings?.enable_post_types && selectedPostTypeId) {
+                                  const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
+                                  if (pt && pt.fields) {
+                                    for (const field of pt.fields) {
+                                      const val = customFieldValues[field.id];
+                                      if (val) {
+                                        fieldsArr.push({
+                                          id: field.id,
+                                          label: field.label,
+                                          var_name: field.var_name || field.id,
+                                          value: val
+                                        });
+                                      }
+                                    }
+                                  }
+                                }
+
+                                await suggestExistingPost(post.id, selectedPostTypeId || undefined, fieldsArr.length > 0 ? fieldsArr : undefined);
+                                const data = await getPostById(params!.id!);
+                                setPost(data);
+                                setIsSuggesting(false);
+                              } catch(e: any) {
+                                alert("Ошибка: " + e.message);
+                              } finally {
+                                setIsSubmitting(false);
+                              }
+                            }}
+                            stretched
+                          >
+                            Отправить заявку
+                          </Button>
+                          <Button 
+                            size="m" 
+                            mode="secondary"
+                            disabled={isSubmitting}
+                            onClick={() => {
+                              setIsSuggesting(false);
+                              setSelectedPostTypeId(null);
+                              setCustomFieldValues({});
+                            }}
+                            stretched
+                          >
+                            Отмена
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

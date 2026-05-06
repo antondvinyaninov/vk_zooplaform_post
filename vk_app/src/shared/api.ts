@@ -428,10 +428,31 @@ export const updateCommunitySettings = async (payload: Partial<Pick<AppGroupSett
   });
 };
 
-export const suggestExistingPost = async (id: number | string) => {
-  return fetchJSON<AppPost>(`${API_URL}/posts/${id}/suggest`, {
+export const suggestExistingPost = async (id: number | string, postTypeId?: string, customFields?: any[]) => {
+  const formData = new FormData();
+  if (postTypeId) {
+    formData.append('post_type_id', postTypeId);
+  }
+  if (customFields && customFields.length > 0) {
+    formData.append('custom_fields', JSON.stringify(customFields));
+  }
+
+  const vkSignature = getVKLaunchSignature();
+  const response = await fetch(`${API_URL}/posts/${id}/suggest?x-vk-sign=${encodeURIComponent(vkSignature)}`, {
     method: 'POST',
+    headers: {
+      'X-VK-Sign': vkSignature,
+      'Authorization': `Bearer ${vkSignature}`,
+    },
+    body: formData,
   });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.error || 'Request failed');
+  }
+
+  return response.json() as Promise<AppPost>;
 };
 
 export async function sendTestNotification(): Promise<void> {

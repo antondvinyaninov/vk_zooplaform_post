@@ -524,10 +524,17 @@ func suggestExistingPostHandler(w http.ResponseWriter, r *http.Request, postID i
 		}
 	}
 
+	// Опционально парсим форму, если она есть
+	r.ParseMultipartForm(10 << 20)
+	postTypeID := r.FormValue("post_type_id")
+	customFields := r.FormValue("custom_fields")
+
 	pub := &models.PostPublication{
-		PostID:  post.ID,
-		GroupID: group.ID,
-		Status:  "pending",
+		PostID:       post.ID,
+		GroupID:      group.ID,
+		Status:       "pending",
+		PostTypeID:   postTypeID,
+		CustomFields: customFields,
 	}
 
 	if err := createPublication(pub); err != nil {
