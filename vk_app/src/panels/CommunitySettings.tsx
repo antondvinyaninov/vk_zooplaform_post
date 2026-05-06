@@ -21,15 +21,12 @@ import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
 
 const POST_TYPE_COLORS = [
-  '#bbf7d0', // green
-  '#fecaca', // red
-  '#fef08a', // yellow
-  '#bfdbfe', // blue
-  '#e9d5ff', // purple
-  '#fed7aa', // orange
-  '#fbcfe8', // pink
-  '#e5e5e5', // gray
-  '#d6d3d1', // sand/brown
+  '#86efac', // Green (distinct)
+  '#fca5a5', // Red/Pink (combined)
+  '#fcd34d', // Yellow/Orange (combined)
+  '#93c5fd', // Blue (distinct)
+  '#c4b5fd', // Purple (distinct)
+  '#d1d5db', // Gray (distinct)
 ];
 
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
