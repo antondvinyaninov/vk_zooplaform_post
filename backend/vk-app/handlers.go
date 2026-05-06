@@ -85,6 +85,14 @@ type groupSettingsResponse struct {
 	IsActive   bool   `json:"is_active"`
 	HasToken   bool   `json:"has_token"`
 	NotifyUserIDs []int  `json:"notify_user_ids"`
+	PostTypes     []PostType `json:"post_types"`
+}
+
+type PostType struct {
+	ID           string `json:"id"`
+	Label        string `json:"label"`
+	Color        string `json:"color"`
+	ModeratorIDs []int  `json:"moderator_ids"`
 }
 
 type userSummary struct {
@@ -1021,6 +1029,7 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 			CityTitle  *string `json:"city_title"`
 			IsActive   *bool   `json:"is_active"`
 			NotifyUserIDs []int `json:"notify_user_ids"`
+			PostTypes     *[]PostType `json:"post_types"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -1049,6 +1058,10 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		if req.NotifyUserIDs != nil {
 			b, _ := json.Marshal(req.NotifyUserIDs)
 			group.NotifyUserIDs = string(b)
+		}
+		if req.PostTypes != nil {
+			b, _ := json.Marshal(req.PostTypes)
+			group.PostTypes = string(b)
 		}
 
 		if group.Name == "" {
@@ -1430,6 +1443,13 @@ func groupToSettings(group *models.Group) *groupSettingsResponse {
 	}
 	if resp.NotifyUserIDs == nil {
 		resp.NotifyUserIDs = []int{}
+	}
+
+	if group.PostTypes != "" {
+		json.Unmarshal([]byte(group.PostTypes), &resp.PostTypes)
+	}
+	if resp.PostTypes == nil {
+		resp.PostTypes = []PostType{}
 	}
 
 	return resp

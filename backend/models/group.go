@@ -19,6 +19,7 @@ type Group struct {
 	HealthError  string    `json:"health_error,omitempty"`
 	MembersCount int       `json:"members_count"`
 	NotifyUserIDs string   `json:"notify_user_ids"`
+	PostTypes     string   `json:"post_types"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

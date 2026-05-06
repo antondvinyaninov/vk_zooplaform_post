@@ -16,14 +16,27 @@ import {
   Snackbar,
   CustomSelect,
 } from '@vkontakte/vkui';
-import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline } from '@vkontakte/icons';
+import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, sendTestNotification, type AppGroupSettings, type AppManager } from '../shared/api';
+import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
+
+const POST_TYPE_COLORS = [
+  '#bbf7d0', // green
+  '#fecaca', // red
+  '#fef08a', // yellow
+  '#bfdbfe', // blue
+  '#e9d5ff', // purple
+  '#fed7aa', // orange
+];
 
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [settings, setSettings] = useState<AppGroupSettings | null>(null);
   const [notifyUserIds, setNotifyUserIds] = useState<number[]>([]);
+  const [postTypes, setPostTypes] = useState<PostType[]>([]);
+  const [newTypeLabel, setNewTypeLabel] = useState('');
+  const [newTypeColor, setNewTypeColor] = useState(POST_TYPE_COLORS[0]);
+  const [expandedModeratorType, setExpandedModeratorType] = useState<string | null>(null);
   const [cityId, setCityId] = useState<number | undefined>(undefined);
   const [cityTitle, setCityTitle] = useState<string>('');
   const [cityOptions, setCityOptions] = useState<{value: number, label: string}[]>([]);
@@ -42,6 +55,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         const data = await getCommunitySettings();
         setSettings(data);
         setNotifyUserIds(data.notify_user_ids || []);
+        setPostTypes(data.post_types || []);
         if (data.city_id && data.city_title) {
           setCityId(data.city_id);
           setCityTitle(data.city_title);
@@ -103,6 +117,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
         city_id: cityId,
         city_title: cityTitle,
         notify_user_ids: notifyUserIds,
+        post_types: postTypes,
       });
       setSettings(updated);
       setSnackbar(
@@ -332,6 +347,105 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                   Отправить тестовое сообщение
                 </Button>
               </Div>
+            </FormItem>
+            <FormItem top="Типы объявлений (категории)" bottom="Настройте категории и выберите модераторов для каждой из них. Если модераторы не выбраны — уведомление получат все.">
+              <Div style={{ padding: '0 0 12px 0', display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                {postTypes.map((pt) => (
+                  <div key={pt.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ 
+                        padding: '4px 12px', 
+                        backgroundColor: pt.color, 
+                        borderRadius: 16, 
+                        fontSize: 14, 
+                        fontWeight: 500,
+                        color: 'rgba(0,0,0,0.8)'
+                      }}>
+                        {pt.label}
+                      </div>
+                      <div 
+                        style={{ cursor: 'pointer', opacity: 0.5 }} 
+                        onClick={() => {
+                          if (expandedModeratorType === pt.id) setExpandedModeratorType(null);
+                          else setExpandedModeratorType(pt.id);
+                        }}
+                      >
+                        <Icon28AddCircleOutline width={24} height={24} />
+                      </div>
+                      <div style={{ flexGrow: 1 }} />
+                      <div 
+                        style={{ cursor: 'pointer', opacity: 0.5 }} 
+                        onClick={() => setPostTypes(postTypes.filter(p => p.id !== pt.id))}
+                      >
+                        <Icon24Cancel width={20} height={20} />
+                      </div>
+                    </div>
+                    {expandedModeratorType === pt.id && (
+                      <div style={{ paddingLeft: 0, marginTop: 4 }}>
+                        <ChipsSelect
+                          value={managers.filter(m => pt.moderator_ids?.includes(m.id)).map(m => ({ value: m.id, label: `${m.first_name} ${m.last_name}` }))}
+                          onChange={(options) => {
+                            const newIds = options.map(o => Number(o.value));
+                            setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, moderator_ids: newIds } : p));
+                          }}
+                          options={managers.map(m => ({ value: m.id, label: `${m.first_name} ${m.last_name}` }))}
+                          placeholder="Выберите модераторов для категории"
+                          emptyText="Администраторы не найдены"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </Div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
+                <input 
+                  type="text" 
+                  value={newTypeLabel}
+                  onChange={(e) => setNewTypeLabel(e.target.value)}
+                  placeholder="Новая категория"
+                  style={{ 
+                    flexGrow: 1, 
+                    padding: '8px 12px', 
+                    borderRadius: 8, 
+                    border: '1px solid var(--vkui--color_image_border_alpha)',
+                    background: 'var(--vkui--color_background_content)',
+                    color: 'var(--vkui--color_text_primary)'
+                  }}
+                />
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {POST_TYPE_COLORS.map(c => (
+                    <div 
+                      key={c}
+                      onClick={() => setNewTypeColor(c)}
+                      style={{ 
+                        width: 24, 
+                        height: 24, 
+                        borderRadius: '50%', 
+                        backgroundColor: c,
+                        cursor: 'pointer',
+                        border: newTypeColor === c ? '2px solid var(--vkui--color_icon_accent)' : '1px solid rgba(0,0,0,0.1)'
+                      }}
+                    />
+                  ))}
+                </div>
+                <Button 
+                  mode="secondary" 
+                  onClick={() => {
+                    if (newTypeLabel.trim()) {
+                      setPostTypes([...postTypes, {
+                        id: Date.now().toString(),
+                        label: newTypeLabel.trim(),
+                        color: newTypeColor,
+                        moderator_ids: []
+                      }]);
+                      setNewTypeLabel('');
+                    }
+                  }}
+                  disabled={!newTypeLabel.trim()}
+                >
+                  Добавить
+                </Button>
+              </div>
             </FormItem>
           </Group>
 

@@ -24,10 +24,18 @@ export interface AppGroup {
   photo_200: string;
 }
 
+export interface PostType {
+  id: string;
+  label: string;
+  color: string;
+  moderator_ids: number[];
+}
+
 export interface AppGroupSettings extends AppGroup {
   is_active: boolean;
   has_token: boolean;
   notify_user_ids: number[];
+  post_types: PostType[];
   city_id?: number;
   city_title?: string;
 }
@@ -392,7 +400,7 @@ export const searchCities = async (query: string): Promise<{id: number, title: s
   }
 };
 
-export const updateCommunitySettings = async (payload: Partial<Pick<AppGroupSettings, 'name' | 'screen_name' | 'photo_200' | 'is_active' | 'notify_user_ids' | 'city_id' | 'city_title'>>) => {
+export const updateCommunitySettings = async (payload: Partial<Pick<AppGroupSettings, 'name' | 'screen_name' | 'photo_200' | 'is_active' | 'notify_user_ids' | 'city_id' | 'city_title' | 'post_types'>>) => {
   return fetchJSON<AppGroupSettings>(`${API_URL}/groups/me`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
