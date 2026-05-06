@@ -19,6 +19,8 @@ import {
   File as VKFile,
   HorizontalScroll,
   Image,
+  Input,
+  FormItem,
 } from '@vkontakte/vkui';
 import { 
   Icon28CalendarOutline,
@@ -31,7 +33,7 @@ import {
   Icon24WriteOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
-import { getPostById, moderatePost, editPost, compressImage, getS3PresignedUrl, uploadMediaToS3, suggestExistingPost } from '../shared/api';
+import { getPostById, moderatePost, editPost, compressImage, getS3PresignedUrl, uploadMediaToS3, suggestExistingPost, getCommunitySettings } from '../shared/api';
 
 export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -46,6 +48,34 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editFiles, setEditFiles] = useState<Array<{file: File, thumbnail?: string}>>([]);
   const [existingAttachments, setExistingAttachments] = useState<any[]>([]);
+  
+  const [settings, setSettings] = useState<any>(null);
+  const [selectedPostTypeId, setSelectedPostTypeId] = useState<string | null>(null);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+
+  const applyPhoneMask = (val: string) => {
+    const digits = val.replace(/\D/g, '');
+    let res = '';
+    if (digits.length > 0) {
+      res += (digits[0] === '7' || digits[0] === '8') ? '+7' : '+' + digits[0];
+      if (digits.length > 1) res += ' (' + digits.substring(1, 4);
+      if (digits.length > 4) res += ') ' + digits.substring(4, 7);
+      if (digits.length > 7) res += '-' + digits.substring(7, 9);
+      if (digits.length > 9) res += '-' + digits.substring(9, 11);
+    }
+    return res;
+  };
+
+  const getContrastYIQ = (hexcolor: string) => {
+    if (!hexcolor) return 'black';
+    hexcolor = hexcolor.replace("#", "");
+    if (hexcolor.length === 3) hexcolor = hexcolor.split('').map(c => c + c).join('');
+    const r = parseInt(hexcolor.substr(0, 2), 16);
+    const g = parseInt(hexcolor.substr(2, 2), 16);
+    const b = parseInt(hexcolor.substr(4, 2), 16);
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return (yiq >= 128) ? 'black' : 'white';
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -69,6 +99,18 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
         setLoading(true);
         const data = await getPostById(params.id);
         setPost(data);
+        
+        const launchParams = (window as any).vkLaunchParams || {};
+        const currentVkGroupId = Number(launchParams.vk_group_id);
+        if (currentVkGroupId > 0) {
+          try {
+            const groupSettings = await getCommunitySettings();
+            setSettings(groupSettings);
+          } catch (e) {
+            console.error("Failed to load settings", e);
+          }
+        }
+        
         setLoading(false);
       }
     }
@@ -162,6 +204,66 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
             if (isEditing) {
               return (
                 <div style={{ marginTop: 12, marginBottom: 12 }}>
+                  {settings?.enable_post_types && settings?.post_types && settings.post_types.length > 0 && (
+                    <FormItem top="Категория (тип объявления)" style={{ paddingLeft: 0, paddingRight: 0 }}>
+                      <HorizontalScroll showArrows getScrollToLeft={(i) => i - 120} getScrollToRight={(i) => i + 120}>
+                        <div style={{ display: 'flex', gap: 8, padding: '4px 0' }}>
+                          {settings.post_types.map((pt: any) => {
+                            const isSelected = selectedPostTypeId === pt.id;
+                            return (
+                              <div 
+                                key={pt.id}
+                                onClick={() => {
+                                  setSelectedPostTypeId(isSelected ? null : pt.id);
+                                  setCustomFieldValues({});
+                                }}
+                                style={{ 
+                                  padding: '6px 16px', 
+                                  backgroundColor: isSelected ? pt.color : 'transparent', 
+                                  borderRadius: 16, 
+                                  fontSize: 14, 
+                                  fontWeight: 500,
+                                  color: isSelected ? getContrastYIQ(pt.color) : 'var(--vkui--color_text_primary)',
+                                  border: isSelected ? `1px solid ${pt.color}` : '1px solid var(--vkui--color_image_border_alpha)',
+                                  cursor: 'pointer',
+                                  whiteSpace: 'nowrap',
+                                  transition: 'all 0.2s ease'
+                                }}>
+                                {pt.label}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </HorizontalScroll>
+                    </FormItem>
+                  )}
+
+                  {settings?.enable_post_types && selectedPostTypeId && (() => {
+                    const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
+                    if (!pt || !pt.fields || pt.fields.length === 0) return null;
+                    
+                    return pt.fields.map((field: any) => (
+                      <FormItem 
+                        key={field.id} 
+                        top={`${field.label} ${field.required ? '*' : ''}`}
+                        style={{ paddingLeft: 0, paddingRight: 0 }}
+                      >
+                        <Input 
+                          type={field.type === 'phone' ? 'tel' : field.type === 'number' ? 'number' : 'text'}
+                          value={(customFieldValues[field.id] as string) || ''}
+                          placeholder={field.type === 'link' ? 'https://...' : ''}
+                          onChange={(e) => {
+                            let val = e.target.value;
+                            if (field.type === 'phone') {
+                              val = applyPhoneMask(val);
+                            }
+                            setCustomFieldValues({...customFieldValues, [field.id]: val});
+                          }}
+                        />
+                      </FormItem>
+                    ));
+                  })()}
+
                   <Textarea 
                     getRef={(textarea) => {
                       if (textarea) {
@@ -306,7 +408,7 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                           const existingVKAttachments = existingAttachments.filter(a => !a.id.startsWith('s3:')).map(a => a.id).join(',');
                           const allS3Keys = [...existingS3Keys, ...newS3MediaKeys];
 
-                          await editPost(post.id, editMessage, allS3Keys, existingVKAttachments);
+                          await editPost(post.id, editMessage, allS3Keys, existingVKAttachments, selectedPostTypeId || '', customFieldValues ? JSON.stringify(customFieldValues) : '');
                           
                           const data = await getPostById(post.id);
                           setPost(data);
@@ -371,6 +473,19 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                       setEditMessage(post.message);
                       setExistingAttachments(post.attachment_urls || []);
                       setEditFiles([]);
+                      setSelectedPostTypeId(post.post_type_id || null);
+                      if (post.custom_fields) {
+                        try {
+                          const parsed = JSON.parse(post.custom_fields);
+                          const fieldMap: Record<string, string> = {};
+                          if (Array.isArray(parsed)) {
+                            parsed.forEach((f: any) => {
+                              fieldMap[f.id] = f.value;
+                            });
+                          }
+                          setCustomFieldValues(fieldMap);
+                        } catch(e) {}
+                      }
                       setIsEditing(true);
                     }}
                   >
