@@ -24,11 +24,19 @@ export interface AppGroup {
   photo_200: string;
 }
 
+export interface PostTypeField {
+  id: string;
+  label: string;
+  type: 'text' | 'link' | 'checkbox' | 'phone';
+  required: boolean;
+}
+
 export interface PostType {
   id: string;
   label: string;
   color: string;
   moderator_ids: number[];
+  fields?: PostTypeField[];
 }
 
 export interface AppGroupSettings extends AppGroup {

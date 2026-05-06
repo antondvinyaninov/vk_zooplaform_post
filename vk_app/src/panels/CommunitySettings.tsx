@@ -16,9 +16,9 @@ import {
   Snackbar,
   CustomSelect,
 } from '@vkontakte/vkui';
-import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel } from '@vkontakte/icons';
+import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
+import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType, type PostTypeField } from '../shared/api';
 
 const POST_TYPE_COLORS = [
   '#86efac', // Green (distinct)
@@ -51,6 +51,10 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [newTypeColor, setNewTypeColor] = useState(POST_TYPE_COLORS[0]);
   const [expandedModeratorType, setExpandedModeratorType] = useState<string | null>(null);
   const [expandedColorType, setExpandedColorType] = useState<string | null>(null);
+  const [expandedFieldsType, setExpandedFieldsType] = useState<string | null>(null);
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text'|'link'|'checkbox'|'phone'>('text');
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
   const [customColorInputId, setCustomColorInputId] = useState<string | null>(null);
   const [isNewCustomColorInputOpen, setIsNewCustomColorInputOpen] = useState(false);
   const [addedColors, setAddedColors] = useState<string[]>([]);
@@ -405,6 +409,15 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                           else setExpandedColorType(pt.id);
                         }}
                       />
+                      <div 
+                        style={{ cursor: 'pointer', opacity: 0.5, marginLeft: 4 }} 
+                        onClick={() => {
+                          if (expandedFieldsType === pt.id) setExpandedFieldsType(null);
+                          else setExpandedFieldsType(pt.id);
+                        }}
+                      >
+                        <Icon24ListAddOutline width={24} height={24} />
+                      </div>
                       <div style={{ flexGrow: 1 }} />
                       <div 
                         style={{ cursor: 'pointer', opacity: 0.5 }} 
@@ -490,6 +503,49 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                           placeholder="Выберите модераторов для категории"
                           emptyText="Администраторы не найдены"
                         />
+                      </div>
+                    )}
+                    {expandedFieldsType === pt.id && (
+                      <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,0,0,0.03)' }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Дополнительные поля</div>
+                        {(pt.fields || []).map(f => (
+                           <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, background: '#fff', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.05)' }}>
+                              <div style={{ fontSize: 13 }}>{f.label} <span style={{ opacity: 0.5, fontSize: 11 }}>({f.type})</span> {f.required ? <span style={{ color: 'red' }}>*</span> : ''}</div>
+                              <div style={{ flexGrow: 1 }} />
+                              <div style={{ cursor: 'pointer', opacity: 0.5 }} onClick={() => setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, fields: p.fields?.filter(field => field.id !== f.id) } : p))}>
+                                <Icon24Cancel width={16} height={16} />
+                              </div>
+                           </div>
+                        ))}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                           <input 
+                             type="text" 
+                             value={newFieldLabel} 
+                             onChange={e => setNewFieldLabel(e.target.value)} 
+                             placeholder="Название (напр. Телефон)" 
+                             style={{ flexGrow: 1, minWidth: 120, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--vkui--color_image_border_alpha)', fontSize: 13 }} 
+                           />
+                           <select 
+                             value={newFieldType} 
+                             onChange={e => setNewFieldType(e.target.value as any)} 
+                             style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--vkui--color_image_border_alpha)', fontSize: 13, background: '#fff' }}
+                           >
+                             <option value="text">Текст</option>
+                             <option value="link">Ссылка</option>
+                             <option value="checkbox">Чек-бокс</option>
+                             <option value="phone">Телефон</option>
+                           </select>
+                           <label style={{ display: 'flex', alignItems: 'center', fontSize: 13, gap: 4, cursor: 'pointer' }}>
+                             <input type="checkbox" checked={newFieldRequired} onChange={e => setNewFieldRequired(e.target.checked)} /> Обяз.
+                           </label>
+                           <Button mode="secondary" size="s" onClick={() => {
+                              if (!newFieldLabel) return;
+                              const newField = { id: Date.now().toString(), label: newFieldLabel, type: newFieldType, required: newFieldRequired };
+                              setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, fields: [...(p.fields || []), newField] } : p));
+                              setNewFieldLabel('');
+                              setNewFieldRequired(false);
+                           }}>Добавить</Button>
+                        </div>
                       </div>
                     )}
                   </div>

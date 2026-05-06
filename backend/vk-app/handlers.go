@@ -88,11 +88,19 @@ type groupSettingsResponse struct {
 	PostTypes     []PostType `json:"post_types"`
 }
 
+type PostTypeField struct {
+	ID       string `json:"id"`
+	Label    string `json:"label"`
+	Type     string `json:"type"` // "text", "link", "checkbox", "phone"
+	Required bool   `json:"required"`
+}
+
 type PostType struct {
-	ID           string `json:"id"`
-	Label        string `json:"label"`
-	Color        string `json:"color"`
-	ModeratorIDs []int  `json:"moderator_ids"`
+	ID           string          `json:"id"`
+	Label        string          `json:"label"`
+	Color        string          `json:"color"`
+	ModeratorIDs []int           `json:"moderator_ids"`
+	Fields       []PostTypeField `json:"fields,omitempty"`
 }
 
 type userSummary struct {
