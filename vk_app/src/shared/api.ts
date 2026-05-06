@@ -27,6 +27,7 @@ export interface AppGroup {
 export interface PostTypeField {
   id: string;
   label: string;
+  var_name?: string;
   type: 'text' | 'link' | 'checkbox' | 'phone';
   required: boolean;
 }

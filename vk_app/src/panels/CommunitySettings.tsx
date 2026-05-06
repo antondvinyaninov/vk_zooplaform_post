@@ -56,6 +56,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [expandedColorType, setExpandedColorType] = useState<string | null>(null);
   const [expandedFieldsType, setExpandedFieldsType] = useState<string | null>(null);
   const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldVarName, setNewFieldVarName] = useState('');
   const [newFieldType, setNewFieldType] = useState<'text'|'link'|'checkbox'|'phone'>('text');
   const [newFieldRequired, setNewFieldRequired] = useState(false);
   const [customColorInputId, setCustomColorInputId] = useState<string | null>(null);
@@ -526,7 +527,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                         <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Дополнительные поля</div>
                         {(pt.fields || []).map(f => (
                            <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, background: '#fff', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.05)' }}>
-                              <div style={{ fontSize: 13 }}>{f.label} <span style={{ opacity: 0.5, fontSize: 11 }}>({f.type})</span> {f.required ? <span style={{ color: 'red' }}>*</span> : ''}</div>
+                              <div style={{ fontSize: 13 }}>{f.label} <span style={{ opacity: 0.5, fontSize: 11 }}>({f.type}, var: {f.var_name || f.id})</span> {f.required ? <span style={{ color: 'red' }}>*</span> : ''}</div>
                               <div style={{ flexGrow: 1 }} />
                               <div style={{ cursor: 'pointer', opacity: 0.5 }} onClick={() => setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, fields: p.fields?.filter(field => field.id !== f.id) } : p))}>
                                 <Icon24Cancel width={16} height={16} />
@@ -540,6 +541,13 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                              onChange={e => setNewFieldLabel(e.target.value)} 
                              placeholder="Название (напр. Телефон)" 
                              style={{ flexGrow: 1, minWidth: 120, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--vkui--color_image_border_alpha)', fontSize: 13 }} 
+                           />
+                           <input 
+                             type="text" 
+                             value={newFieldVarName} 
+                             onChange={e => setNewFieldVarName(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} 
+                             placeholder="Переменная (напр. phone_1)" 
+                             style={{ flexGrow: 1, minWidth: 100, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--vkui--color_image_border_alpha)', fontSize: 13 }} 
                            />
                            <select 
                              value={newFieldType} 
@@ -556,19 +564,21 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                            </label>
                            <Button mode="secondary" size="s" onClick={() => {
                               const trimmedLabel = newFieldLabel.trim();
-                              if (!trimmedLabel) return;
+                              const trimmedVarName = newFieldVarName.trim();
+                              if (!trimmedLabel || !trimmedVarName) return;
                               
                               const existingFields = pt.fields || [];
-                              const isDuplicate = existingFields.some((f: any) => f.label.toLowerCase() === trimmedLabel.toLowerCase());
+                              const isDuplicateVar = existingFields.some((f: any) => (f.var_name || f.id).toLowerCase() === trimmedVarName.toLowerCase());
                               
-                              if (isDuplicate) {
-                                alert(`Поле с названием "${trimmedLabel}" уже существует в этой категории.`);
+                              if (isDuplicateVar) {
+                                alert(`Переменная с названием "${trimmedVarName}" уже существует в этой категории.`);
                                 return;
                               }
                               
-                              const newField = { id: Date.now().toString(), label: trimmedLabel, type: newFieldType, required: newFieldRequired };
+                              const newField = { id: Date.now().toString(), label: trimmedLabel, type: newFieldType, required: newFieldRequired, var_name: trimmedVarName };
                               setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, fields: [...existingFields, newField] } : p));
                               setNewFieldLabel('');
+                              setNewFieldVarName('');
                               setNewFieldRequired(false);
                            }}>Добавить</Button>
                         </div>
