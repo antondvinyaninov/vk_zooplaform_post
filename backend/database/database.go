@@ -346,7 +346,7 @@ func migratePostsTable() error {
 	if err := addColumnIfMissing("groups", "city_title", "TEXT"); err != nil {
 		return err
 	}
-	if err := addColumnIfMissing("groups", "post_types", `TEXT DEFAULT '[{"id":"1","label":"Найден","color":"#86efac","moderator_ids":[]},{"id":"2","label":"Потерян","color":"#fca5a5","moderator_ids":[]},{"id":"3","label":"Ищет дом","color":"#fcd34d","moderator_ids":[]},{"id":"4","label":"Сбор","color":"#93c5fd","moderator_ids":[]},{"id":"5","label":"Срочно","color":"#f43f5e","moderator_ids":[]}]'`); err != nil {
+	if err := addColumnIfMissing("groups", "post_types", `TEXT DEFAULT '[{"id":"1","label":"Найден","color":"#86efac","moderator_ids":[]},{"id":"2","label":"Потерян","color":"#fca5a5","moderator_ids":[]},{"id":"3","label":"Ищет дом","color":"#fcd34d","moderator_ids":[],"fields":[{"id":"default_name","label":"Кличка","type":"text","required":false}]},{"id":"4","label":"Сбор","color":"#93c5fd","moderator_ids":[]},{"id":"5","label":"Срочно","color":"#f43f5e","moderator_ids":[]}]'`); err != nil {
 		return err
 	}
 	if _, err := DB.Exec(`CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id)`); err != nil {
