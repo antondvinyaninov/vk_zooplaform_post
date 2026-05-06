@@ -54,7 +54,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [customColorInputId, setCustomColorInputId] = useState<string | null>(null);
   const [isNewCustomColorInputOpen, setIsNewCustomColorInputOpen] = useState(false);
   const [addedColors, setAddedColors] = useState<string[]>([]);
-  const allColors = [...POST_TYPE_COLORS, ...addedColors];
+  const usedCustomColors = postTypes.map(pt => pt.color).filter(c => !POST_TYPE_COLORS.includes(c));
+  const allColors = Array.from(new Set([...POST_TYPE_COLORS, ...usedCustomColors, ...addedColors]));
   const [cityId, setCityId] = useState<number | undefined>(undefined);
   const [cityTitle, setCityTitle] = useState<string>('');
   const [cityOptions, setCityOptions] = useState<{value: number, label: string}[]>([]);
