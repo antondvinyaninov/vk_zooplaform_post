@@ -27,6 +27,14 @@ const POST_TYPE_COLORS = [
   '#bfdbfe', // blue
   '#e9d5ff', // purple
   '#fed7aa', // orange
+  '#fbcfe8', // pink
+  '#99f6e4', // teal
+  '#bae6fd', // light blue
+  '#ddd6fe', // violet
+  '#fcd34d', // amber
+  '#a7f3d0', // emerald
+  '#fecdd3', // rose
+  '#e5e5e5', // gray
 ];
 
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
@@ -396,7 +404,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                       </div>
                     </div>
                     {expandedColorType === pt.id && (
-                      <div style={{ display: 'flex', gap: 6, marginTop: 4, marginLeft: 4 }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4, marginLeft: 4 }}>
                         {POST_TYPE_COLORS.map(c => (
                           <div 
                             key={c}
@@ -450,7 +458,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                     color: 'var(--vkui--color_text_primary)'
                   }}
                 />
-                <div style={{ display: 'flex', gap: 4 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {POST_TYPE_COLORS.map(c => (
                     <div 
                       key={c}
