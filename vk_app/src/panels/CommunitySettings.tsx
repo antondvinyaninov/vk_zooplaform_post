@@ -28,13 +28,8 @@ const POST_TYPE_COLORS = [
   '#e9d5ff', // purple
   '#fed7aa', // orange
   '#fbcfe8', // pink
-  '#99f6e4', // teal
-  '#bae6fd', // light blue
-  '#ddd6fe', // violet
-  '#fcd34d', // amber
-  '#a7f3d0', // emerald
-  '#fecdd3', // rose
   '#e5e5e5', // gray
+  '#d6d3d1', // sand/brown
 ];
 
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
