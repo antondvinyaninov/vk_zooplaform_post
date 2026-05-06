@@ -65,7 +65,7 @@ func TestMain(m *testing.M) {
 }
 
 func clearDB(t *testing.T) {
-	_, err := database.DB.Exec("TRUNCATE TABLE post_publications, posts, users, vk_accounts, post_media, groups CASCADE")
+	_, err := database.DB.Exec("TRUNCATE TABLE post_publications, posts, users, vk_accounts, groups CASCADE")
 	require.NoError(t, err)
 }
 
@@ -77,11 +77,19 @@ func setupMockUser(t *testing.T, vkUserID int) *models.User {
 		Photo200:  "https://example.com/photo.jpg",
 	}
 	err := database.DB.QueryRow(`
-		INSERT INTO users (vk_user_id, first_name, last_name, photo_200, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, true, NOW(), NOW())
+		INSERT INTO users (vk_user_id, first_name, last_name, photo_200, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, NOW(), NOW())
 		RETURNING id
 	`, user.VKUserID, user.FirstName, user.LastName, user.Photo200).Scan(&user.ID)
 	require.NoError(t, err)
+
+	// Insert mock vk account so getActiveVKToken() works
+	_, err = database.DB.Exec(`
+		INSERT INTO vk_accounts (vk_user_id, user_name, access_token, is_active, created_at, updated_at)
+		VALUES ($1, 'Admin', 'mock_token_123', true, NOW(), NOW())
+	`, vkUserID)
+	require.NoError(t, err)
+
 	return user
 }
 
@@ -119,8 +127,7 @@ func TestCreatePostAndSuggest(t *testing.T) {
 	err := json.NewDecoder(res.Body).Decode(&createResp)
 	require.NoError(t, err)
 
-	postData := createResp["data"].(map[string]interface{})
-	postID := int(postData["id"].(float64))
+	postID := int(createResp["id"].(float64))
 	require.NotZero(t, postID)
 
 	// Check publication for Group 1
@@ -171,7 +178,10 @@ func TestCreatePostAndSuggest(t *testing.T) {
 	moderatePostHandler(wMod, reqMod, postID)
 
 	resMod := wMod.Result()
-	require.Equal(t, http.StatusOK, resMod.StatusCode, "Expected 200 OK for moderation")
+	require.Equal(t, http.StatusOK, resMod.StatusCode, "Expected 200 OK for moderation, got: %s", wMod.Body.String())
+
+	// Wait for async goroutine to complete
+	time.Sleep(100 * time.Millisecond)
 
 	// Verify status is now published
 	err = database.DB.QueryRow("SELECT status FROM post_publications WHERE post_id = $1 AND group_id = (SELECT id FROM groups WHERE vk_group_id = $2)", postID, vkGroupID2).Scan(&status)
@@ -198,10 +208,9 @@ func TestSuggestExistingPostForbidden(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	createPostHandler(w, req)
-	
 	var createResp map[string]interface{}
 	json.NewDecoder(w.Result().Body).Decode(&createResp)
-	postID := int(createResp["data"].(map[string]interface{})["id"].(float64))
+	postID := int(createResp["id"].(float64))
 
 	// User 2 tries to suggest user 1's post
 	vkUserID2 := 102
