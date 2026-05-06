@@ -429,17 +429,26 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                             }}
                           />
                         ))}
-                        <div style={{ position: 'relative', width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', border: '1px dashed rgba(0,0,0,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ffffff', color: 'rgba(0,0,0,0.5)', fontSize: 18, fontWeight: 300 }}>
-                          +
-                          <input 
-                            type="color" 
-                            value={pt.color}
-                            onChange={(e) => {
-                              setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, color: e.target.value } : p));
-                            }}
-                            style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          value={pt.color}
+                          onChange={(e) => {
+                            setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, color: e.target.value } : p));
+                          }}
+                          placeholder="#HEX"
+                          maxLength={7}
+                          style={{
+                            width: 70,
+                            height: 24,
+                            padding: '0 8px',
+                            borderRadius: 12,
+                            border: '1px solid var(--vkui--color_image_border_alpha)',
+                            fontSize: 12,
+                            background: 'var(--vkui--color_background_content)',
+                            color: 'var(--vkui--color_text_primary)',
+                            boxSizing: 'border-box'
+                          }}
+                        />
                       </div>
                     )}
                     {expandedModeratorType === pt.id && (
@@ -489,15 +498,24 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                       }}
                     />
                   ))}
-                  <div style={{ position: 'relative', width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', border: '1px dashed rgba(0,0,0,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ffffff', color: 'rgba(0,0,0,0.5)', fontSize: 18, fontWeight: 300 }}>
-                    +
-                    <input 
-                      type="color" 
-                      value={newTypeColor}
-                      onChange={(e) => setNewTypeColor(e.target.value)}
-                      style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={newTypeColor}
+                    onChange={(e) => setNewTypeColor(e.target.value)}
+                    placeholder="#HEX"
+                    maxLength={7}
+                    style={{
+                      width: 70,
+                      height: 24,
+                      padding: '0 8px',
+                      borderRadius: 12,
+                      border: '1px solid var(--vkui--color_image_border_alpha)',
+                      fontSize: 12,
+                      background: 'var(--vkui--color_background_content)',
+                      color: 'var(--vkui--color_text_primary)',
+                      boxSizing: 'border-box'
+                    }}
+                  />
                 </div>
                 <Button 
                   mode="secondary" 
