@@ -1046,6 +1046,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 		currentPub.VKPostID = vkPostID
 		currentPub.Status = req.Status
+		post.Message = messageToPost // Сохраняем скомпилированный текст для отображения в приложении
 		models.LogInfo("POST_PUBLISHED", "Запись успешно опубликована на стене сообщества", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, VK Post ID: %d", group.ID, postID, vkPostID))
 
 	case "rejected":
@@ -1063,9 +1064,8 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		return
 	}
 
-	post.Message = messageToPost // Сохраняем скомпилированный текст для отображения в приложении
-
 	if req.Status == "published" || req.Status == "scheduled" {
+		// Для опубликованных записей сохраняем итоговый отрендеренный текст в БД
 		if err := updatePost(post); err != nil {
 			utils.RespondError(w, http.StatusInternalServerError, err.Error())
 			return
