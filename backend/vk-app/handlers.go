@@ -1700,10 +1700,10 @@ func scanUser(row *sql.Row) (*models.User, error) {
 
 func createGroup(group *models.Group) error {
 	if err := database.QueryRow(`
-		INSERT INTO groups (vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO groups (vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, post_types)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		RETURNING id
-	`, group.VKGroupID, group.Name, group.ScreenName, group.Photo200, group.CityID, group.CityTitle, group.AccessToken, group.IsActive, group.NotifyUserIDs).Scan(&group.ID); err != nil {
+	`, group.VKGroupID, group.Name, group.ScreenName, group.Photo200, group.CityID, group.CityTitle, group.AccessToken, group.IsActive, group.NotifyUserIDs, group.PostTypes).Scan(&group.ID); err != nil {
 		return err
 	}
 	now := time.Now()
@@ -1715,9 +1715,9 @@ func createGroup(group *models.Group) error {
 func updateGroup(group *models.Group) error {
 	_, err := database.Exec(`
 		UPDATE groups
-		SET name = ?, screen_name = ?, photo_200 = ?, city_id = ?, city_title = ?, access_token = ?, is_active = ?, notify_user_ids = ?, updated_at = CURRENT_TIMESTAMP
+		SET name = ?, screen_name = ?, photo_200 = ?, city_id = ?, city_title = ?, access_token = ?, is_active = ?, notify_user_ids = ?, post_types = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, group.Name, group.ScreenName, group.Photo200, group.CityID, group.CityTitle, group.AccessToken, group.IsActive, group.NotifyUserIDs, group.ID)
+	`, group.Name, group.ScreenName, group.Photo200, group.CityID, group.CityTitle, group.AccessToken, group.IsActive, group.NotifyUserIDs, group.PostTypes, group.ID)
 	if err != nil {
 		return err
 	}
@@ -1730,7 +1730,7 @@ func updateGroup(group *models.Group) error {
 
 func getGroupByID(id int) (*models.Group, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, created_at, updated_at
+		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, post_types, created_at, updated_at
 		FROM groups WHERE id = ?
 	`, id)
 	return scanGroup(row)
@@ -1738,7 +1738,7 @@ func getGroupByID(id int) (*models.Group, error) {
 
 func getGroupByVKGroupID(vkGroupID int) (*models.Group, error) {
 	row := database.QueryRow(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, created_at, updated_at
+		SELECT id, vk_group_id, name, screen_name, photo_200, city_id, city_title, access_token, is_active, notify_user_ids, post_types, created_at, updated_at
 		FROM groups WHERE vk_group_id = ?
 	`, vkGroupID)
 	return scanGroup(row)
@@ -1757,6 +1757,7 @@ func scanGroup(row *sql.Row) (*models.Group, error) {
 		&group.AccessToken,
 		&group.IsActive,
 		&group.NotifyUserIDs,
+		&group.PostTypes,
 		&group.CreatedAt,
 		&group.UpdatedAt,
 	)
