@@ -18,7 +18,7 @@ import {
   Switch,
   SimpleCell,
 } from '@vkontakte/vkui';
-import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline, Icon24ArticleOutline } from '@vkontakte/icons';
+import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline, Icon24ArticleOutline, Icon16CopyOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
 
@@ -634,19 +634,63 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                             fontFamily: 'monospace'
                           }}
                         />
-                        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                        <div style={{ fontSize: 12, opacity: 0.7, marginTop: 12 }}>
                           <b>Доступные системные переменные:</b>
-                          <br />
-                          {`{text}`} — основной текст пользователя<br />
-                          {`{author_name}`} — имя автора<br />
-                          {`{author_link}`} — ссылка на страницу автора<br />
-                          {`{date}`} — дата публикации
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                            {[
+                              { var: '{text}', desc: 'основной текст' },
+                              { var: '{author_name}', desc: 'имя автора' },
+                              { var: '{author_link}', desc: 'ссылка на автора' },
+                              { var: '{date}', desc: 'дата публикации' }
+                            ].map(sys => (
+                              <div
+                                key={sys.var}
+                                onClick={() => {
+                                  navigator.clipboard.writeText(sys.var);
+                                  // Optional: you can add a toast notification here
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                  background: 'var(--vkui--color_background_secondary)',
+                                  padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                                  border: '1px solid var(--vkui--color_image_border_alpha)'
+                                }}
+                                title="Нажмите, чтобы скопировать"
+                              >
+                                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{sys.var}</span>
+                                <span style={{ fontSize: 10, opacity: 0.6 }}>— {sys.desc}</span>
+                                <Icon16CopyOutline width={12} height={12} style={{ opacity: 0.5, marginLeft: 2 }} />
+                              </div>
+                            ))}
+                          </div>
                         </div>
                         {pt.fields && pt.fields.length > 0 && (
-                          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 12 }}>
                             <b>Переменные анкеты:</b>
-                            <br />
-                            {pt.fields.map(f => `{${f.var_name || f.id}}`).join(', ')}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                              {pt.fields.map((f: any) => {
+                                const varStr = `{${f.var_name || f.id}}`;
+                                return (
+                                  <div
+                                    key={f.id}
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(varStr);
+                                    }}
+                                    style={{
+                                      display: 'flex', alignItems: 'center', gap: 4,
+                                      background: 'var(--vkui--color_background_secondary)',
+                                      padding: '4px 8px', borderRadius: 6, cursor: 'pointer',
+                                      border: '1px solid var(--vkui--color_image_border_alpha)'
+                                    }}
+                                    title="Нажмите, чтобы скопировать"
+                                  >
+                                    <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{varStr}</span>
+                                    <span style={{ fontSize: 10, opacity: 0.6 }}>— {f.label}</span>
+                                    <Icon16CopyOutline width={12} height={12} style={{ opacity: 0.5, marginLeft: 2 }} />
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                       </div>
