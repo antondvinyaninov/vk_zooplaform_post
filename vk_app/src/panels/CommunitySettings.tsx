@@ -429,7 +429,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                             }}
                           />
                         ))}
-                        <div style={{ position: 'relative', width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}>
+                        <div style={{ position: 'relative', width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', border: '1px dashed rgba(0,0,0,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ffffff', color: 'rgba(0,0,0,0.5)', fontSize: 18, fontWeight: 300 }}>
+                          +
                           <input 
                             type="color" 
                             value={pt.color}
@@ -488,7 +489,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                       }}
                     />
                   ))}
-                  <div style={{ position: 'relative', width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}>
+                  <div style={{ position: 'relative', width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', border: '1px dashed rgba(0,0,0,0.3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ffffff', color: 'rgba(0,0,0,0.5)', fontSize: 18, fontWeight: 300 }}>
+                    +
                     <input 
                       type="color" 
                       value={newTypeColor}
