@@ -47,6 +47,8 @@ type postResponse struct {
 	Author         *userSummary              `json:"author,omitempty"`
 	Attachments    string                    `json:"attachments,omitempty"`
 	S3VideoKey     string                    `json:"s3_video_key,omitempty"`
+	PostTypeID     string                    `json:"post_type_id,omitempty"`
+	CustomFields   string                    `json:"custom_fields,omitempty"`
 	AttachmentURLs []AttachmentURL           `json:"attachment_urls,omitempty"`
 	CreatedAt      string                    `json:"created_at"`
 	UpdatedAt      string                    `json:"updated_at"`
@@ -1319,12 +1321,14 @@ func serializePost(post *models.Post, contextGroupID int, usersMap map[int]*mode
 
 	response := postResponse{
 		ID:          post.ID,
-		Title:       makePostTitle(post.Message),
-		Message:     post.Message,
-		Attachments: post.Attachments,
-		S3VideoKey:  post.S3VideoKey,
-		CreatedAt:   post.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:   post.UpdatedAt.Format(time.RFC3339),
+		Title:        makePostTitle(post.Message),
+		Message:      post.Message,
+		Attachments:  post.Attachments,
+		S3VideoKey:   post.S3VideoKey,
+		PostTypeID:   post.PostTypeID,
+		CustomFields: post.CustomFields,
+		CreatedAt:    post.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:    post.UpdatedAt.Format(time.RFC3339),
 	}
 
 	if user != nil {

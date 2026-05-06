@@ -408,7 +408,50 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                           const existingVKAttachments = existingAttachments.filter(a => !a.id.startsWith('s3:')).map(a => a.id).join(',');
                           const allS3Keys = [...existingS3Keys, ...newS3MediaKeys];
 
-                          await editPost(post.id, editMessage, allS3Keys, existingVKAttachments, selectedPostTypeId || '', customFieldValues ? JSON.stringify(customFieldValues) : '');
+                          let finalCustomFieldsStr = post.custom_fields || '';
+                          if (settings?.enable_post_types && selectedPostTypeId && settings?.post_types) {
+                            const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
+                            if (pt && pt.fields) {
+                              const fieldsArr = [];
+                              
+                              // First, preserve any existing fields that belong to other communities
+                              let existingFields: any[] = [];
+                              if (post.custom_fields) {
+                                try {
+                                  existingFields = JSON.parse(post.custom_fields);
+                                  if (!Array.isArray(existingFields)) existingFields = [];
+                                } catch(e) {}
+                              }
+                              
+                              const knownIds = new Set(pt.fields.map((f: any) => f.id));
+                              for (const ef of existingFields) {
+                                if (!knownIds.has(ef.id)) {
+                                  fieldsArr.push(ef);
+                                }
+                              }
+
+                              // Add or update current community fields
+                              for (const field of pt.fields) {
+                                const val = customFieldValues[field.id];
+                                if (val) {
+                                  fieldsArr.push({
+                                    id: field.id,
+                                    label: field.label,
+                                    var_name: field.var_name || field.id,
+                                    value: val
+                                  });
+                                }
+                              }
+                              
+                              if (fieldsArr.length > 0) {
+                                finalCustomFieldsStr = JSON.stringify(fieldsArr);
+                              } else {
+                                finalCustomFieldsStr = '';
+                              }
+                            }
+                          }
+
+                          await editPost(post.id, editMessage, allS3Keys, existingVKAttachments, selectedPostTypeId || post.post_type_id || '', finalCustomFieldsStr);
                           
                           const data = await getPostById(post.id);
                           setPost(data);
