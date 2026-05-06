@@ -846,37 +846,73 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 
-	switch req.Status {
-	case "published", "scheduled":
-		var publishUnix int64
-		if req.Status == "scheduled" {
-			if strings.TrimSpace(req.PublishDate) == "" {
-				utils.RespondError(w, http.StatusBadRequest, "publish_date is required for scheduled status")
-				return
-			}
-			publishDate, err := time.Parse(time.RFC3339, req.PublishDate)
-			if err != nil {
-				utils.RespondError(w, http.StatusBadRequest, "publish_date must be RFC3339")
-				return
-			}
-			currentPub.PublishDate = publishDate
-			publishUnix = publishDate.Unix()
-		} else {
-			currentPub.PublishDate = time.Time{}
-		}
+	if req.Status == "rejected" {
+		currentPub.Status = "rejected"
+		currentPub.RejectReason = req.RejectReason
+		currentPub.PublishDate = time.Time{}
 
-		// Берём активный токен админа
-		adminToken, err := getActiveVKToken()
-		if err != nil {
+		if err := updatePublication(currentPub); err != nil {
 			utils.RespondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		if adminToken == "" {
-			utils.RespondError(w, http.StatusBadRequest, "VK account is not connected — please login at /vk-connect in the admin panel")
+
+		if author, err := getUserByID(post.UserID); err == nil && author != nil {
+			rejectMsg := "К сожалению, ваш предложенный пост был отклонен модератором."
+			if currentPub.RejectReason != "" {
+				rejectMsg += fmt.Sprintf("\nПричина: %s", currentPub.RejectReason)
+			}
+			rejectMsg += fmt.Sprintf("\n\n[%s|Посмотреть детали]", appURL)
+			sendNotificationToUser(author.VKUserID, rejectMsg)
+		}
+
+		utils.RespondSuccess(w, map[string]interface{}{"success": true, "status": req.Status})
+		return
+	}
+
+	if req.Status != "published" && req.Status != "scheduled" {
+		utils.RespondError(w, http.StatusBadRequest, "unsupported status")
+		return
+	}
+
+	var publishUnix int64
+	if req.Status == "scheduled" {
+		if strings.TrimSpace(req.PublishDate) == "" {
+			utils.RespondError(w, http.StatusBadRequest, "publish_date is required for scheduled status")
 			return
 		}
-		token := adminToken
+		publishDate, err := time.Parse(time.RFC3339, req.PublishDate)
+		if err != nil {
+			utils.RespondError(w, http.StatusBadRequest, "publish_date must be RFC3339")
+			return
+		}
+		currentPub.PublishDate = publishDate
+		publishUnix = publishDate.Unix()
+	} else {
+		currentPub.PublishDate = time.Time{}
+	}
 
+	// Берём активный токен админа
+	adminToken, err := getActiveVKToken()
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if adminToken == "" {
+		utils.RespondError(w, http.StatusBadRequest, "VK account is not connected — please login at /vk-connect in the admin panel")
+		return
+	}
+
+	// Immediately return success so API Gateway doesn't timeout
+	utils.RespondSuccess(w, map[string]interface{}{"success": true, "status": req.Status})
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[Moderate] Panic in async moderation: %v", r)
+			}
+		}()
+
+		client := vk.NewVKClient(adminToken)
 		var attachments []string
 		if post.Attachments != "" {
 			var parts []string
@@ -891,14 +927,11 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			}
 		}
 
-		client := vk.NewVKClient(token)
-
 		// Если есть медиа в S3 - скачиваем и загружаем в VK
 		if post.S3VideoKey != "" {
 			s3, err := s3client.New()
 			if err == nil {
 				s3Keys := strings.Split(post.S3VideoKey, ",")
-				
 				for _, key := range s3Keys {
 					key = strings.TrimSpace(key)
 					if key == "" {
@@ -907,28 +940,25 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 					log.Printf("[Moderate] Downloading S3 media: %s", key)
 					rc, _, err := s3.GetObject(context.Background(), key)
 					if err == nil {
-							var att, attURL string
-							var uploadErr error
-							ext := strings.ToLower(filepath.Ext(key))
+						var att, attURL string
+						var uploadErr error
+						ext := strings.ToLower(filepath.Ext(key))
 
-							tmpFile, err := os.CreateTemp("", "moderation_media_*"+ext)
-							if err == nil {
-								io.Copy(tmpFile, rc)
-								tmpPath := tmpFile.Name()
-								tmpFile.Close()
-								rc.Close()
+						tmpFile, err := os.CreateTemp("", "moderation_media_*"+ext)
+						if err == nil {
+							io.Copy(tmpFile, rc)
+							tmpPath := tmpFile.Name()
+							tmpFile.Close()
+							rc.Close()
 
-								if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
-									// Загружаем как видео
-									att, attURL, uploadErr = client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
-								} else {
-									// Загружаем как фото
-									att, attURL, uploadErr = client.UploadPhotoToWall(tmpPath, strconv.Itoa(group.VKGroupID))
-								}
+							if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
+								att, attURL, uploadErr = client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
+							} else {
+								att, attURL, uploadErr = client.UploadPhotoToWall(tmpPath, strconv.Itoa(group.VKGroupID))
+							}
 
 							if uploadErr == nil {
 								attachments = append(attachments, att)
-								// Обновляем attachments в самом посте (чтобы сохранить URL если надо)
 								var oldParts []string
 								if post.Attachments != "" {
 									if strings.HasPrefix(post.Attachments, "[") {
@@ -945,7 +975,6 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 								newAtts, _ := json.Marshal(oldParts)
 								post.Attachments = string(newAtts)
 								
-								// Удаляем из S3 после успешной загрузки
 								go s3DeleteVideoKey(key)
 							} else {
 								log.Printf("[Moderate] VK Upload error for %s: %v", key, uploadErr)
@@ -956,7 +985,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 						}
 					}
 				}
-				post.S3VideoKey = "" // Очищаем ключи, они больше не нужны
+				post.S3VideoKey = "" // Очищаем ключи
 			}
 		}
 
@@ -972,7 +1001,6 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			}
 		}
 
-		// Обработка шаблонов и дополнительных полей
 		if group.EnablePostTypes && post.PostTypeID != "" && post.CustomFields != "" {
 			var postTypes []struct {
 				ID       string `json:"id"`
@@ -1002,7 +1030,6 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			json.Unmarshal([]byte(post.CustomFields), &fields)
 
 			if selectedType != nil && selectedType.Template != "" {
-				// Компиляция по шаблону
 				compiled := selectedType.Template
 				compiled = strings.ReplaceAll(compiled, "{text}", messageToPost)
 				compiled = strings.ReplaceAll(compiled, "{author_name}", authorName)
@@ -1011,11 +1038,10 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 				for _, f := range fields {
 					compiled = strings.ReplaceAll(compiled, "{"+f.VarName+"}", f.Value)
-					compiled = strings.ReplaceAll(compiled, "{"+f.ID+"}", f.Value) // Fallback for old templates
+					compiled = strings.ReplaceAll(compiled, "{"+f.ID+"}", f.Value)
 				}
 				messageToPost = compiled
 			} else {
-				// Если шаблона нет, добавляем поля в конец перед автором
 				var fieldsText string
 				if selectedType != nil {
 					fieldsText = fmt.Sprintf("[Категория: %s]\n", selectedType.Label)
@@ -1030,71 +1056,44 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 				}
 			}
 		} else {
-			// Стандартное поведение без полей
 			if authorLink != "" {
 				messageToPost += fmt.Sprintf("\n\nАвтор: %s", authorLink)
 			}
 		}
 
-		// from_group=true: постим от имени группы (требует токена сообщества или токена админа с правами)
 		vkPostID, err := client.WallPost("-"+strconv.Itoa(group.VKGroupID), messageToPost, attachments, true, publishUnix)
 		if err != nil {
 			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
-			models.LogWarning("PUBLISH_FAILED", "Не удалось опубликовать запись во ВКонтакте", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, Error: %v", group.VKGroupID, postID, err))
-			utils.RespondError(w, http.StatusBadRequest, err.Error())
+			models.LogWarning("PUBLISH_FAILED", "Не удалось опубликовать запись во ВКонтакте", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, Error: %v", group.VKGroupID, post.ID, err))
+			
+			currentPub.Status = "pending"
+			updatePublication(currentPub)
 			return
 		}
+		
 		currentPub.VKPostID = vkPostID
 		currentPub.Status = req.Status
-		post.Message = messageToPost // Сохраняем скомпилированный текст для отображения в приложении
-		models.LogInfo("POST_PUBLISHED", "Запись успешно опубликована на стене сообщества", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, VK Post ID: %d", group.ID, postID, vkPostID))
-
-	case "rejected":
-		currentPub.Status = "rejected"
-		currentPub.RejectReason = req.RejectReason
-		currentPub.PublishDate = time.Time{}
-		// Видео не удаляем из S3 сразу, чтобы автор мог его посмотреть.
-	default:
-		utils.RespondError(w, http.StatusBadRequest, "unsupported status")
-		return
-	}
-
-	if err := updatePublication(currentPub); err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	if req.Status == "published" || req.Status == "scheduled" {
-		// Для опубликованных записей сохраняем итоговый отрендеренный текст в БД
-		if err := updatePost(post); err != nil {
-			utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		if err := updatePublication(currentPub); err != nil {
+			log.Printf("[Moderate] Failed to update publication: %v", err)
 			return
 		}
-	}
 
-	if author, err := getUserByID(post.UserID); err == nil && author != nil {
-		switch req.Status {
-		case "published":
-			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\n[%s|Открыть пост]", appURL))
-		case "scheduled":
-			sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", currentPub.PublishDate.Format("02.01.2006 15:04"), appURL))
-		case "rejected":
-			rejectMsg := "К сожалению, ваш предложенный пост был отклонен модератором."
-			if currentPub.RejectReason != "" {
-				rejectMsg += fmt.Sprintf("\nПричина: %s", currentPub.RejectReason)
-			}
-			rejectMsg += fmt.Sprintf("\n\n[%s|Посмотреть детали]", appURL)
-			sendNotificationToUser(author.VKUserID, rejectMsg)
+		post.Message = messageToPost
+		if err := updatePost(post); err != nil {
+			log.Printf("[Moderate] Failed to update post: %v", err)
+			return
 		}
-	}
 
-	response, err := serializePost(post, group.ID, nil)
-	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
+		models.LogInfo("POST_PUBLISHED", "Запись успешно опубликована на стене сообщества", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, VK Post ID: %d", group.ID, post.ID, vkPostID))
 
-	utils.RespondSuccess(w, response)
+		if author, err := getUserByID(post.UserID); err == nil && author != nil {
+			if req.Status == "published" {
+				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\n[%s|Открыть пост]", appURL))
+			} else if req.Status == "scheduled" {
+				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", currentPub.PublishDate.Format("02.01.2006 15:04"), appURL))
+			}
+		}
+	}()
 }
 
 func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
