@@ -149,6 +149,8 @@ const postgresSchema = `
 
 	-- Миграция: добавление колонки, если ее нет (на случай если таблица уже существует)
 	ALTER TABLE groups ADD COLUMN IF NOT EXISTS is_test BOOLEAN DEFAULT FALSE;
+	ALTER TABLE post_publications ADD COLUMN IF NOT EXISTS post_type_id TEXT;
+	ALTER TABLE post_publications ADD COLUMN IF NOT EXISTS custom_fields JSONB;
 	
 	-- Помечаем группу Антона как тестовую
 	UPDATE groups SET is_test = TRUE WHERE vk_group_id = 227624792;
@@ -248,6 +250,8 @@ const postgresSchema = `
 		reject_reason TEXT,
 		delete_reason TEXT,
 		delete_comment TEXT,
+		post_type_id TEXT,
+		custom_fields JSONB,
 		publish_date TIMESTAMPTZ,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,

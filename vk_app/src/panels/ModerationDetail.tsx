@@ -146,6 +146,15 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
     );
   }
 
+  const currentPub = post.publications ? (() => {
+    const launchParams = (window as any).vkLaunchParams || {};
+    const groupId = Number(launchParams.vk_group_id);
+    if (groupId > 0) {
+      return post.publications.find((p: any) => p.group?.vk_group_id === groupId) || post.publications[0];
+    }
+    return post.publications[0];
+  })() : null;
+
   return (
     <Panel id={id}>
       <PanelHeader before={<PanelHeaderBack onClick={() => routeNavigator.back()} />} style={{ textAlign: 'center' }}>
@@ -400,7 +409,7 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
                           const existingVKAttachments = existingAttachments.filter(a => !a.id.startsWith('s3:')).map(a => a.id).join(',');
                           const allS3Keys = [...existingS3Keys, ...newS3MediaKeys];
 
-                          let finalCustomFieldsStr = post.custom_fields || '';
+                          let finalCustomFieldsStr = currentPub?.custom_fields || '';
                           if (settings?.enable_post_types && selectedPostTypeId && settings?.post_types) {
                             const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
                             if (pt && pt.fields) {
@@ -426,7 +435,7 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
                             }
                           }
 
-                          await editPost(post.id, editMessage, allS3Keys, existingVKAttachments, selectedPostTypeId || post.post_type_id || '', finalCustomFieldsStr);
+                          await editPost(post.id, editMessage, allS3Keys, existingVKAttachments, selectedPostTypeId || currentPub?.post_type_id || '', finalCustomFieldsStr);
                           
                           const data = await getPostById(post.id);
                           setPost(data);
@@ -460,9 +469,9 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
                 <Text style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
                   {post.message}
                 </Text>
-                {post.custom_fields && (() => {
+                {currentPub?.custom_fields && (() => {
                   try {
-                    const fields = JSON.parse(post.custom_fields);
+                    const fields = JSON.parse(currentPub.custom_fields);
                     if (Array.isArray(fields) && fields.length > 0) {
                       return (
                         <div style={{ marginTop: 12, padding: 12, borderRadius: 8, background: 'var(--vkui--color_background_secondary)' }}>
@@ -491,10 +500,10 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
                       setEditMessage(post.message);
                       setExistingAttachments(post.attachment_urls || []);
                       setEditFiles([]);
-                      setSelectedPostTypeId(post.post_type_id || null);
-                      if (post.custom_fields) {
+                      setSelectedPostTypeId(currentPub?.post_type_id || null);
+                      if (currentPub?.custom_fields) {
                         try {
-                          const parsed = JSON.parse(post.custom_fields);
+                          const parsed = JSON.parse(currentPub.custom_fields);
                           const fieldMap: Record<string, string> = {};
                           if (Array.isArray(parsed)) {
                             parsed.forEach((f: any) => {

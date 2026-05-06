@@ -35,6 +35,8 @@ type postPublicationResponse struct {
 	Status       string        `json:"status"`
 	VKPostID     int           `json:"vk_post_id,omitempty"`
 	RejectReason string        `json:"reject_reason,omitempty"`
+	PostTypeID   string        `json:"post_type_id,omitempty"`
+	CustomFields string        `json:"custom_fields,omitempty"`
 	PublishDate  *string       `json:"publish_date,omitempty"`
 	CreatedAt    string        `json:"created_at"`
 	UpdatedAt    string        `json:"updated_at"`
@@ -47,8 +49,6 @@ type postResponse struct {
 	Author         *userSummary              `json:"author,omitempty"`
 	Attachments    string                    `json:"attachments,omitempty"`
 	S3VideoKey     string                    `json:"s3_video_key,omitempty"`
-	PostTypeID     string                    `json:"post_type_id,omitempty"`
-	CustomFields   string                    `json:"custom_fields,omitempty"`
 	AttachmentURLs []AttachmentURL           `json:"attachment_urls,omitempty"`
 	CreatedAt      string                    `json:"created_at"`
 	UpdatedAt      string                    `json:"updated_at"`
@@ -454,12 +454,10 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	post := &models.Post{
 		UserID:       user.ID,
 		Message:      message,
-		PostTypeID:   postTypeID,
-		CustomFields: customFields,
 		Attachments:  string(attachmentsBytes),
 		S3VideoKey:   s3KeysStr,
 	}
-	if err := createPost(post, group.ID, "pending"); err != nil {
+	if err := createPost(post, group.ID, "pending", postTypeID, customFields); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -745,10 +743,6 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	}
 
 	post.Message = req.Message
-	if req.PostTypeID != "" || req.CustomFields != "" {
-		post.PostTypeID = req.PostTypeID
-		post.CustomFields = req.CustomFields
-	}
 	if req.S3VideoKeys != nil {
 		post.S3VideoKey = strings.Join(req.S3VideoKeys, ",")
 	}
@@ -760,15 +754,23 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	}
 
 	if currentPub != nil {
+		// Update publication custom fields
+		currentPub.PostTypeID = req.PostTypeID
+		currentPub.CustomFields = req.CustomFields
+
 		wasRejected := currentPub.Status == "rejected"
 		if wasRejected {
 			currentPub.Status = "pending"
 			currentPub.RejectReason = ""
-			if err := updatePublication(currentPub); err != nil {
-				utils.RespondError(w, http.StatusInternalServerError, err.Error())
-				return
-			}
-			
+		}
+		
+		// Update publication even if not rejected to save new custom fields
+		if err := updatePublication(currentPub); err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		
+		if wasRejected {
 			g, err := getGroupByID(currentPub.GroupID)
 			if err == nil && g != nil {
 				appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, g.VKGroupID, post.ID)
@@ -1003,7 +1005,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			}
 		}
 
-		if group.EnablePostTypes && post.PostTypeID != "" && post.CustomFields != "" {
+		if group.EnablePostTypes && currentPub.PostTypeID != "" && currentPub.CustomFields != "" {
 			var postTypes []struct {
 				ID       string `json:"id"`
 				Label    string `json:"label"`
@@ -1017,7 +1019,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 				Template string `json:"template"`
 			}
 			for _, pt := range postTypes {
-				if pt.ID == post.PostTypeID {
+				if pt.ID == currentPub.PostTypeID {
 					selectedType = &pt
 					break
 				}
@@ -1029,7 +1031,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 				VarName string `json:"var_name"`
 				Value   string `json:"value"`
 			}
-			json.Unmarshal([]byte(post.CustomFields), &fields)
+			json.Unmarshal([]byte(currentPub.CustomFields), &fields)
 
 			if selectedType != nil && selectedType.Template != "" {
 				compiled := selectedType.Template
@@ -1322,14 +1324,12 @@ func serializePost(post *models.Post, contextGroupID int, usersMap map[int]*mode
 
 	response := postResponse{
 		ID:          post.ID,
-		Title:        makePostTitle(post.Message),
-		Message:      post.Message,
-		Attachments:  post.Attachments,
-		S3VideoKey:   post.S3VideoKey,
-		PostTypeID:   post.PostTypeID,
-		CustomFields: post.CustomFields,
-		CreatedAt:    post.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:    post.UpdatedAt.Format(time.RFC3339),
+		Title:       makePostTitle(post.Message),
+		Message:     post.Message,
+		Attachments: post.Attachments,
+		S3VideoKey:  post.S3VideoKey,
+		CreatedAt:   post.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   post.UpdatedAt.Format(time.RFC3339),
 	}
 
 	if user != nil {
@@ -1344,6 +1344,8 @@ func serializePost(post *models.Post, contextGroupID int, usersMap map[int]*mode
 			Status:       pub.Status,
 			VKPostID:     pub.VKPostID,
 			RejectReason: pub.RejectReason,
+			PostTypeID:   pub.PostTypeID,
+			CustomFields: pub.CustomFields,
 			CreatedAt:    pub.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:    pub.UpdatedAt.Format(time.RFC3339),
 		}
@@ -1882,7 +1884,7 @@ func scanGroup(row *sql.Row) (*models.Group, error) {
 	return group, nil
 }
 
-func createPost(post *models.Post, groupID int, status string) error {
+func createPost(post *models.Post, groupID int, status string, postTypeID string, customFields string) error {
 	tx, err := database.Begin()
 	if err != nil {
 		return err
@@ -1890,23 +1892,25 @@ func createPost(post *models.Post, groupID int, status string) error {
 	defer tx.Rollback()
 
 	if err := tx.QueryRow(database.Rebind(`
-		INSERT INTO posts (user_id, message, post_type_id, custom_fields, attachments, s3_video_key)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO posts (user_id, message, attachments, s3_video_key)
+		VALUES (?, ?, ?, ?)
 		RETURNING id, created_at, updated_at
-	`), post.UserID, post.Message, post.PostTypeID, post.CustomFields, post.Attachments, post.S3VideoKey).Scan(&post.ID, &post.CreatedAt, &post.UpdatedAt); err != nil {
+	`), post.UserID, post.Message, post.Attachments, post.S3VideoKey).Scan(&post.ID, &post.CreatedAt, &post.UpdatedAt); err != nil {
 		return err
 	}
 
 	pub := models.PostPublication{
-		PostID:  post.ID,
-		GroupID: groupID,
-		Status:  status,
+		PostID:       post.ID,
+		GroupID:      groupID,
+		Status:       status,
+		PostTypeID:   postTypeID,
+		CustomFields: customFields,
 	}
 	if err := tx.QueryRow(database.Rebind(`
-		INSERT INTO post_publications (post_id, group_id, status)
-		VALUES (?, ?, ?)
+		INSERT INTO post_publications (post_id, group_id, status, post_type_id, custom_fields)
+		VALUES (?, ?, ?, ?, ?)
 		RETURNING id, created_at, updated_at
-	`), pub.PostID, pub.GroupID, pub.Status).Scan(&pub.ID, &pub.CreatedAt, &pub.UpdatedAt); err != nil {
+	`), pub.PostID, pub.GroupID, pub.Status, pub.PostTypeID, pub.CustomFields).Scan(&pub.ID, &pub.CreatedAt, &pub.UpdatedAt); err != nil {
 		return err
 	}
 
@@ -1918,9 +1922,9 @@ func createPost(post *models.Post, groupID int, status string) error {
 func updatePost(post *models.Post) error {
 	_, err := database.Exec(`
 		UPDATE posts
-		SET message = ?, post_type_id = ?, custom_fields = ?, attachments = ?, s3_video_key = ?, updated_at = CURRENT_TIMESTAMP
+		SET message = ?, attachments = ?, s3_video_key = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, post.Message, post.PostTypeID, post.CustomFields, post.Attachments, post.S3VideoKey, post.ID)
+	`, post.Message, post.Attachments, post.S3VideoKey, post.ID)
 	if err != nil {
 		return err
 	}
@@ -1931,9 +1935,9 @@ func updatePost(post *models.Post) error {
 func updatePublication(pub *models.PostPublication) error {
 	_, err := database.Exec(`
 		UPDATE post_publications
-		SET status = ?, vk_post_id = ?, reject_reason = ?, delete_reason = ?, delete_comment = ?, publish_date = ?, updated_at = CURRENT_TIMESTAMP
+		SET status = ?, vk_post_id = ?, reject_reason = ?, delete_reason = ?, delete_comment = ?, publish_date = ?, post_type_id = ?, custom_fields = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
-	`, pub.Status, pub.VKPostID, pub.RejectReason, pub.DeleteReason, pub.DeleteComment, nullableTime(pub.PublishDate), pub.ID)
+	`, pub.Status, pub.VKPostID, pub.RejectReason, pub.DeleteReason, pub.DeleteComment, nullableTime(pub.PublishDate), pub.PostTypeID, pub.CustomFields, pub.ID)
 	if err != nil {
 		return err
 	}
@@ -1943,11 +1947,11 @@ func updatePublication(pub *models.PostPublication) error {
 
 func createPublication(pub *models.PostPublication) error {
 	query := `
-		INSERT INTO post_publications (post_id, group_id, status)
-		VALUES (?, ?, ?)
+		INSERT INTO post_publications (post_id, group_id, status, post_type_id, custom_fields)
+		VALUES (?, ?, ?, ?, ?)
 		RETURNING id
 	`
-	if err := database.QueryRow(query, pub.PostID, pub.GroupID, pub.Status).Scan(&pub.ID); err != nil {
+	if err := database.QueryRow(query, pub.PostID, pub.GroupID, pub.Status, pub.PostTypeID, pub.CustomFields).Scan(&pub.ID); err != nil {
 		return err
 	}
 	pub.CreatedAt = time.Now()
@@ -1957,7 +1961,7 @@ func createPublication(pub *models.PostPublication) error {
 
 func getPostByID(id int) (*models.Post, error) {
 	row := database.QueryRow(`
-		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at, post_type_id, custom_fields
+		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at
 		FROM posts WHERE id = ?
 	`, id)
 	post, err := scanPost(row)
@@ -1973,7 +1977,7 @@ func getPostByID(id int) (*models.Post, error) {
 
 func getPublicationsForPost(postID int) ([]models.PostPublication, error) {
 	rows, err := database.Query(`
-		SELECT id, post_id, group_id, vk_post_id, status, reject_reason, delete_reason, delete_comment, publish_date, created_at, updated_at
+		SELECT id, post_id, group_id, vk_post_id, status, reject_reason, delete_reason, delete_comment, publish_date, created_at, updated_at, post_type_id, custom_fields
 		FROM post_publications
 		WHERE post_id = ?
 		ORDER BY id DESC
@@ -1989,6 +1993,7 @@ func getPublicationsForPost(postID int) ([]models.PostPublication, error) {
 		var dbVKPostID sql.NullInt64
 		var rejectReason, deleteReason, deleteComment sql.NullString
 		var publishDate sql.NullTime
+		var postTypeID, customFields sql.NullString
 
 		if err := rows.Scan(
 			&pub.ID,
@@ -2002,6 +2007,8 @@ func getPublicationsForPost(postID int) ([]models.PostPublication, error) {
 			&publishDate,
 			&pub.CreatedAt,
 			&pub.UpdatedAt,
+			&postTypeID,
+			&customFields,
 		); err != nil {
 			return nil, err
 		}
@@ -2020,6 +2027,12 @@ func getPublicationsForPost(postID int) ([]models.PostPublication, error) {
 		}
 		if publishDate.Valid {
 			pub.PublishDate = publishDate.Time
+		}
+		if postTypeID.Valid {
+			pub.PostTypeID = postTypeID.String
+		}
+		if customFields.Valid {
+			pub.CustomFields = customFields.String
 		}
 
 		pubs = append(pubs, pub)
@@ -2049,7 +2062,7 @@ func populatePublicationsForPosts(posts []*models.Post) error {
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, post_id, group_id, vk_post_id, status, reject_reason, delete_reason, delete_comment, publish_date, created_at, updated_at
+		SELECT id, post_id, group_id, vk_post_id, status, reject_reason, delete_reason, delete_comment, publish_date, created_at, updated_at, post_type_id, custom_fields
 		FROM post_publications
 		WHERE post_id IN (%s)
 		ORDER BY id DESC
@@ -2067,6 +2080,7 @@ func populatePublicationsForPosts(posts []*models.Post) error {
 		var dbVKPostID sql.NullInt64
 		var rejectReason, deleteReason, deleteComment sql.NullString
 		var publishDate sql.NullTime
+		var postTypeID, customFields sql.NullString
 
 		if err := rows.Scan(
 			&pub.ID,
@@ -2080,6 +2094,8 @@ func populatePublicationsForPosts(posts []*models.Post) error {
 			&publishDate,
 			&pub.CreatedAt,
 			&pub.UpdatedAt,
+			&postTypeID,
+			&customFields,
 		); err != nil {
 			return err
 		}
@@ -2092,6 +2108,18 @@ func populatePublicationsForPosts(posts []*models.Post) error {
 		}
 		if deleteReason.Valid {
 			pub.DeleteReason = deleteReason.String
+		}
+		if deleteComment.Valid {
+			pub.DeleteComment = deleteComment.String
+		}
+		if publishDate.Valid {
+			pub.PublishDate = publishDate.Time
+		}
+		if postTypeID.Valid {
+			pub.PostTypeID = postTypeID.String
+		}
+		if customFields.Valid {
+			pub.CustomFields = customFields.String
 		}
 		if deleteComment.Valid {
 			pub.DeleteComment = deleteComment.String
@@ -2116,7 +2144,7 @@ func populatePublicationsForPosts(posts []*models.Post) error {
 
 func getPostsByStatusAndGroup(status string, groupID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT p.id, p.user_id, p.message, p.attachments, p.s3_video_key, p.created_at, p.updated_at, p.post_type_id, p.custom_fields
+		SELECT p.id, p.user_id, p.message, p.attachments, p.s3_video_key, p.created_at, p.updated_at
 		FROM posts p
 		INNER JOIN post_publications pub ON p.id = pub.post_id
 		WHERE pub.status = ? AND pub.group_id = ?
@@ -2179,8 +2207,6 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 		dbUserID    sql.NullInt64
 		s3VideoKey  sql.NullString
 		attachments sql.NullString
-		postTypeID  sql.NullString
-		customFields sql.NullString
 	)
 
 	err := row.Scan(
@@ -2191,8 +2217,6 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 		&s3VideoKey,
 		&post.CreatedAt,
 		&post.UpdatedAt,
-		&postTypeID,
-		&customFields,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -2209,12 +2233,6 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 	if attachments.Valid {
 		post.Attachments = attachments.String
 	}
-	if postTypeID.Valid {
-		post.PostTypeID = postTypeID.String
-	}
-	if customFields.Valid {
-		post.CustomFields = customFields.String
-	}
 	return &post, nil
 }
 
@@ -2224,8 +2242,6 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 		dbUserID    sql.NullInt64
 		s3VideoKey  sql.NullString
 		attachments sql.NullString
-		postTypeID  sql.NullString
-		customFields sql.NullString
 	)
 
 	if err := rows.Scan(
@@ -2236,8 +2252,6 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 		&s3VideoKey,
 		&post.CreatedAt,
 		&post.UpdatedAt,
-		&postTypeID,
-		&customFields,
 	); err != nil {
 		return nil, err
 	}
@@ -2250,12 +2264,6 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 	}
 	if attachments.Valid {
 		post.Attachments = attachments.String
-	}
-	if postTypeID.Valid {
-		post.PostTypeID = postTypeID.String
-	}
-	if customFields.Valid {
-		post.CustomFields = customFields.String
 	}
 	return &post, nil
 }
