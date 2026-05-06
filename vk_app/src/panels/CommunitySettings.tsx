@@ -29,6 +29,19 @@ const POST_TYPE_COLORS = [
   '#d1d5db', // Gray (distinct)
 ];
 
+const getContrastYIQ = (hexcolor: string) => {
+  if (!hexcolor) return 'rgba(0,0,0,0.8)';
+  hexcolor = hexcolor.replace("#", "");
+  if (hexcolor.length === 3) {
+    hexcolor = hexcolor.split('').map(c => c + c).join('');
+  }
+  const r = parseInt(hexcolor.substr(0,2),16);
+  const g = parseInt(hexcolor.substr(2,2),16);
+  const b = parseInt(hexcolor.substr(4,2),16);
+  const yiq = ((r*299)+(g*587)+(b*114))/1000;
+  return (yiq >= 128) ? 'rgba(0,0,0,0.8)' : '#ffffff';
+};
+
 export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [settings, setSettings] = useState<AppGroupSettings | null>(null);
@@ -360,7 +373,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                         borderRadius: 16, 
                         fontSize: 14, 
                         fontWeight: 500,
-                        color: 'rgba(0,0,0,0.8)'
+                        color: getContrastYIQ(pt.color)
                       }}>
                         {pt.label}
                       </div>
@@ -416,6 +429,17 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                             }}
                           />
                         ))}
+                        <div style={{ position: 'relative', width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}>
+                          <input 
+                            type="color" 
+                            value={pt.color}
+                            onChange={(e) => {
+                              setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, color: e.target.value } : p));
+                            }}
+                            style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
+                          />
+                        </div>
+                        ))}
                       </div>
                     )}
                     {expandedModeratorType === pt.id && (
@@ -465,6 +489,14 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                       }}
                     />
                   ))}
+                  <div style={{ position: 'relative', width: 24, height: 24, borderRadius: '50%', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }}>
+                    <input 
+                      type="color" 
+                      value={newTypeColor}
+                      onChange={(e) => setNewTypeColor(e.target.value)}
+                      style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
+                    />
+                  </div>
                 </div>
                 <Button 
                   mode="secondary" 
