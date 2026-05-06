@@ -405,24 +405,7 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
                             const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
                             if (pt && pt.fields) {
                               const fieldsArr = [];
-                              
-                              // First, preserve any existing fields that belong to other communities
-                              let existingFields: any[] = [];
-                              if (post.custom_fields) {
-                                try {
-                                  existingFields = JSON.parse(post.custom_fields);
-                                  if (!Array.isArray(existingFields)) existingFields = [];
-                                } catch(e) {}
-                              }
-                              
-                              const knownIds = new Set(pt.fields.map((f: any) => f.id));
-                              for (const ef of existingFields) {
-                                if (!knownIds.has(ef.id)) {
-                                  fieldsArr.push(ef);
-                                }
-                              }
 
-                              // Add or update current community fields
                               for (const field of pt.fields) {
                                 const val = customFieldValues[field.id];
                                 if (val) {
