@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-05-06
 
 ### Added
+- **Frontend & Backend / Community Settings**: Implemented a comprehensive "Post Types & Questionnaires" system. Admins can define custom post categories with specific colors and attach dynamic required/optional form fields (text, phone with masking, links, checkboxes).
+- **Frontend / Create Post**: Integrated dynamic form rendering in `CreateAd.tsx` based on the selected community category, automatically compiling structured questionnaire data into the post message.
 - **Frontend / Moderation**: Added inline text editing capabilities for moderators directly within `ModerationDetail`.
 - **Frontend / UI**: Redesigned publication statuses in `AdDetail` to display multiple community placements within a unified `<Group>` structure utilizing `<SimpleCell>`, `Avatar`, and VK wall post links.
 
