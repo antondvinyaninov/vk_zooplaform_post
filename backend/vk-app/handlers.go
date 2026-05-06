@@ -2171,9 +2171,18 @@ func sendNotificationToUser(vkUserID int, message string) {
 		}
 		client := vk.NewVKClient(cfg.VKOfficialGroupToken)
 		if err := client.SendDirectMessage(vkUserID, message); err != nil {
-			log.Printf("[VK Notifications] Failed to send to user %d: %v", vkUserID, err)
+			log.Printf("[VK Notifications] Failed to send DM to user %d: %v. Attempting bell notification...", vkUserID, err)
+			serviceKey := os.Getenv("VK_SERVICE_KEY")
+			if serviceKey != "" {
+				serviceClient := vk.NewVKClient(serviceKey)
+				if notifErr := serviceClient.SendNotification(strconv.Itoa(vkUserID), message); notifErr != nil {
+					log.Printf("[VK Notifications] Failed to send bell notification to user %d: %v", vkUserID, notifErr)
+				} else {
+					log.Printf("[VK Notifications] Successfully sent bell notification to user %d", vkUserID)
+				}
+			}
 		} else {
-			log.Printf("[VK Notifications] Successfully sent to user %d", vkUserID)
+			log.Printf("[VK Notifications] Successfully sent DM to user %d", vkUserID)
 		}
 	}()
 }

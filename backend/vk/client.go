@@ -279,6 +279,17 @@ func (c *VKClient) SendDirectMessage(userID int, message string) error {
 	return err
 }
 
+// SendNotification отправляет разовое уведомление пользователю в колокольчик
+// Требуется сервисный ключ доступа (Service Token).
+func (c *VKClient) SendNotification(userIDs string, message string) error {
+	params := map[string]string{
+		"user_ids": userIDs,
+		"message":  message,
+	}
+	_, err := c.CallMethod("notifications.sendMessage", params)
+	return err
+}
+
 func (c *VKClient) GetCallbackConfirmationCode(groupID int) (string, error) {
 	resp, err := c.CallMethod("groups.getCallbackConfirmationCode", map[string]string{
 		"group_id": strconv.Itoa(groupID),

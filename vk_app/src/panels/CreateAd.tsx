@@ -49,12 +49,17 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
     setIsSubmitting(true);
     try {
       try {
-        bridge.send('VKWebAppAllowMessagesFromGroup', {
+        await bridge.send('VKWebAppAllowMessagesFromGroup', {
           group_id: 165434330,
           key: 'post_status_updates'
-        }).catch(() => {});
+        });
       } catch (e) {
-        // Игнорируем ошибки
+        // Игнорируем отказ от сообщений
+      }
+      try {
+        await bridge.send('VKWebAppAllowNotifications');
+      } catch (e) {
+        // Игнорируем отказ от уведомлений
       }
 
       const s3MediaKeys: string[] = [];
