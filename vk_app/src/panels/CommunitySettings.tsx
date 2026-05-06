@@ -555,9 +555,19 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                              <input type="checkbox" checked={newFieldRequired} onChange={e => setNewFieldRequired(e.target.checked)} /> Обяз.
                            </label>
                            <Button mode="secondary" size="s" onClick={() => {
-                              if (!newFieldLabel) return;
-                              const newField = { id: Date.now().toString(), label: newFieldLabel, type: newFieldType, required: newFieldRequired };
-                              setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, fields: [...(p.fields || []), newField] } : p));
+                              const trimmedLabel = newFieldLabel.trim();
+                              if (!trimmedLabel) return;
+                              
+                              const existingFields = pt.fields || [];
+                              const isDuplicate = existingFields.some((f: any) => f.label.toLowerCase() === trimmedLabel.toLowerCase());
+                              
+                              if (isDuplicate) {
+                                alert(`Поле с названием "${trimmedLabel}" уже существует в этой категории.`);
+                                return;
+                              }
+                              
+                              const newField = { id: Date.now().toString(), label: trimmedLabel, type: newFieldType, required: newFieldRequired };
+                              setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, fields: [...existingFields, newField] } : p));
                               setNewFieldLabel('');
                               setNewFieldRequired(false);
                            }}>Добавить</Button>
