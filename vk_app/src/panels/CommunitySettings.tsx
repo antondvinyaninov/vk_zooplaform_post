@@ -646,8 +646,23 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                               <div
                                 key={sys.var}
                                 onClick={() => {
-                                  navigator.clipboard.writeText(sys.var);
-                                  // Optional: you can add a toast notification here
+                                  vkBridge.send('VKWebAppCopyText', { text: sys.var })
+                                    .then(() => {
+                                      setSnackbar(
+                                        <Snackbar
+                                          onClose={() => setSnackbar(null)}
+                                          onClosed={() => {}}
+                                          before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+                                        >
+                                          Скопировано: {sys.var}
+                                        </Snackbar>
+                                      );
+                                    })
+                                    .catch((e: any) => {
+                                      console.error(e);
+                                      // Fallback
+                                      navigator.clipboard.writeText(sys.var);
+                                    });
                                 }}
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: 4,
@@ -674,7 +689,23 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                                   <div
                                     key={f.id}
                                     onClick={() => {
-                                      navigator.clipboard.writeText(varStr);
+                                      vkBridge.send('VKWebAppCopyText', { text: varStr })
+                                        .then(() => {
+                                          setSnackbar(
+                                            <Snackbar
+                                              onClose={() => setSnackbar(null)}
+                                              onClosed={() => {}}
+                                              before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+                                            >
+                                              Скопировано: {varStr}
+                                            </Snackbar>
+                                          );
+                                        })
+                                        .catch((e: any) => {
+                                          console.error(e);
+                                          // Fallback
+                                          navigator.clipboard.writeText(varStr);
+                                        });
                                     }}
                                     style={{
                                       display: 'flex', alignItems: 'center', gap: 4,
