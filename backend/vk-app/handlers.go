@@ -1063,6 +1063,8 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		return
 	}
 
+	post.Message = messageToPost // Сохраняем скомпилированный текст для отображения в приложении
+
 	if req.Status == "published" || req.Status == "scheduled" {
 		if err := updatePost(post); err != nil {
 			utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -1951,7 +1953,7 @@ func createPublication(pub *models.PostPublication) error {
 
 func getPostByID(id int) (*models.Post, error) {
 	row := database.QueryRow(`
-		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at
+		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at, post_type_id, custom_fields
 		FROM posts WHERE id = ?
 	`, id)
 	post, err := scanPost(row)
@@ -2110,7 +2112,7 @@ func populatePublicationsForPosts(posts []*models.Post) error {
 
 func getPostsByStatusAndGroup(status string, groupID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT p.id, p.user_id, p.message, p.attachments, p.s3_video_key, p.created_at, p.updated_at
+		SELECT p.id, p.user_id, p.message, p.attachments, p.s3_video_key, p.created_at, p.updated_at, p.post_type_id, p.custom_fields
 		FROM posts p
 		INNER JOIN post_publications pub ON p.id = pub.post_id
 		WHERE pub.status = ? AND pub.group_id = ?
@@ -2134,7 +2136,7 @@ func getPostsByStatusAndGroup(status string, groupID int, limit, offset int) ([]
 
 func getPostsByUserID(userID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at
+		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at, post_type_id, custom_fields
 		FROM posts
 		WHERE user_id = ? AND COALESCE(status, '') != 'deleted'
 		ORDER BY created_at DESC
@@ -2173,6 +2175,8 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 		dbUserID    sql.NullInt64
 		s3VideoKey  sql.NullString
 		attachments sql.NullString
+		postTypeID  sql.NullString
+		customFields sql.NullString
 	)
 
 	err := row.Scan(
@@ -2183,6 +2187,8 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 		&s3VideoKey,
 		&post.CreatedAt,
 		&post.UpdatedAt,
+		&postTypeID,
+		&customFields,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -2199,6 +2205,12 @@ func scanPost(row *sql.Row) (*models.Post, error) {
 	if attachments.Valid {
 		post.Attachments = attachments.String
 	}
+	if postTypeID.Valid {
+		post.PostTypeID = postTypeID.String
+	}
+	if customFields.Valid {
+		post.CustomFields = customFields.String
+	}
 	return &post, nil
 }
 
@@ -2208,6 +2220,8 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 		dbUserID    sql.NullInt64
 		s3VideoKey  sql.NullString
 		attachments sql.NullString
+		postTypeID  sql.NullString
+		customFields sql.NullString
 	)
 
 	if err := rows.Scan(
@@ -2218,6 +2232,8 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 		&s3VideoKey,
 		&post.CreatedAt,
 		&post.UpdatedAt,
+		&postTypeID,
+		&customFields,
 	); err != nil {
 		return nil, err
 	}
@@ -2230,6 +2246,12 @@ func scanPostFromRows(rows *sql.Rows) (*models.Post, error) {
 	}
 	if attachments.Valid {
 		post.Attachments = attachments.String
+	}
+	if postTypeID.Valid {
+		post.PostTypeID = postTypeID.String
+	}
+	if customFields.Valid {
+		post.CustomFields = customFields.String
 	}
 	return &post, nil
 }
