@@ -53,6 +53,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [expandedColorType, setExpandedColorType] = useState<string | null>(null);
   const [customColorInputId, setCustomColorInputId] = useState<string | null>(null);
   const [isNewCustomColorInputOpen, setIsNewCustomColorInputOpen] = useState(false);
+  const [addedColors, setAddedColors] = useState<string[]>([]);
+  const allColors = [...POST_TYPE_COLORS, ...addedColors];
   const [cityId, setCityId] = useState<number | undefined>(undefined);
   const [cityTitle, setCityTitle] = useState<string>('');
   const [cityOptions, setCityOptions] = useState<{value: number, label: string}[]>([]);
@@ -412,7 +414,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                     </div>
                     {expandedColorType === pt.id && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4, marginLeft: 4 }}>
-                        {POST_TYPE_COLORS.map(c => (
+                        {allColors.map(c => (
                           <div 
                             key={c}
                             onClick={() => {
@@ -432,26 +434,39 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                           />
                         ))}
                         {customColorInputId === pt.id ? (
-                          <input
-                            type="text"
-                            value={pt.color}
-                            onChange={(e) => {
-                              setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, color: e.target.value } : p));
-                            }}
-                            placeholder="#HEX"
-                            maxLength={7}
-                            style={{
-                              width: 70,
-                              height: 24,
-                              padding: '0 8px',
-                              borderRadius: 12,
-                              border: '1px solid var(--vkui--color_image_border_alpha)',
-                              fontSize: 12,
-                              background: 'var(--vkui--color_background_content)',
-                              color: 'var(--vkui--color_text_primary)',
-                              boxSizing: 'border-box'
-                            }}
-                          />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <input
+                              type="text"
+                              value={pt.color}
+                              onChange={(e) => {
+                                setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, color: e.target.value } : p));
+                              }}
+                              placeholder="#HEX"
+                              maxLength={7}
+                              style={{
+                                width: 70,
+                                height: 24,
+                                padding: '0 8px',
+                                borderRadius: 12,
+                                border: '1px solid var(--vkui--color_image_border_alpha)',
+                                fontSize: 12,
+                                background: 'var(--vkui--color_background_content)',
+                                color: 'var(--vkui--color_text_primary)',
+                                boxSizing: 'border-box'
+                              }}
+                            />
+                            <div 
+                              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              onClick={() => {
+                                setCustomColorInputId(null);
+                                if (/^#[0-9A-Fa-f]{6}$/.test(pt.color) && !allColors.includes(pt.color)) {
+                                  setAddedColors([...addedColors, pt.color]);
+                                }
+                              }}
+                            >
+                              <Icon24CheckCircleOutline width={24} height={24} fill="var(--vkui--color_icon_accent)" />
+                            </div>
+                          </div>
                         ) : (
                           <div 
                             onClick={() => setCustomColorInputId(pt.id)}
@@ -495,7 +510,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                   }}
                 />
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {POST_TYPE_COLORS.map(c => (
+                  {allColors.map(c => (
                     <div 
                       key={c}
                       onClick={() => setNewTypeColor(c)}
@@ -510,24 +525,37 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                     />
                   ))}
                   {isNewCustomColorInputOpen ? (
-                    <input
-                      type="text"
-                      value={newTypeColor}
-                      onChange={(e) => setNewTypeColor(e.target.value)}
-                      placeholder="#HEX"
-                      maxLength={7}
-                      style={{
-                        width: 70,
-                        height: 24,
-                        padding: '0 8px',
-                        borderRadius: 12,
-                        border: '1px solid var(--vkui--color_image_border_alpha)',
-                        fontSize: 12,
-                        background: 'var(--vkui--color_background_content)',
-                        color: 'var(--vkui--color_text_primary)',
-                        boxSizing: 'border-box'
-                      }}
-                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input
+                        type="text"
+                        value={newTypeColor}
+                        onChange={(e) => setNewTypeColor(e.target.value)}
+                        placeholder="#HEX"
+                        maxLength={7}
+                        style={{
+                          width: 70,
+                          height: 24,
+                          padding: '0 8px',
+                          borderRadius: 12,
+                          border: '1px solid var(--vkui--color_image_border_alpha)',
+                          fontSize: 12,
+                          background: 'var(--vkui--color_background_content)',
+                          color: 'var(--vkui--color_text_primary)',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                      <div 
+                        style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        onClick={() => {
+                          setIsNewCustomColorInputOpen(false);
+                          if (/^#[0-9A-Fa-f]{6}$/.test(newTypeColor) && !allColors.includes(newTypeColor)) {
+                            setAddedColors([...addedColors, newTypeColor]);
+                          }
+                        }}
+                      >
+                        <Icon24CheckCircleOutline width={24} height={24} fill="var(--vkui--color_icon_accent)" />
+                      </div>
+                    </div>
                   ) : (
                     <div 
                       onClick={() => setIsNewCustomColorInputOpen(true)}
