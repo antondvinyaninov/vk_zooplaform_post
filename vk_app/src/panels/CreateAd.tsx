@@ -11,18 +11,53 @@ import {
   File as VKFile,
   HorizontalScroll,
   Image,
+  Input,
+  Checkbox,
 } from '@vkontakte/vkui';
 import { Icon24Camera, Icon28CancelCircleFillRed, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import bridge from '@vkontakte/vk-bridge';
-import { createPost, getS3PresignedUrl, uploadMediaToS3, compressImage } from '../shared/api';
+import { createPost, getS3PresignedUrl, uploadMediaToS3, compressImage, getCommunitySettings } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
 export const CreatePost: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
+  const [settings, setSettings] = useState<any>(null);
   const [text, setText] = useState('');
   const [files, setFiles] = useState<{ file: File, thumbnail?: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPostTypeId, setSelectedPostTypeId] = useState<string | null>(null);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | boolean>>({});
+
+  useEffect(() => {
+    getCommunitySettings().then(setSettings).catch(console.error);
+  }, []);
+
+  const getContrastYIQ = (hexcolor: string) => {
+    if (!hexcolor) return 'rgba(0,0,0,0.8)';
+    hexcolor = hexcolor.replace("#", "");
+    if (hexcolor.length === 3) hexcolor = hexcolor.split('').map(c => c + c).join('');
+    const r = parseInt(hexcolor.substr(0,2),16);
+    const g = parseInt(hexcolor.substr(2,2),16);
+    const b = parseInt(hexcolor.substr(4,2),16);
+    const yiq = ((r*299)+(g*587)+(b*114))/1000;
+    return (yiq >= 128) ? 'rgba(0,0,0,0.8)' : '#ffffff';
+  };
+
+  const applyPhoneMask = (val: string) => {
+    const digits = val.replace(/\D/g, '');
+    if (!digits) return '';
+    let res = '+7';
+    let raw = digits;
+    if (raw.startsWith('7') || raw.startsWith('8')) raw = raw.slice(1);
+    
+    if (raw.length > 0) res += ` (${raw.slice(0,3)}`;
+    if (raw.length >= 3) res += `) ${raw.slice(3,6)}`;
+    if (raw.length >= 6) res += `-${raw.slice(6,8)}`;
+    if (raw.length >= 8) res += `-${raw.slice(8,10)}`;
+    
+    return res;
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -44,6 +79,32 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
     if (!text || text.length < 10) {
       alert('Минимальная длина текста — 10 символов');
       return;
+    }
+
+    let finalText = text;
+    if (selectedPostTypeId && settings?.post_types) {
+      const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
+      if (pt) {
+        let fieldsText = `[Категория: ${pt.label}]\n`;
+        if (pt.fields) {
+          for (const field of pt.fields) {
+            const val = customFieldValues[field.id];
+            if (field.required && !val) {
+              alert(`Пожалуйста, заполните обязательное поле: ${field.label}`);
+              return;
+            }
+            if (val) {
+              if (field.type === 'checkbox') {
+                fieldsText += `${field.label}: Да\n`;
+              } else {
+                fieldsText += `${field.label}: ${val}\n`;
+              }
+            }
+          }
+        }
+        fieldsText += '\n';
+        finalText = fieldsText + text;
+      }
     }
 
     setIsSubmitting(true);
@@ -83,7 +144,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
         s3MediaKeys.push(key);
       }
 
-      await createPost(text, s3MediaKeys, []);
+      await createPost(finalText, s3MediaKeys, []);
       routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`);
     } catch (error: any) {
       alert(`Ошибка при сохранении: ${error?.message || String(error)}`);
@@ -99,6 +160,74 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
       </PanelHeader>
 
       <Group>
+        {settings?.post_types && settings.post_types.length > 0 && (
+          <FormItem top="Категория (тип объявления)">
+            <HorizontalScroll showArrows getScrollToLeft={(i) => i - 120} getScrollToRight={(i) => i + 120}>
+              <div style={{ display: 'flex', gap: 8, padding: '4px 0' }}>
+                {settings.post_types.map((pt: any) => {
+                  const isSelected = selectedPostTypeId === pt.id;
+                  return (
+                    <div 
+                      key={pt.id}
+                      onClick={() => {
+                        setSelectedPostTypeId(isSelected ? null : pt.id);
+                        setCustomFieldValues({});
+                      }}
+                      style={{ 
+                        padding: '6px 16px', 
+                        backgroundColor: isSelected ? pt.color : 'transparent', 
+                        borderRadius: 16, 
+                        fontSize: 14, 
+                        fontWeight: 500,
+                        color: isSelected ? getContrastYIQ(pt.color) : 'var(--vkui--color_text_primary)',
+                        border: isSelected ? `1px solid ${pt.color}` : '1px solid var(--vkui--color_image_border_alpha)',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.2s ease'
+                      }}>
+                      {pt.label}
+                    </div>
+                  );
+                })}
+              </div>
+            </HorizontalScroll>
+          </FormItem>
+        )}
+
+        {selectedPostTypeId && (() => {
+          const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
+          if (!pt || !pt.fields || pt.fields.length === 0) return null;
+          
+          return pt.fields.map((field: any) => (
+            <FormItem 
+              key={field.id} 
+              top={`${field.label} ${field.required ? '*' : ''}`}
+            >
+              {field.type === 'checkbox' ? (
+                <Checkbox 
+                  checked={!!customFieldValues[field.id]} 
+                  onChange={(e) => setCustomFieldValues({...customFieldValues, [field.id]: e.target.checked})}
+                >
+                  Да / Нет
+                </Checkbox>
+              ) : (
+                <Input 
+                  type={field.type === 'phone' ? 'tel' : 'text'}
+                  value={(customFieldValues[field.id] as string) || ''}
+                  placeholder={field.type === 'link' ? 'https://...' : ''}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (field.type === 'phone') {
+                      val = applyPhoneMask(val);
+                    }
+                    setCustomFieldValues({...customFieldValues, [field.id]: val});
+                  }}
+                />
+              )}
+            </FormItem>
+          ));
+        })()}
+
         <FormItem 
           top="Текст публикации" 
           status={text.length >= 10 ? 'valid' : 'default'}
