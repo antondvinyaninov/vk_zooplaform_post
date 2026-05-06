@@ -2175,7 +2175,7 @@ func getPostsByStatusAndGroup(status string, groupID int, limit, offset int) ([]
 
 func getPostsByUserID(userID int, limit, offset int) ([]*models.Post, error) {
 	rows, err := database.Query(`
-		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at, post_type_id, custom_fields
+		SELECT id, user_id, message, attachments, s3_video_key, created_at, updated_at
 		FROM posts
 		WHERE user_id = ? AND COALESCE(status, '') != 'deleted'
 		ORDER BY created_at DESC
