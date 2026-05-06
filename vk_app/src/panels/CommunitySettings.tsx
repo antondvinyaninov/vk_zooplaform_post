@@ -37,6 +37,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [newTypeLabel, setNewTypeLabel] = useState('');
   const [newTypeColor, setNewTypeColor] = useState(POST_TYPE_COLORS[0]);
   const [expandedModeratorType, setExpandedModeratorType] = useState<string | null>(null);
+  const [expandedColorType, setExpandedColorType] = useState<string | null>(null);
   const [cityId, setCityId] = useState<number | undefined>(undefined);
   const [cityTitle, setCityTitle] = useState<string>('');
   const [cityOptions, setCityOptions] = useState<{value: number, label: string}[]>([]);
@@ -372,6 +373,20 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                       >
                         <Icon28AddCircleOutline width={24} height={24} />
                       </div>
+                      <div
+                        style={{ 
+                          width: 20, 
+                          height: 20, 
+                          borderRadius: '50%', 
+                          backgroundColor: pt.color,
+                          cursor: 'pointer',
+                          border: '1px solid rgba(0,0,0,0.1)'
+                        }}
+                        onClick={() => {
+                          if (expandedColorType === pt.id) setExpandedColorType(null);
+                          else setExpandedColorType(pt.id);
+                        }}
+                      />
                       <div style={{ flexGrow: 1 }} />
                       <div 
                         style={{ cursor: 'pointer', opacity: 0.5 }} 
@@ -380,28 +395,31 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                         <Icon24Cancel width={20} height={20} />
                       </div>
                     </div>
+                    {expandedColorType === pt.id && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 4, marginLeft: 4 }}>
+                        {POST_TYPE_COLORS.map(c => (
+                          <div 
+                            key={c}
+                            onClick={() => {
+                              setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, color: c } : p));
+                              setExpandedColorType(null);
+                            }}
+                            style={{ 
+                              width: 24, 
+                              height: 24, 
+                              borderRadius: '50%', 
+                              backgroundColor: c,
+                              cursor: 'pointer',
+                              border: pt.color === c ? '2px solid var(--vkui--color_icon_accent)' : '1px solid rgba(0,0,0,0.1)',
+                              transition: 'transform 0.1s ease-in-out',
+                              transform: pt.color === c ? 'scale(1.1)' : 'scale(1)'
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
                     {expandedModeratorType === pt.id && (
                       <div style={{ paddingLeft: 0, marginTop: 4 }}>
-                        <div style={{ display: 'flex', gap: 6, marginBottom: 12, marginLeft: 4 }}>
-                          {POST_TYPE_COLORS.map(c => (
-                            <div 
-                              key={c}
-                              onClick={() => {
-                                setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, color: c } : p));
-                              }}
-                              style={{ 
-                                width: 24, 
-                                height: 24, 
-                                borderRadius: '50%', 
-                                backgroundColor: c,
-                                cursor: 'pointer',
-                                border: pt.color === c ? '2px solid var(--vkui--color_icon_accent)' : '1px solid rgba(0,0,0,0.1)',
-                                transition: 'transform 0.1s ease-in-out',
-                                transform: pt.color === c ? 'scale(1.1)' : 'scale(1)'
-                              }}
-                            />
-                          ))}
-                        </div>
                         <ChipsSelect
                           value={managers.filter(m => pt.moderator_ids?.includes(m.id)).map(m => ({ value: m.id, label: `${m.first_name} ${m.last_name}` }))}
                           onChange={(options) => {
