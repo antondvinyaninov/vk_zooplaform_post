@@ -439,7 +439,6 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                             style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', padding: 0, border: 'none' }}
                           />
                         </div>
-                        ))}
                       </div>
                     )}
                     {expandedModeratorType === pt.id && (
