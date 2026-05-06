@@ -161,13 +161,27 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                             }
 
                             return (
-                              <div key={pub.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '8px', backgroundColor: 'var(--vkui--color_background_secondary)', borderRadius: 8 }}>
-                                <Text weight="2">{groupName}</Text>
-                                <Text style={{ color: statusColor, fontSize: 14 }}>{statusText}</Text>
-                                {pub.status === 'rejected' && pub.reject_reason && (
-                                  <Text style={{ fontSize: 13, color: 'var(--vkui--color_text_secondary)', marginTop: 4 }}>
-                                    Причина: {pub.reject_reason}
-                                  </Text>
+                              <div key={pub.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px', backgroundColor: 'var(--vkui--color_background_secondary)', borderRadius: 8 }}>
+                                <Avatar size={36} src={pub.group?.photo_200} />
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                  <Text weight="2" style={{ fontSize: 14 }}>{groupName}</Text>
+                                  <Text style={{ color: statusColor, fontSize: 13 }}>{statusText}</Text>
+                                  {pub.status === 'rejected' && pub.reject_reason && (
+                                    <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)', marginTop: 2 }}>
+                                      Причина: {pub.reject_reason}
+                                    </Text>
+                                  )}
+                                </div>
+                                {pub.vk_post_id && pub.group?.vk_group_id && (
+                                  <Button 
+                                    mode="tertiary" 
+                                    size="s" 
+                                    href={`https://vk.com/wall-${pub.group.vk_group_id}_${pub.vk_post_id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    ВКонтакте
+                                  </Button>
                                 )}
                               </div>
                             );
@@ -213,44 +227,7 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
                   </div>
                 )}
 
-                {post.publications && post.publications.length > 0 && (
-                  <div style={{ marginBottom: 16, padding: '12px', backgroundColor: 'var(--vkui--color_background_secondary)', borderRadius: 8 }}>
-                    <Text weight="3" style={{ marginBottom: 8 }}>Где опубликовано/предложено:</Text>
-                    {post.publications.map((pub: any) => (
-                      <div 
-                        key={pub.id} 
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          marginBottom: 6,
-                          padding: '4px',
-                          borderRadius: '6px'
-                        }}
-                      >
-                        <Avatar size={24} src={pub.group?.photo_200} style={{ marginRight: 8 }} />
-                        <div style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 13, fontWeight: 500 }}>
-                            {pub.group?.name || 'Группа ' + pub.group_id}
-                          </Text>
-                          <Text style={{ fontSize: 12, color: 'var(--vkui--color_text_secondary)' }}>
-                            {pub.status === 'published' ? '✅ Опубликовано' : pub.status === 'pending' ? '⏳ Модерация' : pub.status === 'rejected' ? '❌ Отклонено' : pub.status}
-                          </Text>
-                        </div>
-                        {pub.vk_post_id && pub.group?.vk_group_id && (
-                          <Button 
-                            mode="tertiary" 
-                            size="s" 
-                            href={`https://vk.com/wall-${pub.group.vk_group_id}_${pub.vk_post_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            ВКонтакте
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+
               </>
             );
           })()}
