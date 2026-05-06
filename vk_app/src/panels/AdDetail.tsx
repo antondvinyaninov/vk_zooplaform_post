@@ -26,15 +26,14 @@ import {
 import { 
   Icon28CalendarOutline,
   Icon56ErrorOutline,
-  Icon24CheckCircleOutline,
-  Icon24CancelOutline,
+
   Icon24Camera,
   Icon28VideoOutline,
   Icon24Dismiss,
   Icon24WriteOutline
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
-import { getPostById, moderatePost, editPost, compressImage, getS3PresignedUrl, uploadMediaToS3, suggestExistingPost, getCommunitySettings } from '../shared/api';
+import { getPostById, editPost, compressImage, getS3PresignedUrl, uploadMediaToS3, suggestExistingPost, getCommunitySettings } from '../shared/api';
 
 export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -44,8 +43,7 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editMessage, setEditMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [isRejecting, setIsRejecting] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editFiles, setEditFiles] = useState<Array<{file: File, thumbnail?: string}>>([]);
   const [existingAttachments, setExistingAttachments] = useState<any[]>([]);
