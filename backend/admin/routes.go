@@ -37,6 +37,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/vk/posts", middleware.CORSFunc(vkGetPostsHandler))
 	mux.HandleFunc("/api/vk/repost", middleware.CORSFunc(vkRepostHandler))
 	mux.HandleFunc("/api/vk/copy-post", middleware.CORSFunc(vkCopyPostHandler))
+	mux.HandleFunc("/api/admin/vk/post-by-link", middleware.CORSFunc(vkPostByLinkPreviewHandler))
 	mux.HandleFunc("/api/vk/groups", middleware.CORSFunc(vkGetGroupsHandler))
 	mux.HandleFunc("/api/vk/user-info", middleware.CORSFunc(vkUserInfoHandler))
 	mux.HandleFunc("/api/vk/service-key", middleware.CORSFunc(vkServiceKeyHandler))

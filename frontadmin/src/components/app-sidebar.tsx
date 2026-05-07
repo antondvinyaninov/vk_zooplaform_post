@@ -15,6 +15,7 @@ import {
   IconSearch,
   IconSettings,
   IconUsers,
+  IconLink,
 } from "@tabler/icons-react"
 
 
@@ -53,6 +54,11 @@ const data = {
       title: "Посты",
       url: "/posts",
       icon: <IconListDetails />,
+    },
+    {
+      title: "Пост по ссылке",
+      url: "/post-by-link",
+      icon: <IconLink />,
     },
     {
       title: "Системные логи",

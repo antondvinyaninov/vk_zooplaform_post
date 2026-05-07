@@ -153,3 +153,45 @@ func (c *VKClient) WallRepost(object, groupID string) (*WallRepostResponse, erro
 
 	return &repostResp, nil
 }
+
+// WallGetByIdExtendedResponse ответ на получение постов по id
+type WallGetByIdExtendedResponse struct {
+	Items    []WallItem `json:"items"`
+	Profiles []User     `json:"profiles"`
+	Groups   []Group    `json:"groups"`
+}
+
+// WallGetById получает посты по их идентификаторам
+func (c *VKClient) WallGetById(posts string, extended bool) (*WallGetByIdExtendedResponse, error) {
+	params := map[string]string{
+		"posts": posts,
+	}
+
+	if extended {
+		params["extended"] = "1"
+	}
+
+	resp, err := c.CallMethod("wall.getById", params)
+	if err != nil {
+		return nil, err
+	}
+
+	// Когда extended=1 возвращается объект {items, profiles, groups}.
+	// Когда extended=0 возвращается массив постов.
+	// API VK возвращает разные типы в зависимости от флага.
+	
+	if extended {
+		var extendedResp WallGetByIdExtendedResponse
+		if err := json.Unmarshal(resp, &extendedResp); err != nil {
+			return nil, fmt.Errorf("failed to parse extended wall.getById response: %w", err)
+		}
+		return &extendedResp, nil
+	}
+
+	var items []WallItem
+	if err := json.Unmarshal(resp, &items); err != nil {
+		return nil, fmt.Errorf("failed to parse array wall.getById response: %w", err)
+	}
+
+	return &WallGetByIdExtendedResponse{Items: items}, nil
+}
