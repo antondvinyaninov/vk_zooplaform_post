@@ -42,11 +42,10 @@ export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => 
         
         if (onConfirm) {
           onConfirm(postId, pubType, pubType === 'scheduled' ? scheduledDate : undefined);
+        } else {
+          window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId } }));
+          closeModal();
         }
-        
-        window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId } }));
-        
-        closeModal();
       } catch (error) {
         console.error('Failed to moderate post:', error);
       } finally {

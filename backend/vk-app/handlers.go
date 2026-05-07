@@ -927,6 +927,14 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		return
 	}
 
+	// Устанавливаем статус processing, чтобы предотвратить дублирование запросов
+	// если пользователь нажмет кнопку несколько раз подряд.
+	currentPub.Status = "processing"
+	if err := updatePublication(currentPub); err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to set processing status")
+		return
+	}
+
 	// Immediately return success so API Gateway doesn't timeout
 	utils.RespondSuccess(w, map[string]interface{}{"success": true, "status": req.Status})
 
