@@ -1,7 +1,7 @@
 package vkapp
 
 import (
-	"backend/database"
+
 	"backend/vk"
 	"encoding/json"
 	"fmt"
@@ -150,20 +150,16 @@ func appPublishPostByLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем токен группы
-	groupIDStr := fmt.Sprintf("%v", vkCtx.GroupID)
-	var groupToken string
-	err = database.DB.QueryRow("SELECT access_token FROM groups WHERE vk_group_id = $1", groupIDStr).Scan(&groupToken)
-	if err != nil || groupToken == "" {
-		// Fallback: пытаемся использовать глобальный токен админа
-		groupToken, err = getActiveVKToken()
-		if err != nil || groupToken == "" {
-			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not find token to publish post"})
-			return
-		}
+	// Для публикации на стену группы требуется пользовательский токен администратора.
+	// Токен группы (community access token) не имеет прав на вызов wall.post.
+	adminToken, err := getActiveVKToken()
+	if err != nil || adminToken == "" {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not find admin token to publish post"})
+		return
 	}
 
-	client := vk.NewVKClient(groupToken)
+	groupIDStr := fmt.Sprintf("%v", vkCtx.GroupID)
+	client := vk.NewVKClient(adminToken)
 	
 	var atts []string
 	if req.Attachments != "" {
