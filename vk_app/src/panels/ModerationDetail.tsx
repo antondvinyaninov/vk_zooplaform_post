@@ -118,6 +118,22 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
     fetchDetail();
   }, [params?.id]);
 
+  useEffect(() => {
+    const handlePostModerated = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const moderatedPostId = customEvent.detail?.postId;
+      const currentId = Number(params?.id);
+      
+      if (moderatedPostId && currentId === moderatedPostId) {
+        // Запрашиваем актуальные данные о посте, чтобы обновить статус (например, pending -> published)
+        getPostById(currentId).then(setPost).catch(console.error);
+      }
+    };
+    
+    window.addEventListener('postModerated', handlePostModerated);
+    return () => window.removeEventListener('postModerated', handlePostModerated);
+  }, [params?.id]);
+
   if (loading) {
     return (
       <Panel id={id}>
