@@ -12,6 +12,7 @@ import {
   Div,
   NavIdProps,
   Snackbar,
+  Checkbox,
 } from '@vkontakte/vkui';
 import { Icon28CheckCircleOutline, Icon28ErrorCircleOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -24,6 +25,7 @@ export const PostByLink: FC<NavIdProps> = ({ id }) => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [preview, setPreview] = useState<any>(null);
   const [editedText, setEditedText] = useState('');
+  const [includeSource, setIncludeSource] = useState(true);
   const [snackbar, setSnackbar] = useState<React.ReactNode | null>(null);
 
   const handleLoad = async () => {
@@ -53,7 +55,8 @@ export const PostByLink: FC<NavIdProps> = ({ id }) => {
     if (!preview) return;
     setIsPublishing(true);
     try {
-      await publishPostByLink(editedText, preview.attachments);
+      const finalMessage = includeSource ? editedText + preview.source : editedText;
+      await publishPostByLink(finalMessage, preview.attachments);
       setSnackbar(
         <Snackbar
           onClose={() => setSnackbar(null)}
@@ -152,6 +155,15 @@ export const PostByLink: FC<NavIdProps> = ({ id }) => {
               </Div>
             </FormItem>
           )}
+
+          <FormItem>
+            <Checkbox 
+              checked={includeSource}
+              onChange={(e) => setIncludeSource(e.target.checked)}
+            >
+              Указывать ссылку на источник
+            </Checkbox>
+          </FormItem>
 
           <Div>
             <Button 

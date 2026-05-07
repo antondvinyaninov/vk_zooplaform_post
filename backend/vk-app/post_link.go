@@ -86,7 +86,6 @@ func appPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Формируем текст с источником (формат: источник: [wall-165434330_16254|Название группы])
 	sourceStr := fmt.Sprintf("\n\nисточник: [wall%s|%s]", postIDStr, authorName)
-	newText := post.Text + sourceStr
 
 	// Формируем список вложений (photo-123_456)
 	var attachmentIDs []string
@@ -121,7 +120,8 @@ func appPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"success": true,
 		"post": map[string]interface{}{
-			"text":        newText,
+			"text":        post.Text,
+			"source":      sourceStr,
 			"attachments": strings.Join(attachmentIDs, ","),
 			"preview":     previewURLs,
 		},
