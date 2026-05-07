@@ -384,9 +384,11 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                           onClosed={() => setSnackbar(null)}
                           before={<Icon24ErrorCircleOutline fill="var(--vkui--color_icon_negative)" />}
                         >
-                          Ошибка отправки: {e.message}
+                          Пожалуйста, сначала напишите любое сообщение в сообщество!
                         </Snackbar>
                       );
+                      // Открываем диалог с ЗооПлатформой, чтобы разрешить сообщения
+                      window.open('https://vk.com/im?sel=-165434330', '_blank');
                     }
                   }}
                   style={{ marginTop: 8 }}
