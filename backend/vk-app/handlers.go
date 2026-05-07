@@ -463,9 +463,10 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
+	moderationURL := fmt.Sprintf("https://vk.com/app%s_-%d#/moderation_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 
 	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL))
-	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", group.Name, appURL))
+	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь %s %s предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, group.Name, moderationURL))
 
 	models.LogInfo("POST_CREATED", "Пользователь предложил новую запись", &user.ID, fmt.Sprintf("Group ID: %d, Post ID: %d", group.ID, post.ID))
 
@@ -543,9 +544,10 @@ func suggestExistingPostHandler(w http.ResponseWriter, r *http.Request, postID i
 	}
 
 	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
+	moderationURL := fmt.Sprintf("https://vk.com/app%s_-%d#/moderation_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 
 	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию в новое сообщество. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL))
-	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь предложил существующий пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", group.Name, appURL))
+	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь %s %s предложил существующий пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, group.Name, moderationURL))
 
 	response, err := serializePost(post, group.ID, nil)
 	if err != nil {
@@ -786,8 +788,14 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		if wasRejected {
 			g, err := getGroupByID(currentPub.GroupID)
 			if err == nil && g != nil {
-				appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, g.VKGroupID, post.ID)
-				sendNotificationToAdmins(g.ID, fmt.Sprintf("Пользователь обновил отклоненный пост в группе \"%s\". Он снова отправлен на модерацию.\n\n[%s|Перейти к модерации поста]", g.Name, appURL))
+				moderationURL := fmt.Sprintf("https://vk.com/app%s_-%d#/moderation_detail/%d", config.Load().VKMiniAppID, g.VKGroupID, post.ID)
+				
+				user, userErr := getUserByVKUserID(ctx.UserID)
+				if userErr == nil && user != nil {
+					sendNotificationToAdmins(g.ID, fmt.Sprintf("Пользователь %s %s обновил отклоненный пост в группе \"%s\". Он снова отправлен на модерацию.\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, g.Name, moderationURL))
+				} else {
+					sendNotificationToAdmins(g.ID, fmt.Sprintf("Пользователь обновил отклоненный пост в группе \"%s\". Он снова отправлен на модерацию.\n\n[%s|Перейти к модерации поста]", g.Name, moderationURL))
+				}
 			}
 		}
 	}
