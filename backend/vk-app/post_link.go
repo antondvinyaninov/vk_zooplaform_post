@@ -1,15 +1,24 @@
-package admin
+package vkapp
 
 import (
+	"backend/database"
 	"backend/vk"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
 )
 
-// vkPostByLinkPreviewHandler получает ссылку на пост ВКонтакте и возвращает текст с медиа
-func vkPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
+// respondJSON отправляет JSON-ответ
+func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(payload)
+}
+
+// appPostByLinkPreviewHandler получает ссылку на пост ВКонтакте и возвращает текст с медиа
+func appPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
 		return
@@ -21,7 +30,6 @@ func vkPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Извлекаем wall-123_456 из ссылки
 	re := regexp.MustCompile(`wall(-?\d+_\d+)`)
 	matches := re.FindStringSubmatch(link)
 	if len(matches) < 2 {
@@ -30,13 +38,14 @@ func vkPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	postIDStr := matches[1]
 
-	token, err := getActiveAccountToken()
-	if err != nil || token == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK account not connected"})
+	// Получаем глобальный токен админа для чтения публичных постов
+	adminToken, err := getActiveVKToken()
+	if err != nil || adminToken == "" {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Admin VK token not found"})
 		return
 	}
 
-	client := vk.NewVKClient(token)
+	client := vk.NewVKClient(adminToken)
 	resp, err := client.WallGetById(postIDStr, true)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("VK API Error: %v", err)})
@@ -75,8 +84,7 @@ func vkPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 		authorName = "Источник"
 	}
 
-	// Формируем текст с источником
-	// источник: [wall-165434330_16254|Название группы]
+	// Формируем текст с источником (формат: источник: [wall-165434330_16254|Название группы])
 	sourceStr := fmt.Sprintf("\n\nисточник: [wall%s|%s]", postIDStr, authorName)
 	newText := post.Text + sourceStr
 
@@ -107,10 +115,6 @@ func vkPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 				"type": "video",
 				"url":  fmt.Sprintf("https://vk.com/video%d_%d", att.Video.OwnerID, att.Video.ID),
 			})
-		} else if att.Type == "doc" || att.Type == "audio" {
-			// Можно поддержать другие типы, если нужно, но в SMM обычно фото/видео.
-			// Как пример: doc123_456
-			// Но структура Attachment не имеет doc/audio по умолчанию, нужно добавить в vk.go
 		}
 	}
 
@@ -121,5 +125,59 @@ func vkPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 			"attachments": strings.Join(attachmentIDs, ","),
 			"preview":     previewURLs,
 		},
+	})
+}
+
+// appPublishPostByLinkHandler публикует пост от имени группы
+func appPublishPostByLinkHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+		return
+	}
+
+	vkCtx, err := parseLaunchContext(r)
+	if err != nil || vkCtx.GroupID == 0 {
+		respondJSON(w, http.StatusForbidden, map[string]string{"error": "Not running in group context"})
+		return
+	}
+
+	var req struct {
+		Message     string `json:"message"`
+		Attachments string `json:"attachments"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON payload"})
+		return
+	}
+
+	// Получаем токен группы
+	groupIDStr := fmt.Sprintf("%v", vkCtx.GroupID)
+	var groupToken string
+	err = database.DB.QueryRow("SELECT access_token FROM groups WHERE vk_group_id = $1", groupIDStr).Scan(&groupToken)
+	if err != nil || groupToken == "" {
+		// Fallback: пытаемся использовать глобальный токен админа
+		groupToken, err = getActiveVKToken()
+		if err != nil || groupToken == "" {
+			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not find token to publish post"})
+			return
+		}
+	}
+
+	client := vk.NewVKClient(groupToken)
+	
+	var atts []string
+	if req.Attachments != "" {
+		atts = strings.Split(req.Attachments, ",")
+	}
+
+	postID, err := client.WallPost("-"+groupIDStr, req.Message, atts, true, 0)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Failed to publish: %v", err)})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"post_id": postID,
 	})
 }

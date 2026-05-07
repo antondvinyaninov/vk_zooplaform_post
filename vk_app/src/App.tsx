@@ -32,6 +32,7 @@ const AdDetail = lazy(() => import('./panels/AdDetail'));
 const ModerationDetail = lazy(() => import('./panels/ModerationDetail'));
 const Moderation = lazy(() => import('./panels/Moderation'));
 const ModerationModal = lazy(() => import('./panels/ModerationModal'));
+const PostByLink = lazy(() => import('./panels/PostByLink').then(m => ({ default: m.PostByLink })));
 const DeletePostModal = lazy(() => import('./panels/DeletePostModal').then(m => ({ default: m.DeletePostModal })));
 
 const STORY_IDS = {
@@ -44,6 +45,7 @@ const STORY_IDS = {
   ONBOARDING: 'onboarding_story',
   POST_DETAIL: 'post_detail_story',
   MODERATION_DETAIL: 'moderation_detail_story',
+  POST_BY_LINK: 'post_by_link_story',
 } as const;
 
 const MAIN_PANEL_TO_ROUTE: Record<string, string> = {
@@ -73,6 +75,8 @@ const getActiveStory = (panel: string): string => {
       return STORY_IDS.POST_DETAIL;
     case DEFAULT_VIEW_PANELS.MODERATION_DETAIL:
       return STORY_IDS.MODERATION_DETAIL;
+    case DEFAULT_VIEW_PANELS.POST_BY_LINK:
+      return STORY_IDS.POST_BY_LINK;
     default:
       return STORY_IDS.HOME;
   }
@@ -306,6 +310,9 @@ export const App = () => {
               </View>
               <View id={STORY_IDS.MODERATION_DETAIL} activePanel={activePanel}>
                 <ModerationDetail id="moderation_detail" />
+              </View>
+              <View id={STORY_IDS.POST_BY_LINK} activePanel={activePanel}>
+                <PostByLink id="post_by_link" />
               </View>
             </Epic>
           </Suspense>

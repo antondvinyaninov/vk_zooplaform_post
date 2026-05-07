@@ -17,6 +17,7 @@ import {
   Icon28CheckShieldOutline,
   Icon28ErrorCircleOutline,
   Icon28CheckCircleOutline,
+  Icon28LinkOutline,
 } from '@vkontakte/icons';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -73,6 +74,13 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, appUser, role, onAp
               onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.MODERATION}`)}
             >
               Модерация объявлений
+            </SimpleCell>
+
+            <SimpleCell 
+              before={<Icon28LinkOutline />} 
+              onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POST_BY_LINK}`)}
+            >
+              Пост по ссылке
             </SimpleCell>
           </List>
         </Group>

@@ -21,6 +21,7 @@ export const DEFAULT_VIEW_PANELS = {
   POST_DETAIL: 'post_detail',
   MODERATION_DETAIL: 'moderation_detail',
   MODERATION: 'moderation',
+  POST_BY_LINK: 'post_by_link',
 } as const;
 
 export const routes = RoutesConfig.create([
@@ -46,6 +47,7 @@ export const routes = RoutesConfig.create([
       createPanel(DEFAULT_VIEW_PANELS.MODERATION, `/${DEFAULT_VIEW_PANELS.MODERATION}`, [
         createModal('approve_settings', `/${DEFAULT_VIEW_PANELS.MODERATION}/approve_settings/:id`),
       ]),
+      createPanel(DEFAULT_VIEW_PANELS.POST_BY_LINK, `/${DEFAULT_VIEW_PANELS.POST_BY_LINK}`, []),
     ]),
   ]),
 ]);

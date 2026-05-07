@@ -464,3 +464,16 @@ export async function sendTestNotification(): Promise<void> {
     throw new Error(e.message || 'Failed to send test notification');
   }
 }
+
+export async function loadPostByLink(link: string): Promise<any> {
+  const url = `${API_URL}/vk/post-by-link?link=${encodeURIComponent(link)}`;
+  return fetchJSON(url);
+}
+
+export async function publishPostByLink(message: string, attachments: string): Promise<any> {
+  const url = `${API_URL}/vk/publish-post-by-link`;
+  return fetchJSON(url, {
+    method: 'POST',
+    body: JSON.stringify({ message, attachments }),
+  });
+}
