@@ -49,6 +49,7 @@ export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => 
         closeModal();
       } catch (error) {
         console.error('Failed to moderate post:', error);
+      } finally {
         setIsSubmitting(false);
       }
     }

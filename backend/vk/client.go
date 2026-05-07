@@ -32,7 +32,9 @@ type VKClient struct {
 func NewVKClient(accessToken string) *VKClient {
 	return &VKClient{
 		AccessToken: accessToken,
-		HTTPClient:  &http.Client{},
+		HTTPClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}
 }
 
