@@ -61,7 +61,7 @@ export interface AppPostPublication {
   id: number;
   group_id: number;
   group?: AppGroup;
-  status: 'pending' | 'scheduled' | 'published' | 'rejected' | 'failed' | 'draft';
+  status: 'pending' | 'scheduled' | 'published' | 'rejected' | 'failed' | 'draft' | 'processing';
   vk_post_id?: number;
   reject_reason?: string;
   publish_date?: string;
@@ -75,7 +75,7 @@ export interface AppPost {
   message: string;
   post_type_id?: string;
   custom_fields?: string;
-  status: 'pending' | 'scheduled' | 'published' | 'rejected' | 'failed' | 'draft';
+  status: 'pending' | 'scheduled' | 'published' | 'rejected' | 'failed' | 'draft' | 'processing';
   vk_post_id?: number;
   publish_date?: string;
   attachments?: string;

@@ -35,6 +35,7 @@ import {
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { getPostById, moderatePost, editPost, compressImage, getS3PresignedUrl, uploadMediaToS3, getCommunitySettings } from '../shared/api';
+import { formatPostStatus } from '../utils';
 
 export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -180,22 +181,7 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
       <Group>
         <Div>
           <Text weight="3" style={{ color: 'var(--vkui--color_text_accent)', marginBottom: 12 }}>
-            Статус: {(() => {
-              if (post.status === 'published') return '✅ Опубликовано';
-              if (post.status === 'pending') return '⏳ На модерации';
-              if (post.status === 'rejected') return '❌ Отклонено';
-              if (post.status === 'draft') return '📝 Черновик';
-              if (post.status === 'scheduled') {
-                if (post.publish_date && new Date(post.publish_date).getTime() <= Date.now()) {
-                  return '✅ Опубликовано (отложенный)';
-                }
-                const dateStr = post.publish_date 
-                  ? new Date(post.publish_date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                  : '';
-                return `📅 Отложено на ${dateStr}`;
-              }
-              return post.status;
-            })()}
+            Статус: {formatPostStatus(post.status, post.publish_date)}
           </Text>
 
           {post.status === 'rejected' && post.reject_reason && (

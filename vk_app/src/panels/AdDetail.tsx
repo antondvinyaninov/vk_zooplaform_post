@@ -34,6 +34,7 @@ import {
 } from '@vkontakte/icons';
 import { useRouteNavigator, useParams } from '@vkontakte/vk-mini-apps-router';
 import { getPostById, editPost, compressImage, getS3PresignedUrl, uploadMediaToS3, suggestExistingPost, getCommunitySettings } from '../shared/api';
+import { formatPostStatus, getPostStatusColor } from '../utils';
 
 export const AdDetail: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
@@ -757,31 +758,8 @@ export const AdDetail: FC<NavIdProps> = ({ id }) => {
           post.publications.map((pub: any) => {
             const groupName = pub.group ? pub.group.name : 'Неизвестная группа';
             
-            let statusText = pub.status;
-            let statusColor = 'var(--vkui--color_text_secondary)';
-            if (pub.status === 'published') {
-              statusText = '✅ Опубликовано';
-              statusColor = 'var(--vkui--color_text_positive)';
-            } else if (pub.status === 'pending') {
-              statusText = '⏳ На модерации';
-              statusColor = 'var(--vkui--color_text_accent)';
-            } else if (pub.status === 'rejected') {
-              statusText = '❌ Отклонено';
-              statusColor = 'var(--vkui--color_text_negative)';
-            } else if (pub.status === 'draft') {
-              statusText = '📝 Черновик';
-            } else if (pub.status === 'scheduled') {
-              if (pub.publish_date && new Date(pub.publish_date).getTime() <= Date.now()) {
-                statusText = '✅ Опубликовано (отложенный)';
-                statusColor = 'var(--vkui--color_text_positive)';
-              } else {
-                const dateStr = pub.publish_date 
-                  ? new Date(pub.publish_date).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-                  : '';
-                statusText = `📅 Отложено на ${dateStr}`;
-                statusColor = 'var(--vkui--color_text_accent_themed)';
-              }
-            }
+            const statusText = formatPostStatus(pub.status, pub.publish_date);
+            const statusColor = getPostStatusColor(pub.status, pub.publish_date);
 
             return (
               <div key={pub.id} style={{ display: 'flex', flexDirection: 'column' }}>

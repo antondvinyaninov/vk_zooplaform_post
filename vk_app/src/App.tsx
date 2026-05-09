@@ -234,7 +234,7 @@ export const App = () => {
           onConfirm={(postId, type, date) => {
             console.log(`Action confirmed for post ${postId}: ${type} at ${date?.toLocaleString() || 'NOW'}`);
             window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId } }));
-            routeNavigator.back();
+            routeNavigator.replace(`/${DEFAULT_VIEW_PANELS.MODERATION}`);
           }} 
         />
         <DeletePostModal id="delete_post_modal" />
