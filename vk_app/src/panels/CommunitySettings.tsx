@@ -73,7 +73,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [expandedTemplateType, setExpandedTemplateType] = useState<string | null>(null);
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldVarName, setNewFieldVarName] = useState('');
-  const [newFieldType, setNewFieldType] = useState<'text'|'link'|'number'|'phone'>('text');
+  const [newFieldType, setNewFieldType] = useState<'text'|'link'|'number'|'phone'|'select'|'boolean'>('text');
   const [newFieldRequired, setNewFieldRequired] = useState(false);
   const [customColorInputId, setCustomColorInputId] = useState<string | null>(null);
   const [isNewCustomColorInputOpen, setIsNewCustomColorInputOpen] = useState(false);
@@ -553,12 +553,63 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                       <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,0,0,0.03)' }}>
                         <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Дополнительные поля</div>
                         {(pt.fields || []).map(f => (
-                           <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, background: '#fff', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.05)' }}>
-                              <div style={{ fontSize: 13 }}>{f.label} <span style={{ opacity: 0.5, fontSize: 11 }}>({f.type}, var: {f.var_name || f.id})</span> {f.required ? <span style={{ color: 'red' }}>*</span> : ''}</div>
-                              <div style={{ flexGrow: 1 }} />
-                              <div style={{ cursor: 'pointer', opacity: 0.5 }} onClick={() => setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, fields: p.fields?.filter(field => field.id !== f.id) } : p))}>
-                                <Icon24Cancel width={16} height={16} />
+                           <div key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8, background: '#fff', padding: '8px', borderRadius: 6, border: '1px solid rgba(0,0,0,0.05)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ fontSize: 13 }}>{f.label} <span style={{ opacity: 0.5, fontSize: 11 }}>({f.type}, var: {f.var_name || f.id})</span> {f.required ? <span style={{ color: 'red' }}>*</span> : ''}</div>
+                                <div style={{ flexGrow: 1 }} />
+                                <div style={{ cursor: 'pointer', opacity: 0.5 }} onClick={() => setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, fields: p.fields?.filter(field => field.id !== f.id) } : p))}>
+                                  <Icon24Cancel width={16} height={16} />
+                                </div>
                               </div>
+                              {f.type === 'select' && (
+                                <div style={{ marginTop: 4, paddingLeft: 8, borderLeft: '2px solid rgba(0,0,0,0.1)' }}>
+                                  <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Варианты выбора:</div>
+                                  {(f.options || []).map((opt: string, idx: number) => (
+                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                                      <input
+                                        type="text"
+                                        value={opt}
+                                        onChange={(e) => {
+                                          const newOptions = [...(f.options || [])];
+                                          newOptions[idx] = e.target.value;
+                                          setPostTypes(postTypes.map(p => p.id === pt.id ? {
+                                            ...p,
+                                            fields: p.fields?.map(field => field.id === f.id ? { ...field, options: newOptions } : field)
+                                          } : p));
+                                        }}
+                                        placeholder={`Вариант ${idx + 1}`}
+                                        style={{ flexGrow: 1, padding: '4px 6px', borderRadius: 4, border: '1px solid var(--vkui--color_image_border_alpha)', fontSize: 12 }}
+                                      />
+                                      <div
+                                        style={{ cursor: 'pointer', opacity: 0.5 }}
+                                        onClick={() => {
+                                          const newOptions = (f.options || []).filter((_: string, i: number) => i !== idx);
+                                          setPostTypes(postTypes.map(p => p.id === pt.id ? {
+                                            ...p,
+                                            fields: p.fields?.map(field => field.id === f.id ? { ...field, options: newOptions } : field)
+                                          } : p));
+                                        }}
+                                      >
+                                        <Icon24Cancel width={14} height={14} />
+                                      </div>
+                                    </div>
+                                  ))}
+                                  <Button
+                                    mode="secondary"
+                                    size="s"
+                                    onClick={() => {
+                                      const newOptions = [...(f.options || []), ''];
+                                      setPostTypes(postTypes.map(p => p.id === pt.id ? {
+                                        ...p,
+                                        fields: p.fields?.map(field => field.id === f.id ? { ...field, options: newOptions } : field)
+                                      } : p));
+                                    }}
+                                    style={{ marginTop: 4 }}
+                                  >
+                                    + Добавить вариант
+                                  </Button>
+                                </div>
+                              )}
                            </div>
                         ))}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8, alignItems: 'center' }}>
@@ -591,6 +642,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                              <option value="link">Ссылка</option>
                              <option value="number">Число</option>
                              <option value="phone">Телефон</option>
+                             <option value="select">Выбор из списка</option>
+                             <option value="boolean">Да/Нет</option>
                            </select>
                            <label style={{ display: 'flex', alignItems: 'center', fontSize: 13, gap: 4, cursor: 'pointer' }}>
                              <input type="checkbox" checked={newFieldRequired} onChange={e => setNewFieldRequired(e.target.checked)} /> Обяз.
@@ -608,7 +661,19 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                                 return;
                               }
                               
-                              const newField = { id: Date.now().toString(), label: trimmedLabel, type: newFieldType, required: newFieldRequired, var_name: trimmedVarName };
+                              const newField: any = { 
+                                id: Date.now().toString(), 
+                                label: trimmedLabel, 
+                                type: newFieldType, 
+                                required: newFieldRequired, 
+                                var_name: trimmedVarName 
+                              };
+                              
+                              // Для типа select добавляем пустой массив options
+                              if (newFieldType === 'select') {
+                                newField.options = [''];
+                              }
+                              
                               setPostTypes(postTypes.map(p => p.id === pt.id ? { ...p, fields: [...existingFields, newField] } : p));
                               setNewFieldLabel('');
                               setNewFieldVarName('');

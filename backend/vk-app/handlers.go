@@ -77,25 +77,26 @@ type groupSummary struct {
 }
 
 type groupSettingsResponse struct {
-	ID         int    `json:"id"`
-	VKGroupID  int    `json:"vk_group_id"`
-	Name       string `json:"name"`
-	ScreenName string `json:"screen_name"`
-	Photo200   string `json:"photo_200"`
-	CityID     *int   `json:"city_id"`
-	CityTitle  *string `json:"city_title"`
-	IsActive   bool   `json:"is_active"`
-	HasToken   bool   `json:"has_token"`
-	NotifyUserIDs []int  `json:"notify_user_ids"`
-	PostTypes     []PostType `json:"post_types"`
-	EnablePostTypes bool   `json:"enable_post_types"`
+	ID              int        `json:"id"`
+	VKGroupID       int        `json:"vk_group_id"`
+	Name            string     `json:"name"`
+	ScreenName      string     `json:"screen_name"`
+	Photo200        string     `json:"photo_200"`
+	CityID          *int       `json:"city_id"`
+	CityTitle       *string    `json:"city_title"`
+	IsActive        bool       `json:"is_active"`
+	HasToken        bool       `json:"has_token"`
+	NotifyUserIDs   []int      `json:"notify_user_ids"`
+	PostTypes       []PostType `json:"post_types"`
+	EnablePostTypes bool       `json:"enable_post_types"`
 }
 
 type PostTypeField struct {
-	ID       string `json:"id"`
-	Label    string `json:"label"`
-	Type     string `json:"type"` // "text", "link", "checkbox", "phone"
-	Required bool   `json:"required"`
+	ID       string   `json:"id"`
+	Label    string   `json:"label"`
+	Type     string   `json:"type"` // "string", "link", "number", "phone", "select", "boolean"
+	Required bool     `json:"required"`
+	Options  []string `json:"options,omitempty"` // Для типа "select" - список вариантов выбора
 }
 
 type PostType struct {
@@ -107,14 +108,14 @@ type PostType struct {
 }
 
 type userSummary struct {
-	ID        int    `json:"id"`
-	VKUserID  int    `json:"vk_user_id"`
-	FirstName  string  `json:"first_name"`
-	LastName   string  `json:"last_name"`
-	Photo200   string  `json:"photo_200"`
-	CityID     *int    `json:"city_id"`
-	CityTitle  *string `json:"city_title"`
-	Role       string  `json:"role"`
+	ID        int     `json:"id"`
+	VKUserID  int     `json:"vk_user_id"`
+	FirstName string  `json:"first_name"`
+	LastName  string  `json:"last_name"`
+	Photo200  string  `json:"photo_200"`
+	CityID    *int    `json:"city_id"`
+	CityTitle *string `json:"city_title"`
+	Role      string  `json:"role"`
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -371,7 +372,7 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var uploadedAttachments []string
-	
+
 	if r.MultipartForm != nil {
 		if atts, ok := r.MultipartForm.Value["attachments"]; ok {
 			for _, att := range atts {
@@ -415,12 +416,12 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 				// Detect if image or video
 				contentType := fileHeader.Header.Get("Content-Type")
 				filenameLower := strings.ToLower(fileHeader.Filename)
-				
+
 				// Если фронтенд по ошибке прислал видео в поле media
-				if strings.HasPrefix(contentType, "video/") || 
-				   strings.HasSuffix(filenameLower, ".mp4") || 
-				   strings.HasSuffix(filenameLower, ".mov") || 
-				   strings.HasSuffix(filenameLower, ".qt") {
+				if strings.HasPrefix(contentType, "video/") ||
+					strings.HasSuffix(filenameLower, ".mp4") ||
+					strings.HasSuffix(filenameLower, ".mov") ||
+					strings.HasSuffix(filenameLower, ".qt") {
 					os.Remove(tmpPath)
 					continue
 				}
@@ -452,10 +453,10 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	attachmentsBytes, _ := json.Marshal(uploadedAttachments)
 	post := &models.Post{
-		UserID:       user.ID,
-		Message:      message,
-		Attachments:  string(attachmentsBytes),
-		S3VideoKey:   s3KeysStr,
+		UserID:      user.ID,
+		Message:     message,
+		Attachments: string(attachmentsBytes),
+		S3VideoKey:  s3KeysStr,
 	}
 	if err := createPost(post, group.ID, "pending", postTypeID, customFields); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -762,7 +763,7 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		post.S3VideoKey = strings.Join(req.S3VideoKeys, ",")
 	}
 	post.Attachments = req.Attachments
-	
+
 	if err := updatePost(post); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -778,18 +779,18 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 			currentPub.Status = "pending"
 			currentPub.RejectReason = ""
 		}
-		
+
 		// Update publication even if not rejected to save new custom fields
 		if err := updatePublication(currentPub); err != nil {
 			utils.RespondError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		
+
 		if wasRejected {
 			g, err := getGroupByID(currentPub.GroupID)
 			if err == nil && g != nil {
 				moderationURL := fmt.Sprintf("https://vk.com/app%s_-%d#/moderation_detail/%d", config.Load().VKMiniAppID, g.VKGroupID, post.ID)
-				
+
 				user, userErr := getUserByVKUserID(ctx.UserID)
 				if userErr == nil && user != nil {
 					sendNotificationToAdmins(g.ID, fmt.Sprintf("Пользователь %s %s обновил отклоненный пост в группе \"%s\". Он снова отправлен на модерацию.\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, g.Name, moderationURL))
@@ -867,7 +868,6 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		utils.RespondError(w, http.StatusBadRequest, "post is already moderated")
 		return
 	}
-
 
 	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 
@@ -1007,7 +1007,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 								}
 								newAtts, _ := json.Marshal(oldParts)
 								post.Attachments = string(newAtts)
-								
+
 								go s3DeleteVideoKey(key)
 							} else {
 								log.Printf("[Moderate] VK Upload error for %s: %v", key, uploadErr)
@@ -1023,7 +1023,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 
 		messageToPost := post.Message
-		
+
 		var authorLink string
 		var authorName string
 		if post.UserID != 0 {
@@ -1083,7 +1083,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 					fieldsText += fmt.Sprintf("%s: %s\n", f.Label, f.Value)
 				}
 				messageToPost = fmt.Sprintf("%s\n\n%s", messageToPost, strings.TrimSpace(fieldsText))
-				
+
 				if authorLink != "" {
 					messageToPost += fmt.Sprintf("\n\nАвтор: %s", authorLink)
 				}
@@ -1101,16 +1101,16 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		} else {
 			vkPostID, err = client.WallPost("-"+strconv.Itoa(group.VKGroupID), messageToPost, attachments, true, publishUnix)
 		}
-		
+
 		if err != nil {
 			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
 			models.LogWarning("PUBLISH_FAILED", "Не удалось опубликовать запись во ВКонтакте", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, Error: %v", group.VKGroupID, post.ID, err))
-			
+
 			currentPub.Status = "pending"
 			updatePublication(currentPub)
 			return
 		}
-		
+
 		currentPub.VKPostID = vkPostID
 		currentPub.Status = req.Status
 		if err := updatePublication(currentPub); err != nil {
@@ -1164,15 +1164,15 @@ func groupSettingsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var req struct {
-			Name       *string `json:"name"`
-			ScreenName *string `json:"screen_name"`
-			Photo200   *string `json:"photo_200"`
-			CityID     *int    `json:"city_id"`
-			CityTitle  *string `json:"city_title"`
-			IsActive   *bool   `json:"is_active"`
-			NotifyUserIDs []int `json:"notify_user_ids"`
-			PostTypes     *[]PostType `json:"post_types"`
-			EnablePostTypes *bool `json:"enable_post_types"`
+			Name            *string     `json:"name"`
+			ScreenName      *string     `json:"screen_name"`
+			Photo200        *string     `json:"photo_200"`
+			CityID          *int        `json:"city_id"`
+			CityTitle       *string     `json:"city_title"`
+			IsActive        *bool       `json:"is_active"`
+			NotifyUserIDs   []int       `json:"notify_user_ids"`
+			PostTypes       *[]PostType `json:"post_types"`
+			EnablePostTypes *bool       `json:"enable_post_types"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -1389,12 +1389,12 @@ func serializePost(post *models.Post, contextGroupID int, usersMap map[int]*mode
 			pd := pub.PublishDate.Format(time.RFC3339)
 			pubResp.PublishDate = &pd
 		}
-		
+
 		g, err := getGroupByID(pub.GroupID)
 		if err == nil && g != nil {
 			pubResp.Group = userFacingGroup(g)
 		}
-		
+
 		response.Publications = append(response.Publications, pubResp)
 
 		if contextGroupID > 0 && pub.GroupID == contextGroupID {
@@ -1438,7 +1438,7 @@ func userFacingGroup(group *models.Group) *groupSummary {
 
 func populateAttachmentURLs(posts []postResponse) []postResponse {
 	var videoIDs []string
-	
+
 	// First pass: collect all VK video IDs that need thumbnails
 	for _, p := range posts {
 		if p.Attachments != "" {
@@ -1455,7 +1455,7 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 				if id == "" {
 					continue
 				}
-				
+
 				var mediaURL string
 				if len(idAndUrl) > 1 {
 					mediaURL = idAndUrl[1]
@@ -1474,7 +1474,7 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 		adminToken, tokenErr := getActiveVKToken()
 		if tokenErr == nil && adminToken != "" {
 			vkClient := vk.NewVKClient(adminToken)
-			
+
 			// Deduplicate IDs
 			uniqueIDs := make(map[string]bool)
 			var batch []string
@@ -1484,7 +1484,7 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 					batch = append(batch, id)
 				}
 			}
-			
+
 			if thumbs, err := vkClient.GetVideoThumbnails(batch); err == nil {
 				videoThumbnails = thumbs
 			} else {
@@ -1568,25 +1568,24 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 	return posts
 }
 
-
 func groupToSettings(group *models.Group) *groupSettingsResponse {
 	if group == nil {
 		return nil
 	}
 
 	resp := &groupSettingsResponse{
-		ID:         group.ID,
-		VKGroupID:  group.VKGroupID,
-		Name:       group.Name,
-		ScreenName: group.ScreenName,
-		Photo200:   group.Photo200,
-		CityID:     group.CityID,
-		CityTitle:  group.CityTitle,
-		IsActive:   group.IsActive,
-		HasToken:   group.AccessToken != "",
+		ID:              group.ID,
+		VKGroupID:       group.VKGroupID,
+		Name:            group.Name,
+		ScreenName:      group.ScreenName,
+		Photo200:        group.Photo200,
+		CityID:          group.CityID,
+		CityTitle:       group.CityTitle,
+		IsActive:        group.IsActive,
+		HasToken:        group.AccessToken != "",
 		EnablePostTypes: group.EnablePostTypes,
 	}
-	
+
 	if group.NotifyUserIDs != "" {
 		json.Unmarshal([]byte(group.NotifyUserIDs), &resp.NotifyUserIDs)
 	}
@@ -1679,7 +1678,7 @@ func upsertUser(vkUserID int, firstName, lastName, photo200, cityIdStr, cityTitl
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var cityID *int
 	if cityIdStr != "" {
 		if id, err := strconv.Atoi(cityIdStr); err == nil {
@@ -1708,7 +1707,7 @@ func upsertUser(vkUserID int, firstName, lastName, photo200, cityIdStr, cityTitl
 	}
 
 	needsUpdate := user.FirstName != firstName || user.LastName != lastName || user.Photo200 != photo200
-	
+
 	// Если с VK пришел город, а у пользователя он не установлен - сохраняем
 	if cityID != nil && user.CityID == nil {
 		user.CityID = cityID
@@ -2572,7 +2571,6 @@ func saveGroupTokenHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	ctx, err := parseLaunchContext(r)
 	if err != nil {
@@ -2638,7 +2636,7 @@ func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 	// Soft-delete: обновляем статус и очищаем медиа в posts
 	res, err := tx.Exec(
-		"UPDATE posts SET status = 'deleted', delete_reason = $1, delete_comment = $2, s3_video_key = '', attachments = '' WHERE id = $3 AND user_id = $4", 
+		"UPDATE posts SET status = 'deleted', delete_reason = $1, delete_comment = $2, s3_video_key = '', attachments = '' WHERE id = $3 AND user_id = $4",
 		reqBody.Reason, reqBody.Comment, postID, user.ID,
 	)
 	if err != nil {
@@ -2646,7 +2644,7 @@ func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	
+
 	rowsAffected, _ := res.RowsAffected()
 	if rowsAffected == 0 {
 		log.Printf("[deletePostHandler] No rows affected in posts table")
@@ -2702,7 +2700,7 @@ func s3PresignHandler(w http.ResponseWriter, r *http.Request) {
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	
+
 	// Чтобы избежать проблем с кодировками (кириллица, пробелы), используем только безопасный префикс
 	safeSuffix := "file"
 	if strings.Contains(contentType, "video") {
@@ -2710,7 +2708,7 @@ func s3PresignHandler(w http.ResponseWriter, r *http.Request) {
 	} else if strings.Contains(contentType, "image") {
 		safeSuffix = "image.jpg"
 	}
-	
+
 	key := fmt.Sprintf("pending-media/%d_%s", time.Now().UnixNano(), safeSuffix)
 
 	s3, err := s3client.New()

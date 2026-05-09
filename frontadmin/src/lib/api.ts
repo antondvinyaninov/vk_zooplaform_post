@@ -14,6 +14,22 @@ export const api = axios.create({
 export const fetcher = (url: string) => api.get(url).then((res) => res.data);
 
 // Types
+export interface PostTypeField {
+  id: string;
+  label: string;
+  type: 'string' | 'link' | 'number' | 'phone' | 'select' | 'boolean';
+  required: boolean;
+  options?: string[];
+}
+
+export interface PostType {
+  id: string;
+  label: string;
+  color: string;
+  moderator_ids: number[];
+  fields?: PostTypeField[];
+}
+
 export interface Group {
   id: number;
   vk_group_id: number;
@@ -26,6 +42,8 @@ export interface Group {
   last_check_at?: string;
   health_error?: string;
   members_count: number;
+  enable_post_types?: boolean;
+  post_types?: PostType[];
 }
 
 export interface GroupsResponse {

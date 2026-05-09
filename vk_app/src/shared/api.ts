@@ -28,8 +28,9 @@ export interface PostTypeField {
   id: string;
   label: string;
   var_name?: string;
-  type: 'text' | 'link' | 'number' | 'phone';
+  type: 'text' | 'link' | 'number' | 'phone' | 'select' | 'boolean';
   required: boolean;
+  options?: string[]; // Для типа select - список вариантов
 }
 
 export interface PostType {

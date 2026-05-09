@@ -12,6 +12,7 @@ import {
   HorizontalScroll,
   Image,
   Input,
+  Checkbox,
 } from '@vkontakte/vkui';
 import { Icon24Camera, Icon28CancelCircleFillRed, Icon28VideoOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -199,25 +200,76 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
           const pt = settings.post_types.find((p: any) => p.id === selectedPostTypeId);
           if (!pt || !pt.fields || pt.fields.length === 0) return null;
           
-          return pt.fields.map((field: any) => (
-            <FormItem 
-              key={field.id} 
-              top={`${field.label} ${field.required ? '*' : ''}`}
-            >
-              <Input 
-                type={field.type === 'phone' ? 'tel' : field.type === 'number' ? 'number' : 'text'}
-                value={(customFieldValues[field.id] as string) || ''}
-                placeholder={field.type === 'link' ? 'https://...' : ''}
-                onChange={(e) => {
-                  let val = e.target.value;
-                  if (field.type === 'phone') {
-                    val = applyPhoneMask(val);
-                  }
-                  setCustomFieldValues({...customFieldValues, [field.id]: val});
-                }}
-              />
-            </FormItem>
-          ));
+          return pt.fields.map((field: any) => {
+            // Для типа boolean - чекбокс
+            if (field.type === 'boolean') {
+              return (
+                <FormItem key={field.id}>
+                  <Checkbox
+                    checked={!!customFieldValues[field.id]}
+                    onChange={(e) => {
+                      setCustomFieldValues({...customFieldValues, [field.id]: e.target.checked});
+                    }}
+                  >
+                    {field.label} {field.required ? '*' : ''}
+                  </Checkbox>
+                </FormItem>
+              );
+            }
+            
+            // Для типа select - выпадающий список
+            if (field.type === 'select') {
+              return (
+                <FormItem 
+                  key={field.id} 
+                  top={`${field.label} ${field.required ? '*' : ''}`}
+                >
+                  <select
+                    value={(customFieldValues[field.id] as string) || ''}
+                    onChange={(e) => {
+                      setCustomFieldValues({...customFieldValues, [field.id]: e.target.value});
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--vkui--color_field_border_alpha)',
+                      background: 'var(--vkui--color_background_content)',
+                      color: 'var(--vkui--color_text_primary)',
+                      fontSize: '16px',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <option value="">Выберите вариант</option>
+                    {(field.options || []).map((opt: string, idx: number) => (
+                      <option key={idx} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </FormItem>
+              );
+            }
+            
+            // Для остальных типов - обычный input
+            return (
+              <FormItem 
+                key={field.id} 
+                top={`${field.label} ${field.required ? '*' : ''}`}
+              >
+                <Input 
+                  type={field.type === 'phone' ? 'tel' : field.type === 'number' ? 'number' : 'text'}
+                  value={(customFieldValues[field.id] as string) || ''}
+                  placeholder={field.type === 'link' ? 'https://...' : ''}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (field.type === 'phone') {
+                      val = applyPhoneMask(val);
+                    }
+                    setCustomFieldValues({...customFieldValues, [field.id]: val});
+                  }}
+                />
+              </FormItem>
+            );
+          });
         })()}
 
         <FormItem 
