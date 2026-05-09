@@ -1,7 +1,6 @@
 package vkapp
 
 import (
-
 	"backend/vk"
 	"encoding/json"
 	"fmt"
@@ -15,6 +14,16 @@ func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(payload)
+}
+
+func formatPostByLinkSource(postIDStr string, authorName string) string {
+	linkText := strings.TrimSpace(authorName)
+	if linkText == "" {
+		linkText = "Источник"
+	}
+	linkText = strings.NewReplacer("[", "(", "]", ")", "|", " ").Replace(linkText)
+
+	return fmt.Sprintf("\n\nИсточник: [https://vk.com/wall%s|%s]", postIDStr, linkText)
 }
 
 // appPostByLinkPreviewHandler получает ссылку на пост ВКонтакте и возвращает текст с медиа
@@ -84,8 +93,7 @@ func appPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 		authorName = "Источник"
 	}
 
-	// Формируем текст с источником (формат: источник: [wall-165434330_16254|Название группы])
-	sourceStr := fmt.Sprintf("\n\nисточник: [wall%s|%s]", postIDStr, authorName)
+	sourceStr := formatPostByLinkSource(postIDStr, authorName)
 
 	// Формируем список вложений (photo-123_456)
 	var attachmentIDs []string
@@ -94,7 +102,7 @@ func appPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 	for _, att := range post.Attachments {
 		if att.Type == "photo" && att.Photo != nil {
 			attachmentIDs = append(attachmentIDs, fmt.Sprintf("photo%d_%d", att.Photo.OwnerID, att.Photo.ID))
-			
+
 			// Находим лучшую миниатюру
 			var bestURL string
 			var bestWidth int
@@ -160,7 +168,7 @@ func appPublishPostByLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	groupIDStr := fmt.Sprintf("%v", vkCtx.GroupID)
 	client := vk.NewVKClient(adminToken)
-	
+
 	var atts []string
 	if req.Attachments != "" {
 		atts = strings.Split(req.Attachments, ",")
