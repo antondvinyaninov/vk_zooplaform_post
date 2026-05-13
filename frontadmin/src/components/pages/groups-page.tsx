@@ -2,8 +2,17 @@ import { IconHeartbeat, IconRefresh } from "@tabler/icons-react"
 import { Button } from "@/components/ui/button"
 import { GroupsTable } from "@/components/groups/groups-table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent } from "@/components/ui/card"
+import useSWR from "swr"
+import { fetcher, type GroupsResponse } from "@/lib/api"
 
 export function GroupsPage() {
+  const { data } = useSWR<GroupsResponse>("/admin/groups/installed", fetcher)
+  
+  const totalPosts = data?.groups?.reduce((sum, group) => sum + (group.posts_count || 0), 0) || 0
+  const connectedGroups = data?.groups?.filter(g => !g.is_test && g.health_status === 'ok').length || 0
+  const newGroups = data?.groups?.filter(g => !g.is_test && g.health_status !== 'ok').length || 0
+
   return (
     <div className="@container/main flex flex-1 flex-col gap-2">
       <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
@@ -26,6 +35,34 @@ export function GroupsPage() {
               Проверить все группы
             </Button>
           </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-muted-foreground">Всего постов</p>
+                <p className="text-3xl font-bold">{new Intl.NumberFormat("ru-RU").format(totalPosts)}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-muted-foreground">Подключенные группы</p>
+                <p className="text-3xl font-bold text-green-600 dark:text-green-400">{connectedGroups}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-muted-foreground">Требуют внимания</p>
+                <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{newGroups}</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Groups Data Table */}
