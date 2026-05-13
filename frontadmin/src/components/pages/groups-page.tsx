@@ -9,7 +9,7 @@ import { fetcher, type GroupsResponse } from "@/lib/api"
 export function GroupsPage() {
   const { data } = useSWR<GroupsResponse>("/admin/groups/installed", fetcher)
   
-  const totalPosts = data?.groups?.reduce((sum, group) => sum + (group.posts_count || 0), 0) || 0
+  const totalPosts = data?.groups?.filter(g => !g.is_test && g.health_status === 'ok').reduce((sum, group) => sum + (group.posts_count || 0), 0) || 0
   const totalSubscribers = data?.groups?.filter(g => !g.is_test && g.health_status === 'ok').reduce((sum, group) => sum + (group.members_count || 0), 0) || 0
   const connectedGroups = data?.groups?.filter(g => !g.is_test && g.health_status === 'ok').length || 0
   const newGroups = data?.groups?.filter(g => !g.is_test && g.health_status !== 'ok').length || 0
