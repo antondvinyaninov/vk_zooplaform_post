@@ -10,6 +10,7 @@ export function GroupsPage() {
   const { data } = useSWR<GroupsResponse>("/admin/groups/installed", fetcher)
   
   const totalPosts = data?.groups?.reduce((sum, group) => sum + (group.posts_count || 0), 0) || 0
+  const totalSubscribers = data?.groups?.reduce((sum, group) => sum + (group.members_count || 0), 0) || 0
   const connectedGroups = data?.groups?.filter(g => !g.is_test && g.health_status === 'ok').length || 0
   const newGroups = data?.groups?.filter(g => !g.is_test && g.health_status !== 'ok').length || 0
 
@@ -38,12 +39,20 @@ export function GroupsPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col gap-1">
                 <p className="text-sm font-medium text-muted-foreground">Всего постов</p>
                 <p className="text-3xl font-bold">{new Intl.NumberFormat("ru-RU").format(totalPosts)}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-muted-foreground">Всего подписчиков</p>
+                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{new Intl.NumberFormat("ru-RU").format(totalSubscribers)}</p>
               </div>
             </CardContent>
           </Card>
