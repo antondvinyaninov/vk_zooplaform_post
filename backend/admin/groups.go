@@ -26,6 +26,7 @@ type installedGroupResponse struct {
 	LastCheckAt  *string `json:"last_check_at,omitempty"`
 	HealthError  string  `json:"health_error,omitempty"`
 	MembersCount int     `json:"members_count"`
+	PostsCount   int     `json:"posts_count"` // Количество постов через приложение
 }
 
 func installedGroupsHandler(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +79,6 @@ func installedGroupsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 func allInstalledGroupsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
@@ -123,10 +123,24 @@ func refreshGroupHealthHandler(w http.ResponseWriter, r *http.Request) {
 
 func listInstalledGroups() ([]installedGroupResponse, error) {
 	rows, err := database.Query(`
-		SELECT id, vk_group_id, name, screen_name, photo_200, is_active, is_test, health_status, last_check_at, health_error, members_count
-		FROM groups
-		WHERE is_active = ?
-		ORDER BY updated_at DESC
+		SELECT 
+			g.id, 
+			g.vk_group_id, 
+			g.name, 
+			g.screen_name, 
+			g.photo_200, 
+			g.is_active, 
+			g.is_test, 
+			g.health_status, 
+			g.last_check_at, 
+			g.health_error, 
+			g.members_count,
+			COALESCE(COUNT(DISTINCT pp.id), 0) as posts_count
+		FROM groups g
+		LEFT JOIN post_publications pp ON pp.group_id = g.id
+		WHERE g.is_active = ?
+		GROUP BY g.id, g.vk_group_id, g.name, g.screen_name, g.photo_200, g.is_active, g.is_test, g.health_status, g.last_check_at, g.health_error, g.members_count
+		ORDER BY g.updated_at DESC
 	`, true)
 	if err != nil {
 		return nil, err
@@ -135,7 +149,7 @@ func listInstalledGroups() ([]installedGroupResponse, error) {
 
 	result := make([]installedGroupResponse, 0)
 	for rows.Next() {
-		group, err := scanInstalledGroup(rows)
+		group, postsCount, err := scanInstalledGroupWithPosts(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -151,6 +165,7 @@ func listInstalledGroups() ([]installedGroupResponse, error) {
 			HealthStatus: normalizeHealthStatus(group.HealthStatus),
 			HealthError:  strings.TrimSpace(group.HealthError),
 			MembersCount: group.MembersCount,
+			PostsCount:   postsCount,
 		}
 		if !group.LastCheckAt.IsZero() {
 			ts := group.LastCheckAt.Format(time.RFC3339)
@@ -199,6 +214,47 @@ func scanInstalledGroup(scanner interface {
 	}
 
 	return &group, nil
+}
+
+func scanInstalledGroupWithPosts(scanner interface {
+	Scan(dest ...interface{}) error
+}) (*models.Group, int, error) {
+	var (
+		group          models.Group
+		healthStatus   sql.NullString
+		lastCheckAt    sql.NullTime
+		healthErrorRaw sql.NullString
+		postsCount     int
+	)
+
+	err := scanner.Scan(
+		&group.ID,
+		&group.VKGroupID,
+		&group.Name,
+		&group.ScreenName,
+		&group.Photo200,
+		&group.IsActive,
+		&group.IsTest,
+		&healthStatus,
+		&lastCheckAt,
+		&healthErrorRaw,
+		&group.MembersCount,
+		&postsCount,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	if healthStatus.Valid {
+		group.HealthStatus = healthStatus.String
+	}
+	if lastCheckAt.Valid {
+		group.LastCheckAt = lastCheckAt.Time
+	}
+	if healthErrorRaw.Valid {
+		group.HealthError = healthErrorRaw.String
+	}
+
+	return &group, postsCount, nil
 }
 
 func normalizeHealthStatus(status string) string {
@@ -257,11 +313,11 @@ func refreshGroupsHealth(groupID int) (int, error) {
 			report = append(report, "❌ Токен: не подключен")
 		} else {
 			report = append(report, "✅ Токен: подключен")
-			
+
 			// 2. Проверяем наличие нашего сервера в Callback API
 			groupClient := vk.NewVKClient(groupToken)
 			servers, checkErr := groupClient.GetCallbackServers(vkGroupID)
-			
+
 			if checkErr != nil {
 				status = "error"
 				report = append(report, "❌ Вебхук: ошибка API ("+checkErr.Error()+")")
@@ -279,7 +335,7 @@ func refreshGroupsHealth(groupID int) (int, error) {
 						break
 					}
 				}
-				
+
 				if !ourServerFound {
 					errAdd := vk.EnsureCallbackServer(&models.Group{
 						VKGroupID:   vkGroupID,
@@ -312,7 +368,7 @@ func refreshGroupsHealth(groupID int) (int, error) {
 
 		errText := strings.Join(report, "\n")
 
-		// Всегда получаем актуальное количество подписчиков через Service Key, 
+		// Всегда получаем актуальное количество подписчиков через Service Key,
 		// чтобы оно отображалось даже если токен группы умер (Ошибка 38 и т.д.)
 		cfg := config.Load()
 		serviceClient := vk.NewVKClient(cfg.VKServiceKey)
@@ -358,7 +414,7 @@ func saveDailyStatsSnapshot() {
 	}
 
 	today := time.Now().Format("2006-01-02")
-	
+
 	// Сохраняем снимок с конфликтом ON CONFLICT
 	_, err = database.Exec(`
 		INSERT INTO group_stats_history (date, total_groups, total_subscribers)
@@ -379,7 +435,7 @@ func StartHealthCheckCron() {
 	go func() {
 		ticker := time.NewTicker(15 * time.Minute)
 		defer ticker.Stop()
-		
+
 		log.Printf("🔄 [Cron] Starting initial groups health check...")
 		if _, err := refreshGroupsHealth(0); err != nil {
 			log.Printf("❌ [Cron] Initial health check failed: %v", err)

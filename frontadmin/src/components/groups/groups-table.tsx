@@ -76,6 +76,7 @@ export function GroupsTable({ endpoint = "/admin/groups/installed", filterFn }: 
             <TableHead>VK ID</TableHead>
             <TableHead>Статус</TableHead>
             <TableHead className="hidden md:table-cell">Последняя проверка</TableHead>
+            <TableHead className="hidden lg:table-cell text-right">Постов</TableHead>
             <TableHead className="hidden sm:table-cell text-right">Подписчики</TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
@@ -97,13 +98,14 @@ export function GroupsTable({ endpoint = "/admin/groups/installed", filterFn }: 
                 <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                 <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
                 <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                <TableCell className="hidden lg:table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                 <TableCell className="hidden sm:table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="size-8 ml-auto" /></TableCell>
               </TableRow>
             ))
           ) : error ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                 <div className="flex flex-col items-center justify-center">
                   <IconAlertCircle className="size-6 text-destructive mb-2" />
                   <p>Ошибка загрузки групп</p>
@@ -112,7 +114,7 @@ export function GroupsTable({ endpoint = "/admin/groups/installed", filterFn }: 
             </TableRow>
           ) : groups.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                 Группы не найдены
               </TableCell>
             </TableRow>
@@ -145,6 +147,9 @@ export function GroupsTable({ endpoint = "/admin/groups/installed", filterFn }: 
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                   {group.last_check_at ? formatDistanceToNow(new Date(group.last_check_at), { addSuffix: true, locale: ru }) : "Никогда"}
+                </TableCell>
+                <TableCell className="hidden lg:table-cell text-right font-medium tabular-nums">
+                  {new Intl.NumberFormat("ru-RU").format(group.posts_count || 0)}
                 </TableCell>
                 <TableCell className="hidden sm:table-cell text-right font-medium tabular-nums">
                   {new Intl.NumberFormat("ru-RU").format(group.members_count)}

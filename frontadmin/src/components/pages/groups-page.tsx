@@ -30,17 +30,17 @@ export function GroupsPage() {
 
         {/* Groups Data Table */}
         <div className="mt-4">
-          <Tabs defaultValue="my" className="w-full">
+          <Tabs defaultValue="connected" className="w-full">
             <TabsList className="mb-4">
-              <TabsTrigger value="my">Мои группы</TabsTrigger>
-              <TabsTrigger value="all">Все группы (Суперадмин)</TabsTrigger>
+              <TabsTrigger value="connected">Подключенные</TabsTrigger>
+              <TabsTrigger value="attention">Новенькие</TabsTrigger>
               <TabsTrigger value="test">Тестовые группы</TabsTrigger>
             </TabsList>
-            <TabsContent value="my" className="m-0">
-              <GroupsTable endpoint="/admin/groups/installed" filterFn={(g) => !g.is_test} />
+            <TabsContent value="connected" className="m-0">
+              <GroupsTable endpoint="/admin/groups/installed" filterFn={(g) => !g.is_test && g.health_status === 'ok'} />
             </TabsContent>
-            <TabsContent value="all" className="m-0">
-              <GroupsTable endpoint="/admin/groups/all" filterFn={(g) => !g.is_test} />
+            <TabsContent value="attention" className="m-0">
+              <GroupsTable endpoint="/admin/groups/installed" filterFn={(g) => !g.is_test && g.health_status === 'error'} />
             </TabsContent>
             <TabsContent value="test" className="m-0">
               <GroupsTable endpoint="/admin/groups/all" filterFn={(g) => !!g.is_test} />

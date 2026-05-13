@@ -42,6 +42,7 @@ export interface Group {
   last_check_at?: string;
   health_error?: string;
   members_count: number;
+  posts_count?: number; // Количество постов через приложение
   enable_post_types?: boolean;
   post_types?: PostType[];
 }
