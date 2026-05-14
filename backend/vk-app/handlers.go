@@ -105,6 +105,7 @@ type PostType struct {
 	Color        string          `json:"color"`
 	ModeratorIDs []int           `json:"moderator_ids"`
 	Fields       []PostTypeField `json:"fields,omitempty"`
+	Template     string          `json:"template,omitempty"`
 }
 
 type userSummary struct {
