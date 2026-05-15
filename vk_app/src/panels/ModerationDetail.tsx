@@ -93,8 +93,8 @@ export const ModerationDetail: FC<NavIdProps> = ({ id }) => {
         alert(`Фото "${file.name}" слишком большое. Максимальный размер фото: 10 МБ.`);
         return;
       }
-      if (file.type.startsWith('video/') && file.size > 500 * 1024 * 1024) {
-        alert(`Видео "${file.name}" слишком большое. Максимальный размер видео: 500 МБ.`);
+      if (file.type.startsWith('video/') && file.size > 100 * 1024 * 1024) {
+        alert(`Видео "${file.name}" слишком большое. Максимальный размер видео: 100 МБ.`);
         return;
       }
     }
