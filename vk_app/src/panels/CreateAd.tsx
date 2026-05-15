@@ -67,6 +67,17 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
       return;
     }
 
+    for (const file of newFilesList) {
+      if (file.type.startsWith('image/') && file.size > 10 * 1024 * 1024) {
+        alert(`Фото "${file.name}" слишком большое. Максимальный размер фото: 10 МБ.`);
+        return;
+      }
+      if (file.type.startsWith('video/') && file.size > 500 * 1024 * 1024) {
+        alert(`Видео "${file.name}" слишком большое. Максимальный размер видео: 500 МБ.`);
+        return;
+      }
+    }
+
     const items = newFilesList.map(file => ({ file }));
     setFiles((prev) => [...prev, ...items]);
   };
