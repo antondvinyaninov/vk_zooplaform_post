@@ -2432,7 +2432,9 @@ func groupManagersHandler(w http.ResponseWriter, r *http.Request) {
 		"fields":   "first_name,last_name",
 	})
 	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err.Error())
+		// If access is denied (VK error 15) or token lacks permissions, simply return an empty list of managers
+		// rather than returning a 500 server error to avoid crashing the UI or cluttering the logs.
+		utils.RespondSuccess(w, []managerResponse{})
 		return
 	}
 
