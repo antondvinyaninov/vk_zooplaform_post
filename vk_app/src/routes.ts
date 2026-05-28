@@ -27,9 +27,7 @@ export const DEFAULT_VIEW_PANELS = {
 export const routes = RoutesConfig.create([
   createRoot(DEFAULT_ROOT, [
     createView(DEFAULT_VIEW, [
-      createPanel(DEFAULT_VIEW_PANELS.HOME, '/', [
-        createModal('delete_post_modal', `/${DEFAULT_VIEW_PANELS.HOME}/delete_post/:id`),
-      ]), // Добавляем корневой роут
+      createPanel(DEFAULT_VIEW_PANELS.CREATE_POST, '/', []),
       createPanel(DEFAULT_VIEW_PANELS.HOME, '/home', [
         createModal('delete_post_modal_home', `/${DEFAULT_VIEW_PANELS.HOME}/delete_post/:id`),
       ]),

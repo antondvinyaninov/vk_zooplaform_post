@@ -83,7 +83,7 @@ const getActiveStory = (panel: string): string => {
 };
 
 export const App = () => {
-  const { panel: activePanel = DEFAULT_VIEW_PANELS.HOME, modal: activeModal } = useActiveVkuiLocation();
+  const { panel: activePanel = DEFAULT_VIEW_PANELS.CREATE_POST, modal: activeModal } = useActiveVkuiLocation();
   const routeNavigator = useRouteNavigator();
   const [fetchedUser, setUser] = useState<UserInfo | undefined>();
   const [appUser, setAppUser] = useState<AppUser | undefined>();
