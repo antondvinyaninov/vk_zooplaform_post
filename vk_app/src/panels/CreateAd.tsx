@@ -15,9 +15,7 @@ import {
   Text,
 } from '@vkontakte/vkui';
 import {
-  Icon24InfoCircleOutline,
   Icon24PicturePlusOutline,
-  Icon24SmileOutline,
   Icon28Cancel,
   Icon28CancelCircleFillRed,
   Icon28UploadOutline,
@@ -39,8 +37,6 @@ type MediaItem = {
   thumbnail?: string;
 };
 
-const QUICK_EMOJIS = ['😊', '😍', '🙏', '❤️', '👍', '🐾', '😢', '😻', '🏠', '📍', '📞', '💰'];
-
 export const CreatePost: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [settings, setSettings] = useState<any>(null);
@@ -51,8 +47,6 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | boolean>>({});
   const [isCompact, setIsCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   const [mediaDimensions, setMediaDimensions] = useState<Record<string, MediaDimensions>>({});
-  const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const objectUrlsRef = useRef<string[]>([]);
   const mediaInputId = `media-upload-${id}`;
 
@@ -215,32 +209,6 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
     };
   };
 
-  const insertEmoji = (emoji: string) => {
-    if (isSubmitting) return;
-
-    const textarea = textareaRef.current;
-    const start = textarea?.selectionStart ?? text.length;
-    const end = textarea?.selectionEnd ?? text.length;
-    const safeStart = Math.max(0, Math.min(start, text.length));
-    const safeEnd = Math.max(safeStart, Math.min(end, text.length));
-    const nextText = `${text.slice(0, safeStart)}${emoji}${text.slice(safeEnd)}`;
-    const nextCaretPosition = safeStart + emoji.length;
-
-    setText(nextText);
-
-    const restoreFocus = () => {
-      if (!textareaRef.current) return;
-      textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(nextCaretPosition, nextCaretPosition);
-    };
-
-    if (typeof window !== 'undefined') {
-      window.requestAnimationFrame(restoreFocus);
-    } else {
-      restoreFocus();
-    }
-  };
-
   const handlePublish = async () => {
     if (!text || text.length < 10) {
       alert('Минимальная длина текста — 10 символов');
@@ -332,12 +300,6 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
           placeholder={getTextPlaceholder()}
           rows={isCompact ? 10 : 5}
           disabled={isSubmitting}
-          slotProps={{
-            textArea: {
-              getRootRef: textareaRef,
-              style: { paddingRight: 48 },
-            },
-          }}
           style={{
             '--vkui--size_field_height--regular': 'auto',
             minHeight: isCompact ? (files.length > 0 ? 150 : 360) : 150,
@@ -345,69 +307,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
             background: 'transparent',
           } as CSSProperties}
         />
-        <button
-          type="button"
-          onClick={() => setEmojiPanelOpen((open) => !open)}
-          disabled={isSubmitting}
-          aria-label="Добавить смайлик"
-          style={{
-            position: 'absolute',
-            right: 8,
-            top: 8,
-            width: 40,
-            height: 40,
-            border: 0,
-            borderRadius: '50%',
-            background: emojiPanelOpen ? 'var(--vkui--color_background_secondary)' : 'transparent',
-            color: 'var(--vkui--color_icon_secondary)',
-            cursor: isSubmitting ? 'default' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0,
-          }}
-        >
-          <Icon24SmileOutline width={28} height={28} />
-        </button>
       </div>
-      {emojiPanelOpen && (
-        <div
-          role="listbox"
-          aria-label="Смайлы"
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 6,
-            marginTop: 8,
-            padding: 8,
-            borderRadius: 14,
-            background: 'var(--vkui--color_background_secondary)',
-          }}
-        >
-          {QUICK_EMOJIS.map((emoji) => (
-            <button
-              key={emoji}
-              type="button"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => insertEmoji(emoji)}
-              disabled={isSubmitting}
-              style={{
-                width: 36,
-                height: 36,
-                border: 0,
-                borderRadius: 10,
-                background: 'var(--vkui--color_background_content)',
-                cursor: isSubmitting ? 'default' : 'pointer',
-                fontSize: 22,
-                lineHeight: '36px',
-                padding: 0,
-              }}
-            >
-              {emoji}
-            </button>
-          ))}
-        </div>
-      )}
       {text.length > 0 && text.length < 10 && (
         <Text style={{ color: 'var(--vkui--color_text_secondary)', marginTop: 8 }}>
           Минимум 10 символов для отправки.
@@ -821,25 +721,10 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
               paddingTop: 18,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
               gap: 16,
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                color: 'var(--vkui--color_text_accent)',
-                fontWeight: 600,
-                minWidth: 0,
-              }}
-            >
-              <Icon24InfoCircleOutline width={24} height={24} />
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Советы по публикации
-              </span>
-            </div>
             <Button
               size="l"
               disabled={!canSubmit}
