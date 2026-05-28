@@ -971,6 +971,17 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			}
 		}
 
+		// Считаем сколько медиа ожидается из S3
+		expectedS3Count := 0
+		if post.S3VideoKey != "" {
+			for _, key := range strings.Split(post.S3VideoKey, ",") {
+				if strings.TrimSpace(key) != "" {
+					expectedS3Count++
+				}
+			}
+		}
+		uploadedFromS3Count := 0
+
 		// Если есть медиа в S3 - скачиваем и загружаем в VK
 		if post.S3VideoKey != "" {
 			s3, err := s3client.New()
@@ -982,55 +993,91 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 						continue
 					}
 					log.Printf("[Moderate] Downloading S3 media: %s", key)
-					rc, _, err := s3.GetObject(context.Background(), key)
-					if err == nil {
+
+					// Retry loop: до 3 попыток на каждый файл
+					const maxRetries = 3
+					var uploadedOK bool
+					for attempt := 1; attempt <= maxRetries; attempt++ {
+						rc, _, err := s3.GetObject(context.Background(), key)
+						if err != nil {
+							log.Printf("[Moderate] S3 GetObject attempt %d/%d failed for %s: %v", attempt, maxRetries, key, err)
+							continue
+						}
+
 						var att, attURL string
 						var uploadErr error
 						ext := strings.ToLower(filepath.Ext(key))
 
 						tmpFile, err := os.CreateTemp("", "moderation_media_*"+ext)
-						if err == nil {
-							io.Copy(tmpFile, rc)
-							tmpPath := tmpFile.Name()
-							tmpFile.Close()
+						if err != nil {
 							rc.Close()
-
-							if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
-								att, attURL, uploadErr = client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
-							} else {
-								att, attURL, uploadErr = client.UploadPhotoToWall(tmpPath, strconv.Itoa(group.VKGroupID))
-							}
-
-							if uploadErr == nil {
-								attachments = append(attachments, att)
-								var oldParts []string
-								if post.Attachments != "" {
-									if strings.HasPrefix(post.Attachments, "[") {
-										json.Unmarshal([]byte(post.Attachments), &oldParts)
-									} else {
-										oldParts = strings.Split(post.Attachments, ",")
-									}
-								}
-								if attURL != "" {
-									oldParts = append(oldParts, att+"|"+attURL)
-								} else {
-									oldParts = append(oldParts, att)
-								}
-								newAtts, _ := json.Marshal(oldParts)
-								post.Attachments = string(newAtts)
-
-								go s3DeleteVideoKey(key)
-							} else {
-								log.Printf("[Moderate] VK Upload error for %s: %v", key, uploadErr)
-							}
-							os.Remove(tmpPath)
-						} else {
-							rc.Close()
+							log.Printf("[Moderate] TempFile create failed: %v", err)
+							continue
 						}
+
+						io.Copy(tmpFile, rc)
+						tmpPath := tmpFile.Name()
+						tmpFile.Close()
+						rc.Close()
+
+						if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
+							att, attURL, uploadErr = client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
+						} else {
+							att, attURL, uploadErr = client.UploadPhotoToWall(tmpPath, strconv.Itoa(group.VKGroupID))
+						}
+						os.Remove(tmpPath)
+
+						if uploadErr != nil {
+							log.Printf("[Moderate] VK upload attempt %d/%d failed for %s: %v", attempt, maxRetries, key, uploadErr)
+							continue
+						}
+
+						// Успешно загружено в VK
+						attachments = append(attachments, att)
+						var oldParts []string
+						if post.Attachments != "" {
+							if strings.HasPrefix(post.Attachments, "[") {
+								json.Unmarshal([]byte(post.Attachments), &oldParts)
+							} else {
+								oldParts = strings.Split(post.Attachments, ",")
+							}
+						}
+						if attURL != "" {
+							oldParts = append(oldParts, att+"|"+attURL)
+						} else {
+							oldParts = append(oldParts, att)
+						}
+						newAtts, _ := json.Marshal(oldParts)
+						post.Attachments = string(newAtts)
+
+						go s3DeleteVideoKey(key)
+						uploadedOK = true
+						uploadedFromS3Count++
+						break // выход из retry loop
+					}
+
+					if !uploadedOK {
+						log.Printf("[Moderate] ❌ Media integrity FAIL: could not upload %s after %d attempts", key, maxRetries)
 					}
 				}
-				post.S3VideoKey = "" // Очищаем ключи
+				post.S3VideoKey = ""
 			}
+		}
+
+		// ✅ Проверка целостности медиа
+		// Если не все S3-медиа удалось загрузить в VK — откатываем публикацию
+		if expectedS3Count > 0 && uploadedFromS3Count < expectedS3Count {
+			missingCount := expectedS3Count - uploadedFromS3Count
+			log.Printf("[Moderate] ❌ Media integrity check FAILED for post %d: expected %d S3 files, uploaded %d to VK (%d missing). Reverting to pending.",
+				post.ID, expectedS3Count, uploadedFromS3Count, missingCount)
+			models.LogWarning("MEDIA_INTEGRITY_FAIL",
+				fmt.Sprintf("Проверка целостности медиа провалена: ожидалось %d файлов из S3, загружено в VK %d (потеряно %d)", expectedS3Count, uploadedFromS3Count, missingCount),
+				nil,
+				fmt.Sprintf("Post ID: %d, Group ID: %d, Expected: %d, Uploaded: %d", post.ID, group.ID, expectedS3Count, uploadedFromS3Count),
+			)
+			currentPub.Status = "pending"
+			updatePublication(currentPub)
+			return
 		}
 
 		messageToPost := post.Message
