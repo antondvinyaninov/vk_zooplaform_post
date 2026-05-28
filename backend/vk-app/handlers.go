@@ -707,7 +707,16 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 		return
 	}
 
-	isAuthor := (post.UserID == ctx.UserID)
+	// Правильно определяем автора: ищем пользователя в БД по VK user ID,
+	// затем сравниваем его внутренний DB ID с post.UserID
+	isAuthor := false
+	if ctx.UserID > 0 {
+		if dbUser, err := getUserByVKUserID(ctx.UserID); err == nil && dbUser != nil {
+			isAuthor = (post.UserID == dbUser.ID)
+		}
+	}
+
+	isMod := isModerator(ctx.GroupRole)
 
 	var group *models.Group
 	var currentPub *models.PostPublication
@@ -726,24 +735,25 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	}
 
 	if !isAuthor {
+		// Для не-авторов обязательно нужна роль модератора или выше
+		if !isMod {
+			utils.RespondError(w, http.StatusForbidden, "only author or moderator can edit the post")
+			return
+		}
+
+		// Модератор должен быть привязан к группе
 		if group == nil {
 			utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
 			return
 		}
 
-		if currentPub == nil {
-			utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
-			return
-		}
-
-		if currentPub.Status != "pending" && currentPub.Status != "draft" && currentPub.Status != "rejected" {
-			utils.RespondError(w, http.StatusForbidden, "can only edit pending, draft or rejected posts")
-			return
-		}
-
-		if !isModerator(ctx.GroupRole) {
-			utils.RespondError(w, http.StatusForbidden, "only author or moderator can edit the post")
-			return
+		// Если у поста нет публикации в этой группе — проверяем, есть ли она вообще
+		// (модератор может редактировать пост, у которого ещё нет publication в его группе)
+		if currentPub != nil {
+			if currentPub.Status != "pending" && currentPub.Status != "draft" && currentPub.Status != "rejected" {
+				utils.RespondError(w, http.StatusForbidden, "can only edit pending, draft or rejected posts")
+				return
+			}
 		}
 	}
 
