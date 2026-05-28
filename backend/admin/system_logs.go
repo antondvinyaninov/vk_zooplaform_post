@@ -6,7 +6,9 @@ import (
 	"backend/utils"
 	"database/sql"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 func logsHandler(w http.ResponseWriter, r *http.Request) {
@@ -71,5 +73,157 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 		logs = append(logs, l)
 	}
 
+	// Enrich logs with User, Group and Post details
+	enrichLogsWithDetails(logs)
+
 	utils.RespondSuccess(w, logs)
+}
+
+var groupIDRegex = regexp.MustCompile(`Group ID: (\d+)`)
+var postIDRegex = regexp.MustCompile(`Post ID: (\d+)`)
+
+func enrichLogsWithDetails(logs []models.SystemLog) {
+	if len(logs) == 0 {
+		return
+	}
+
+	userIDsMap := make(map[int]bool)
+	groupIDsMap := make(map[int]bool)
+	postIDsMap := make(map[int]bool)
+
+	for _, l := range logs {
+		if l.UserID != nil {
+			userIDsMap[*l.UserID] = true
+		}
+		if matches := groupIDRegex.FindStringSubmatch(l.Details); len(matches) > 1 {
+			if id, err := strconv.Atoi(matches[1]); err == nil {
+				groupIDsMap[id] = true
+			}
+		}
+		if matches := postIDRegex.FindStringSubmatch(l.Details); len(matches) > 1 {
+			if id, err := strconv.Atoi(matches[1]); err == nil {
+				postIDsMap[id] = true
+			}
+		}
+	}
+
+	users := fetchUsers(userIDsMap)
+	groups := fetchGroups(groupIDsMap)
+	posts := fetchPosts(postIDsMap)
+
+	for i, l := range logs {
+		if l.UserID != nil {
+			if u, ok := users[*l.UserID]; ok {
+				logs[i].User = &u
+			}
+		}
+		if matches := groupIDRegex.FindStringSubmatch(l.Details); len(matches) > 1 {
+			if id, err := strconv.Atoi(matches[1]); err == nil {
+				if g, ok := groups[id]; ok {
+					logs[i].Group = &g
+				}
+			}
+		}
+		if matches := postIDRegex.FindStringSubmatch(l.Details); len(matches) > 1 {
+			if id, err := strconv.Atoi(matches[1]); err == nil {
+				if p, ok := posts[id]; ok {
+					logs[i].Post = &p
+				}
+			}
+		}
+	}
+}
+
+func fetchUsers(idsMap map[int]bool) map[int]models.UserSummary {
+	res := make(map[int]models.UserSummary)
+	ids := getKeys(idsMap)
+	if len(ids) == 0 {
+		return res
+	}
+	query := `SELECT id, first_name, last_name, photo_200 FROM users WHERE id IN (` + joinInts(ids) + `)`
+	rows, err := database.Query(query)
+	if err != nil {
+		return res
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var u models.UserSummary
+		var photo sql.NullString
+		if err := rows.Scan(&u.ID, &u.FirstName, &u.LastName, &photo); err == nil {
+			if photo.Valid {
+				u.Photo200 = photo.String
+			}
+			res[u.ID] = u
+		}
+	}
+	return res
+}
+
+func fetchGroups(idsMap map[int]bool) map[int]models.GroupSummary {
+	res := make(map[int]models.GroupSummary)
+	ids := getKeys(idsMap)
+	if len(ids) == 0 {
+		return res
+	}
+	query := `SELECT id, name, screen_name, photo_200 FROM groups WHERE id IN (` + joinInts(ids) + `)`
+	rows, err := database.Query(query)
+	if err != nil {
+		return res
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var g models.GroupSummary
+		var screen, photo sql.NullString
+		if err := rows.Scan(&g.ID, &g.Name, &screen, &photo); err == nil {
+			if screen.Valid {
+				g.ScreenName = screen.String
+			}
+			if photo.Valid {
+				g.Photo200 = photo.String
+			}
+			res[g.ID] = g
+		}
+	}
+	return res
+}
+
+func fetchPosts(idsMap map[int]bool) map[int]models.PostSummary {
+	res := make(map[int]models.PostSummary)
+	ids := getKeys(idsMap)
+	if len(ids) == 0 {
+		return res
+	}
+	query := `SELECT id, message FROM posts WHERE id IN (` + joinInts(ids) + `)`
+	rows, err := database.Query(query)
+	if err != nil {
+		return res
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p models.PostSummary
+		var msg sql.NullString
+		if err := rows.Scan(&p.ID, &msg); err == nil {
+			if msg.Valid {
+				p.Message = msg.String
+			}
+			res[p.ID] = p
+		}
+	}
+	return res
+}
+
+func getKeys(m map[int]bool) []int {
+	keys := make([]int, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func joinInts(ints []int) string {
+	strs := make([]string, len(ints))
+	for i, v := range ints {
+		strs[i] = strconv.Itoa(v)
+	}
+	return strings.Join(strs, ",")
 }

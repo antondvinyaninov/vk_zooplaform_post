@@ -23,6 +23,22 @@ interface SystemLog {
   user_id: number | null;
   details: string;
   created_at: string;
+  user?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    photo_200: string;
+  };
+  group?: {
+    id: number;
+    name: string;
+    screen_name: string;
+    photo_200: string;
+  };
+  post?: {
+    id: number;
+    message: string;
+  };
 }
 
 export function SystemLogs() {
@@ -106,7 +122,7 @@ export function SystemLogs() {
                   <TableHead className="w-[120px]">Уровень</TableHead>
                   <TableHead className="w-[200px]">Действие</TableHead>
                   <TableHead>Сообщение</TableHead>
-                  <TableHead className="text-right">Пользователь</TableHead>
+                  <TableHead className="text-right w-[200px]">Пользователь</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -120,15 +136,49 @@ export function SystemLogs() {
                       <span className="font-semibold">{log.action}</span>
                     </TableCell>
                     <TableCell className="text-sm">
-                      <div>{log.message}</div>
-                      {log.details && (
-                        <div className="text-xs text-muted-foreground mt-1 bg-muted p-1 rounded font-mono truncate max-w-xs md:max-w-md">
-                          {log.details}
+                      <div className="font-medium">{log.message}</div>
+                      
+                      {/* Enriched Group & Post visualization */}
+                      {(log.group || log.post) ? (
+                        <div className="mt-2 flex flex-col gap-2">
+                          {log.group && (
+                            <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-md border border-border/50">
+                              <img src={log.group.photo_200 || 'https://vk.com/images/community_200.png'} alt={log.group.name} className="w-8 h-8 rounded-full bg-background" />
+                              <div className="flex flex-col overflow-hidden">
+                                <span className="font-medium text-xs truncate" title={log.group.name}>{log.group.name}</span>
+                                <span className="text-[10px] text-muted-foreground">ID: {log.group.id}</span>
+                              </div>
+                            </div>
+                          )}
+                          {log.post && (
+                            <div className="text-xs text-muted-foreground bg-muted p-2 rounded-md border border-border/50 truncate max-w-xs md:max-w-md">
+                              <span className="font-semibold text-foreground mr-1">Пост #{log.post.id}:</span>
+                              {log.post.message || 'Без текста'}
+                            </div>
+                          )}
                         </div>
+                      ) : (
+                        log.details && (
+                          <div className="text-xs text-muted-foreground mt-1 bg-muted p-1 rounded font-mono truncate max-w-xs md:max-w-md">
+                            {log.details}
+                          </div>
+                        )
                       )}
                     </TableCell>
                     <TableCell className="text-right text-sm">
-                      {log.user_id ? `ID: ${log.user_id}` : <span className="text-muted-foreground">Система</span>}
+                      {log.user ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-col text-right">
+                            <span className="font-medium text-xs whitespace-nowrap">{log.user.first_name} {log.user.last_name}</span>
+                            <span className="text-[10px] text-muted-foreground">ID: {log.user.id}</span>
+                          </div>
+                          <img src={log.user.photo_200 || 'https://vk.com/images/camera_200.png'} alt="user" className="w-8 h-8 rounded-full bg-muted" />
+                        </div>
+                      ) : log.user_id ? (
+                        `ID: ${log.user_id}`
+                      ) : (
+                        <span className="text-muted-foreground">Система</span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

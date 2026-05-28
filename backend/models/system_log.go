@@ -7,13 +7,35 @@ import (
 )
 
 type SystemLog struct {
-	ID        int       `json:"id"`
-	Level     string    `json:"level"`
-	Action    string    `json:"action"`
-	Message   string    `json:"message"`
-	UserID    *int      `json:"user_id"`
-	Details   string    `json:"details"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        int           `json:"id"`
+	Level     string        `json:"level"`
+	Action    string        `json:"action"`
+	Message   string        `json:"message"`
+	UserID    *int          `json:"user_id"`
+	Details   string        `json:"details"`
+	CreatedAt time.Time     `json:"created_at"`
+	User      *UserSummary  `json:"user,omitempty"`
+	Group     *GroupSummary `json:"group,omitempty"`
+	Post      *PostSummary  `json:"post,omitempty"`
+}
+
+type UserSummary struct {
+	ID        int    `json:"id"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+	Photo200  string `json:"photo_200"`
+}
+
+type GroupSummary struct {
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	ScreenName string `json:"screen_name"`
+	Photo200   string `json:"photo_200"`
+}
+
+type PostSummary struct {
+	ID      int    `json:"id"`
+	Message string `json:"message"`
 }
 
 func CreateSystemLog(level, action, message string, userID *int, details string) {
