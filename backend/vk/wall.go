@@ -195,3 +195,19 @@ func (c *VKClient) WallGetById(posts string, extended bool) (*WallGetByIdExtende
 
 	return &WallGetByIdExtendedResponse{Items: items}, nil
 }
+
+// WallEdit редактирует уже опубликованный пост (обновляет текст и/или вложения)
+func (c *VKClient) WallEdit(ownerID string, postID int, message string, attachments []string) error {
+	params := map[string]string{
+		"owner_id": ownerID,
+		"post_id":  strconv.Itoa(postID),
+	}
+	if message != "" {
+		params["message"] = message
+	}
+	if len(attachments) > 0 {
+		params["attachments"] = strings.Join(attachments, ",")
+	}
+	_, err := c.CallMethod("wall.edit", params)
+	return err
+}

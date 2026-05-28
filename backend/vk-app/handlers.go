@@ -1065,19 +1065,18 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 
 		// ✅ Проверка целостности медиа
-		// Если не все S3-медиа удалось загрузить в VK — откатываем публикацию
-		if expectedS3Count > 0 && uploadedFromS3Count < expectedS3Count {
+		// Если часть медиа не загрузилась → публикуем с тем что есть,
+		// затем догружаем остальное через wall.edit (publish-then-patch)
+		hasPartialMedia := expectedS3Count > 0 && uploadedFromS3Count < expectedS3Count
+		if hasPartialMedia {
 			missingCount := expectedS3Count - uploadedFromS3Count
-			log.Printf("[Moderate] ❌ Media integrity check FAILED for post %d: expected %d S3 files, uploaded %d to VK (%d missing). Reverting to pending.",
+			log.Printf("[Moderate] ⚠️ Partial media upload for post %d: expected %d, uploaded %d (%d missing). Will publish and patch via wall.edit.",
 				post.ID, expectedS3Count, uploadedFromS3Count, missingCount)
-			models.LogWarning("MEDIA_INTEGRITY_FAIL",
-				fmt.Sprintf("Проверка целостности медиа провалена: ожидалось %d файлов из S3, загружено в VK %d (потеряно %d)", expectedS3Count, uploadedFromS3Count, missingCount),
+			models.LogWarning("MEDIA_PARTIAL_UPLOAD",
+				fmt.Sprintf("Часть медиа (%d из %d) не загрузилась с первого раза. Публикуем с тем что есть, остальное догрузим через wall.edit", uploadedFromS3Count, expectedS3Count),
 				nil,
 				fmt.Sprintf("Post ID: %d, Group ID: %d, Expected: %d, Uploaded: %d", post.ID, group.ID, expectedS3Count, uploadedFromS3Count),
 			)
-			currentPub.Status = "pending"
-			updatePublication(currentPub)
-			return
 		}
 
 		messageToPost := post.Message
@@ -1172,13 +1171,13 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		currentPub.VKPostID = vkPostID
 		currentPub.Status = req.Status
 		if err := updatePublication(currentPub); err != nil {
-			log.Printf("[Moderate] Failed to update publication: %v", err)
+			log.Printf("[Moderate] Failed to update publication: %v\n", err)
 			return
 		}
 
 		post.Message = messageToPost
 		if err := updatePost(post); err != nil {
-			log.Printf("[Moderate] Failed to update post: %v", err)
+			log.Printf("[Moderate] Failed to update post: %v\n", err)
 			return
 		}
 
@@ -1191,6 +1190,117 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			case "scheduled":
 				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", currentPub.PublishDate.Format("02.01.2006 15:04"), appURL))
 			}
+		}
+
+		// Если часть медиа не загрузилась — пытаемся догрузить в фоне и обновить пост через wall.edit
+		if hasPartialMedia && post.S3VideoKey != "" && vkPostID > 0 {
+			remainingKeys := post.S3VideoKey
+			capturedVKPostID := vkPostID
+			capturedGroupID := group.VKGroupID
+			capturedPostID := post.ID
+			capturedMessage := messageToPost
+			capturedAttachments := make([]string, len(attachments))
+			copy(capturedAttachments, attachments)
+
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("[PatchMedia] Panic: %v", r)
+					}
+				}()
+
+				s3, err := s3client.New()
+				if err != nil {
+					log.Printf("[PatchMedia] Failed to init S3 client: %v", err)
+					return
+				}
+
+				patchClient := vk.NewVKClient(adminToken)
+				var newAttachments []string
+
+				for _, key := range strings.Split(remainingKeys, ",") {
+					key = strings.TrimSpace(key)
+					if key == "" {
+						continue
+					}
+
+					const patchMaxRetries = 5
+					for attempt := 1; attempt <= patchMaxRetries; attempt++ {
+						// Экспоненциальная задержка между попытками: 2, 4, 8, 16, 32 сек
+						if attempt > 1 {
+							time.Sleep(time.Duration(1<<uint(attempt)) * time.Second)
+						}
+
+						log.Printf("[PatchMedia] Attempt %d/%d uploading missed media %s for VK post %d", attempt, patchMaxRetries, key, capturedVKPostID)
+
+						rc, _, err := s3.GetObject(context.Background(), key)
+						if err != nil {
+							log.Printf("[PatchMedia] S3 GetObject failed: %v", err)
+							continue
+						}
+
+						ext := strings.ToLower(filepath.Ext(key))
+						tmpFile, err := os.CreateTemp("", "patch_media_*"+ext)
+						if err != nil {
+							rc.Close()
+							continue
+						}
+						io.Copy(tmpFile, rc)
+						tmpPath := tmpFile.Name()
+						tmpFile.Close()
+						rc.Close()
+
+						var att string
+						var uploadErr error
+						if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
+							att, _, uploadErr = patchClient.UploadVideo(tmpPath, strconv.Itoa(capturedGroupID), filepath.Base(key))
+						} else {
+							att, _, uploadErr = patchClient.UploadPhotoToWall(tmpPath, strconv.Itoa(capturedGroupID))
+						}
+						os.Remove(tmpPath)
+
+						if uploadErr != nil {
+							log.Printf("[PatchMedia] VK upload attempt %d/%d failed: %v", attempt, patchMaxRetries, uploadErr)
+							continue
+						}
+
+						newAttachments = append(newAttachments, att)
+						go s3DeleteVideoKey(key)
+						log.Printf("[PatchMedia] ✅ Successfully uploaded missed media %s", key)
+						break
+					}
+				}
+
+				if len(newAttachments) == 0 {
+					log.Printf("[PatchMedia] ❌ No media recovered for VK post %d, patch skipped", capturedVKPostID)
+					models.LogWarning("MEDIA_PATCH_FAILED",
+						"Не удалось догрузить пропавшие медиафайлы через wall.edit",
+						nil,
+						fmt.Sprintf("Post ID: %d, VK Post ID: %d", capturedPostID, capturedVKPostID),
+					)
+					return
+				}
+
+				// Патчим опубликованный пост — добавляем к существующим вложениям новые
+				allAttachments := append(capturedAttachments, newAttachments...)
+				ownerID := "-" + strconv.Itoa(capturedGroupID)
+				if err := patchClient.WallEdit(ownerID, capturedVKPostID, capturedMessage, allAttachments); err != nil {
+					log.Printf("[PatchMedia] ❌ wall.edit failed for VK post %d: %v", capturedVKPostID, err)
+					models.LogWarning("MEDIA_PATCH_WALL_EDIT_FAILED",
+						"wall.edit не удался при попытке дозагрузить медиа в опубликованный пост",
+						nil,
+						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Error: %v", capturedPostID, capturedVKPostID, err),
+					)
+					return
+				}
+
+				log.Printf("[PatchMedia] ✅ Post %d patched successfully: added %d missing media via wall.edit", capturedVKPostID, len(newAttachments))
+				models.LogInfo("MEDIA_PATCH_SUCCESS",
+					fmt.Sprintf("Успешно дозагружено %d медиафайлов в опубликованный пост через wall.edit", len(newAttachments)),
+					nil,
+					fmt.Sprintf("Post ID: %d, VK Post ID: %d", capturedPostID, capturedVKPostID),
+				)
+			}()
 		}
 	}()
 }
