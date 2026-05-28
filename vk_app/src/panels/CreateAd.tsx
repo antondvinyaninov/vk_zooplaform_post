@@ -516,6 +516,20 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
     </Div>
   );
 
+  const renderCompactSubmitButton = () => (
+    <Div style={{ paddingTop: 0, paddingBottom: 18 }}>
+      <Button
+        size="l"
+        stretched
+        disabled={!canSubmit}
+        loading={isSubmitting}
+        onClick={handlePublish}
+      >
+        Отправить
+      </Button>
+    </Div>
+  );
+
   return (
     <Panel id={id}>
       <PanelHeader
@@ -526,13 +540,6 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
               onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`)}
             >
               <Icon28Cancel />
-            </PanelHeaderButton>
-          ) : undefined
-        }
-        after={
-          isCompact ? (
-            <PanelHeaderButton primary disabled={!canSubmit} onClick={handlePublish}>
-              Далее
             </PanelHeaderButton>
           ) : undefined
         }
@@ -656,6 +663,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
         {files.length === 0 ? renderEmptyMediaPicker() : renderMediaPreview()}
         {isCompact && files.length > 0 && renderTextEditor()}
         {isCompact && files.length > 0 && renderCompactMediaToolbar()}
+        {isCompact && renderCompactSubmitButton()}
         {!isCompact && renderTextEditor()}
 
         {!isCompact && (
@@ -692,7 +700,7 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
               onClick={handlePublish}
               style={{ minWidth: 116 }}
             >
-              Далее
+              Отправить
             </Button>
           </Div>
         )}
