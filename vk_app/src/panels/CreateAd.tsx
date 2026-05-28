@@ -1,4 +1,4 @@
-import { CSSProperties, ChangeEvent, FC, useState, useEffect } from 'react';
+import { CSSProperties, ChangeEvent, FC, useEffect, useRef, useState } from 'react';
 import {
   Panel,
   PanelHeader,
@@ -15,7 +15,6 @@ import {
   Text,
 } from '@vkontakte/vkui';
 import {
-  Icon24ChevronDown,
   Icon24InfoCircleOutline,
   Icon24PicturePlusOutline,
   Icon24SmileOutline,
@@ -29,15 +28,32 @@ import bridge from '@vkontakte/vk-bridge';
 import { createPost, getS3PresignedUrl, uploadMediaToS3, compressImage, getCommunitySettings } from '../shared/api';
 import { DEFAULT_VIEW_PANELS } from '../routes';
 
+type MediaDimensions = {
+  width: number;
+  height: number;
+};
+
+type MediaItem = {
+  file: File;
+  previewUrl: string;
+  thumbnail?: string;
+};
+
+const QUICK_EMOJIS = ['😊', '😍', '🙏', '❤️', '👍', '🐾', '😢', '😻', '🏠', '📍', '📞', '💰'];
+
 export const CreatePost: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [settings, setSettings] = useState<any>(null);
   const [text, setText] = useState('');
-  const [files, setFiles] = useState<{ file: File, thumbnail?: string }[]>([]);
+  const [files, setFiles] = useState<MediaItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPostTypeId, setSelectedPostTypeId] = useState<string | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | boolean>>({});
   const [isCompact, setIsCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  const [mediaDimensions, setMediaDimensions] = useState<Record<string, MediaDimensions>>({});
+  const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const objectUrlsRef = useRef<string[]>([]);
   const mediaInputId = `media-upload-${id}`;
 
   useEffect(() => {
@@ -48,6 +64,13 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
     const handleResize = () => setIsCompact(window.innerWidth < 640);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      objectUrlsRef.current = [];
+    };
   }, []);
 
   const selectedPostType = settings?.post_types?.find((pt: any) => pt.id === selectedPostTypeId);
@@ -119,13 +142,103 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
       }
     }
 
-    const items = newFilesList.map(file => ({ file }));
+    const items = newFilesList.map((file) => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+
+    objectUrlsRef.current.push(...items.map((item) => item.previewUrl));
+
+    items.forEach((item) => {
+      const { file, previewUrl } = item;
+
+      if (file.type.startsWith('image/')) {
+        const img = new window.Image();
+        img.onload = () => {
+          setMediaDimensions((prev) => ({
+            ...prev,
+            [previewUrl]: { width: img.naturalWidth, height: img.naturalHeight },
+          }));
+        };
+        img.src = previewUrl;
+        return;
+      }
+
+      if (file.type.startsWith('video/')) {
+        const video = document.createElement('video');
+        video.onloadedmetadata = () => {
+          setMediaDimensions((prev) => ({
+            ...prev,
+            [previewUrl]: { width: video.videoWidth, height: video.videoHeight },
+          }));
+        };
+        video.src = previewUrl;
+      }
+    });
+
     setFiles((prev) => [...prev, ...items]);
     e.target.value = '';
   };
 
   const removeFile = (index: number) => {
+    const itemToRemove = files[index];
+    if (itemToRemove) {
+      URL.revokeObjectURL(itemToRemove.previewUrl);
+      objectUrlsRef.current = objectUrlsRef.current.filter((url) => url !== itemToRemove.previewUrl);
+      setMediaDimensions((prev) => {
+        const next = { ...prev };
+        delete next[itemToRemove.previewUrl];
+        return next;
+      });
+    }
+
     setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const getPreviewFrameStyle = (item: MediaItem): CSSProperties => {
+    const dimensions = mediaDimensions[item.previewUrl];
+    const ratio = dimensions?.width && dimensions?.height ? dimensions.width / dimensions.height : 1;
+    const maxHeight = isCompact ? 360 : 520;
+    const minHeight = isCompact ? 180 : 300;
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 390;
+    const frameWidth = isCompact ? 0.86 * viewportWidth : 560;
+    const calculatedHeight = Math.round(frameWidth / Math.max(ratio, 0.45));
+
+    return {
+      width: files.length === 1 ? (isCompact ? 'calc(100vw - 32px)' : 'min(100%, 560px)') : isCompact ? '72vw' : 'min(76vw, 560px)',
+      maxWidth: '100%',
+      height: Math.max(minHeight, Math.min(maxHeight, calculatedHeight)),
+      flexShrink: 0,
+      borderRadius: 12,
+      overflow: 'hidden',
+      background: 'var(--vkui--color_background_secondary)',
+    };
+  };
+
+  const insertEmoji = (emoji: string) => {
+    if (isSubmitting) return;
+
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? text.length;
+    const end = textarea?.selectionEnd ?? text.length;
+    const safeStart = Math.max(0, Math.min(start, text.length));
+    const safeEnd = Math.max(safeStart, Math.min(end, text.length));
+    const nextText = `${text.slice(0, safeStart)}${emoji}${text.slice(safeEnd)}`;
+    const nextCaretPosition = safeStart + emoji.length;
+
+    setText(nextText);
+
+    const restoreFocus = () => {
+      if (!textareaRef.current) return;
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(nextCaretPosition, nextCaretPosition);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(restoreFocus);
+    } else {
+      restoreFocus();
+    }
   };
 
   const handlePublish = async () => {
@@ -219,6 +332,12 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
           placeholder={getTextPlaceholder()}
           rows={isCompact ? 10 : 5}
           disabled={isSubmitting}
+          slotProps={{
+            textArea: {
+              getRootRef: textareaRef,
+              style: { paddingRight: 48 },
+            },
+          }}
           style={{
             '--vkui--size_field_height--regular': 'auto',
             minHeight: isCompact ? (files.length > 0 ? 150 : 360) : 150,
@@ -226,18 +345,69 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
             background: 'transparent',
           } as CSSProperties}
         />
-        <Icon24SmileOutline
-          width={28}
-          height={28}
+        <button
+          type="button"
+          onClick={() => setEmojiPanelOpen((open) => !open)}
+          disabled={isSubmitting}
+          aria-label="Добавить смайлик"
           style={{
             position: 'absolute',
-            right: 12,
-            top: 12,
+            right: 8,
+            top: 8,
+            width: 40,
+            height: 40,
+            border: 0,
+            borderRadius: '50%',
+            background: emojiPanelOpen ? 'var(--vkui--color_background_secondary)' : 'transparent',
             color: 'var(--vkui--color_icon_secondary)',
-            pointerEvents: 'none',
+            cursor: isSubmitting ? 'default' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 0,
           }}
-        />
+        >
+          <Icon24SmileOutline width={28} height={28} />
+        </button>
       </div>
+      {emojiPanelOpen && (
+        <div
+          role="listbox"
+          aria-label="Смайлы"
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 6,
+            marginTop: 8,
+            padding: 8,
+            borderRadius: 14,
+            background: 'var(--vkui--color_background_secondary)',
+          }}
+        >
+          {QUICK_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => insertEmoji(emoji)}
+              disabled={isSubmitting}
+              style={{
+                width: 36,
+                height: 36,
+                border: 0,
+                borderRadius: 10,
+                background: 'var(--vkui--color_background_content)',
+                cursor: isSubmitting ? 'default' : 'pointer',
+                fontSize: 22,
+                lineHeight: '36px',
+                padding: 0,
+              }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
       {text.length > 0 && text.length < 10 && (
         <Text style={{ color: 'var(--vkui--color_text_secondary)', marginTop: 8 }}>
           Минимум 10 символов для отправки.
@@ -342,34 +512,27 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
           <div style={{ display: 'flex', gap: 8, paddingBottom: 4 }}>
             {files.map((item, index) => {
               const isVideo = item.file.type.startsWith('video/');
-              const mediaUrl = URL.createObjectURL(item.file);
 
               return (
                 <div
-                  key={`${item.file.name}-${index}`}
+                  key={item.previewUrl}
                   style={{
                     position: 'relative',
-                    width: files.length === 1 ? 'calc(100vw - 64px)' : isCompact ? '72vw' : 'min(76vw, 560px)',
-                    maxWidth: '100%',
-                    height: isCompact ? 260 : 420,
-                    flexShrink: 0,
-                    borderRadius: 12,
-                    overflow: 'hidden',
-                    background: 'var(--vkui--color_background_secondary)',
+                    ...getPreviewFrameStyle(item),
                   }}
                 >
                   {isVideo ? (
                     <video
-                      src={mediaUrl}
+                      src={item.previewUrl}
                       playsInline
                       muted
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
                     />
                   ) : (
                     <img
-                      src={mediaUrl}
+                      src={item.previewUrl}
                       alt=""
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
                     />
                   )}
                   {isVideo && (
@@ -427,21 +590,6 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
           borderBottom: isCompact ? undefined : '1px solid var(--vkui--color_separator_primary)',
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            color: 'var(--vkui--color_text_primary)',
-            fontWeight: 600,
-            fontSize: isCompact ? 16 : 18,
-          }}
-        >
-          <span style={{ fontSize: 22, lineHeight: 1 }}>][</span>
-          <span>Карусель</span>
-          <Icon24ChevronDown width={20} height={20} />
-        </div>
-
         {!isCompact && (
           <>
             <input
@@ -468,7 +616,6 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
             >
               <Icon24PicturePlusOutline width={24} height={24} />
               <span>Фото/Видео</span>
-              <Icon24ChevronDown width={20} height={20} />
             </label>
           </>
         )}
