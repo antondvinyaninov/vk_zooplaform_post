@@ -158,11 +158,23 @@ func wallAttachmentIDs(attachments []vk.Attachment) []string {
 	return ids
 }
 
+func normalizeAttachmentID(attachment string) string {
+	attachment = strings.TrimSpace(attachment)
+	if strings.HasPrefix(attachment, "video") {
+		parts := strings.SplitN(attachment, "_", 3)
+		if len(parts) >= 2 {
+			return parts[0] + "_" + parts[1]
+		}
+	}
+	return attachment
+}
+
 func missingAttachmentIDs(expected []string, actual []string) []string {
 	actualSet := make(map[string]struct{}, len(actual))
 	for _, attachment := range actual {
-		if attachment != "" {
-			actualSet[attachment] = struct{}{}
+		normalized := normalizeAttachmentID(attachment)
+		if normalized != "" {
+			actualSet[normalized] = struct{}{}
 		}
 	}
 
@@ -172,7 +184,7 @@ func missingAttachmentIDs(expected []string, actual []string) []string {
 		if attachment == "" {
 			continue
 		}
-		if _, ok := actualSet[attachment]; !ok {
+		if _, ok := actualSet[normalizeAttachmentID(attachment)]; !ok {
 			missing = append(missing, attachment)
 		}
 	}
@@ -218,6 +230,27 @@ func verifyWallAttachmentsWithRetry(client *vk.VKClient, ownerID string, postID 
 			return result
 		}
 	}
+}
+
+func safeMediaSuffix(fileName string, contentType string) string {
+	ext := strings.ToLower(filepath.Ext(fileName))
+	if strings.HasPrefix(contentType, "video/") {
+		switch ext {
+		case ".mp4", ".mov", ".qt", ".m4v", ".avi", ".webm":
+			return "video" + ext
+		default:
+			return "video.mp4"
+		}
+	}
+	if strings.HasPrefix(contentType, "image/") {
+		switch ext {
+		case ".jpg", ".jpeg", ".png", ".gif", ".webp":
+			return "image" + ext
+		default:
+			return "image.jpg"
+		}
+	}
+	return "file"
 }
 
 type groupSummary struct {
@@ -1149,7 +1182,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 					lastFailure := mediaUploadFailure{Key: key, Stage: "unknown", Err: fmt.Errorf("upload was not attempted")}
 
 					for attempt := 1; attempt <= maxRetries; attempt++ {
-						rc, _, err := s3.GetObject(context.Background(), key)
+						rc, objectSize, err := s3.GetObject(context.Background(), key)
 						if err != nil {
 							lastFailure = mediaUploadFailure{Key: key, Stage: "s3_get_object", Err: err}
 							log.Printf("[Moderate] S3 GetObject attempt %d/%d failed for %s: %v", attempt, maxRetries, key, err)
@@ -1159,6 +1192,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 						var att, attURL string
 						var uploadErr error
 						ext := strings.ToLower(filepath.Ext(key))
+						log.Printf("[Moderate] S3 media object ready: key=%s size=%d ext=%s", key, objectSize, ext)
 
 						tmpFile, err := os.CreateTemp("", "moderation_media_*"+ext)
 						if err != nil {
@@ -1475,7 +1509,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 						log.Printf("[PatchMedia] Attempt %d/%d uploading missed media %s for VK post %d", attempt, patchMaxRetries, key, capturedVKPostID)
 
-						rc, _, err := s3.GetObject(context.Background(), key)
+						rc, objectSize, err := s3.GetObject(context.Background(), key)
 						if err != nil {
 							lastFailure = mediaUploadFailure{Key: key, Stage: "s3_get_object", Err: err}
 							log.Printf("[PatchMedia] S3 GetObject failed: %v", err)
@@ -1483,6 +1517,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 						}
 
 						ext := strings.ToLower(filepath.Ext(key))
+						log.Printf("[PatchMedia] S3 media object ready: key=%s size=%d ext=%s", key, objectSize, ext)
 						tmpFile, err := os.CreateTemp("", "patch_media_*"+ext)
 						if err != nil {
 							rc.Close()
@@ -3164,20 +3199,13 @@ func s3PresignHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Генерируем уникальный ключ для файла (используем только безопасные символы)
-	_ = r.URL.Query().Get("filename")
+	fileName := r.URL.Query().Get("filename")
 	contentType := r.URL.Query().Get("type")
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
 
-	// Чтобы избежать проблем с кодировками (кириллица, пробелы), используем только безопасный префикс
-	safeSuffix := "file"
-	if strings.Contains(contentType, "video") {
-		safeSuffix = "video.mp4"
-	} else if strings.Contains(contentType, "image") {
-		safeSuffix = "image.jpg"
-	}
-
+	safeSuffix := safeMediaSuffix(fileName, contentType)
 	key := fmt.Sprintf("pending-media/%d_%s", time.Now().UnixNano(), safeSuffix)
 
 	s3, err := s3client.New()

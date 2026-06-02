@@ -146,8 +146,8 @@ type PhotoUploadResponse struct {
 
 // SavedPhoto сохраненное фото
 type SavedPhoto struct {
-	ID        int `json:"id"`
-	OwnerID   int `json:"owner_id"`
+	ID        int    `json:"id"`
+	OwnerID   int    `json:"owner_id"`
 	Photo75   string `json:"photo_75"`
 	Photo130  string `json:"photo_130"`
 	Photo604  string `json:"photo_604"`
@@ -426,6 +426,15 @@ type VideoSaveResponse struct {
 	AccessKey string `json:"access_key"`
 }
 
+type VideoUploadResult struct {
+	Size      int64  `json:"size"`
+	VideoID   int    `json:"video_id"`
+	OwnerID   int    `json:"owner_id"`
+	Error     string `json:"error"`
+	ErrorMsg  string `json:"error_msg"`
+	ErrorCode int    `json:"error_code"`
+}
+
 // GetVideoUploadUrl запрашивает ссылку для прямой загрузки видео
 func (c *VKClient) GetVideoUploadUrl(groupID string, fileName string) (*VideoSaveResponse, error) {
 	params := map[string]string{
@@ -537,7 +546,7 @@ func (c *VKClient) GetVideoThumbnails(attachmentIDs []string) (map[string]string
 	thumbnails := make(map[string]string)
 	for _, v := range result.Items {
 		id := fmt.Sprintf("video%d_%d", v.OwnerID, v.ID)
-		
+
 		url := ""
 		if best := bestImage(v.FirstFrame, false); best != "" {
 			url = best
@@ -552,7 +561,7 @@ func (c *VKClient) GetVideoThumbnails(attachmentIDs []string) (map[string]string
 		} else if best := bestImage(v.Image, false); best != "" {
 			url = best
 		}
-		
+
 		if url != "" {
 			thumbnails[id] = url
 		}
@@ -567,14 +576,14 @@ func (c *VKClient) GetVideoThumbnail(attachmentID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	raw := strings.TrimPrefix(attachmentID, "video")
 	partsRaw := strings.SplitN(raw, "_", 3)
 	if len(partsRaw) < 2 {
 		return "", fmt.Errorf("invalid video attachment id: %s", attachmentID)
 	}
 	baseID := fmt.Sprintf("video%s_%s", partsRaw[0], partsRaw[1])
-	
+
 	if url, ok := thumbs[baseID]; ok {
 		return url, nil
 	}
@@ -638,7 +647,24 @@ func (c *VKClient) UploadVideo(filePath string, groupID string, fileName string)
 		return "", "", fmt.Errorf("video upload failed with status: %d", resp.StatusCode)
 	}
 
+	uploadRespBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read video upload response: %w", err)
+	}
+
+	var uploadResult VideoUploadResult
+	if err := json.Unmarshal(uploadRespBody, &uploadResult); err != nil {
+		return "", "", fmt.Errorf("failed to parse video upload response: %w; raw response: %s", err, string(uploadRespBody))
+	}
+	if uploadResult.Error != "" || uploadResult.ErrorMsg != "" || uploadResult.ErrorCode != 0 {
+		return "", "", fmt.Errorf("video upload returned error: code=%d error=%s message=%s raw=%s",
+			uploadResult.ErrorCode, uploadResult.Error, uploadResult.ErrorMsg, string(uploadRespBody))
+	}
+
 	// Формируем attachment строку
 	attachment := fmt.Sprintf("video%d_%d", videoSave.OwnerID, videoSave.VideoID)
+	if videoSave.AccessKey != "" {
+		attachment = fmt.Sprintf("video%d_%d_%s", videoSave.OwnerID, videoSave.VideoID, videoSave.AccessKey)
+	}
 	return attachment, "", nil
 }
