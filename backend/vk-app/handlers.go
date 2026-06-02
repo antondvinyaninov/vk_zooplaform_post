@@ -1272,7 +1272,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 				rejectMsg += fmt.Sprintf("\nПричина: %s", currentPub.RejectReason)
 			}
 			rejectMsg += fmt.Sprintf("\n\n[%s|Посмотреть детали]", appURL)
-			sendNotificationToUser(author.VKUserID, rejectMsg)
+			sendNotificationToUser(author.VKUserID, rejectMsg, postDetailFragment(post.ID))
 		}
 
 		utils.RespondSuccess(w, map[string]interface{}{"success": true, "status": req.Status})
@@ -1635,9 +1635,9 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		if author, err := getUserByID(post.UserID); err == nil && author != nil {
 			switch req.Status {
 			case "published":
-				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\n[%s|Открыть пост]", appURL))
+				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\n[%s|Открыть пост]", appURL), postDetailFragment(post.ID))
 			case "scheduled":
-				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", currentPub.PublishDate.Format("02.01.2006 15:04"), appURL))
+				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", currentPub.PublishDate.Format("02.01.2006 15:04"), appURL), postDetailFragment(post.ID))
 			}
 		}
 
@@ -3052,7 +3052,38 @@ func loadNotifyUserIDs(groupID int) ([]int, error) {
 	return notifyUserIDs, nil
 }
 
-func sendDirectOrBellNotification(client *vk.VKClient, serviceClient *vk.VKClient, vkUserID int, message string) (string, error) {
+func postDetailFragment(postID int) string {
+	if postID <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("/post_detail/%d", postID)
+}
+
+func moderationDetailFragment(postID int) string {
+	if postID <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("/moderation_detail/%d", postID)
+}
+
+func notificationText(message string) string {
+	lines := strings.Split(message, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[http") && strings.HasSuffix(trimmed, "]") {
+			if sep := strings.LastIndex(trimmed, "|"); sep > 0 && sep < len(trimmed)-1 {
+				lines[i] = strings.TrimSuffix(trimmed[sep+1:], "]")
+			}
+		}
+	}
+	cleaned := strings.TrimSpace(strings.Join(lines, "\n"))
+	if cleaned == "" {
+		return message
+	}
+	return cleaned
+}
+
+func sendDirectOrBellNotification(client *vk.VKClient, serviceClient *vk.VKClient, vkUserID int, message string, fragment string) (string, error) {
 	var dmErr error
 	if client != nil {
 		if err := client.SendDirectMessage(vkUserID, message); err == nil {
@@ -3067,7 +3098,7 @@ func sendDirectOrBellNotification(client *vk.VKClient, serviceClient *vk.VKClien
 	if serviceClient == nil {
 		return "", fmt.Errorf("dm: %w; bell: service_key_missing", dmErr)
 	}
-	if notifErr := serviceClient.SendNotification(strconv.Itoa(vkUserID), message); notifErr == nil {
+	if notifErr := serviceClient.SendNotificationWithFragment(strconv.Itoa(vkUserID), notificationText(message), fragment); notifErr == nil {
 		return "bell", nil
 	} else {
 		return "", fmt.Errorf("dm: %v; bell: %v", dmErr, notifErr)
@@ -3101,12 +3132,14 @@ func sendPostCreatedNotifications(groupID int, postID int, userID int, vkUserID 
 			client = vk.NewVKClient(cfg.VKOfficialGroupToken)
 		}
 		var serviceClient *vk.VKClient
-		if cfg.VKServiceKey != "" {
-			serviceClient = vk.NewVKClient(cfg.VKServiceKey)
+		if strings.TrimSpace(cfg.VKMiniAppServiceKey) != "" {
+			serviceClient = vk.NewVKClient(cfg.VKMiniAppServiceKey)
 		}
+		adminFragment := moderationDetailFragment(postID)
+		userFragment := postDetailFragment(postID)
 
 		for _, adminVKUserID := range notifyUserIDs {
-			channel, err := sendDirectOrBellNotification(client, serviceClient, adminVKUserID, adminMessage)
+			channel, err := sendDirectOrBellNotification(client, serviceClient, adminVKUserID, adminMessage, adminFragment)
 			if err != nil {
 				report.AdminFailures = append(report.AdminFailures, fmt.Sprintf("admin %d: %v", adminVKUserID, err))
 				log.Printf("[VK Notifications] Failed to notify admin %d for post %d: %v", adminVKUserID, postID, err)
@@ -3116,7 +3149,7 @@ func sendPostCreatedNotifications(groupID int, postID int, userID int, vkUserID 
 			log.Printf("[VK Notifications] Successfully notified admin %d via %s for post %d", adminVKUserID, channel, postID)
 		}
 
-		channel, err := sendDirectOrBellNotification(client, serviceClient, vkUserID, userMessage)
+		channel, err := sendDirectOrBellNotification(client, serviceClient, vkUserID, userMessage, userFragment)
 		if err != nil {
 			report.UserFailure = err.Error()
 			log.Printf("[VK Notifications] Failed to notify user %d for post %d: %v", vkUserID, postID, err)
@@ -3176,26 +3209,28 @@ func sendNotificationToAdmins(groupID int, message string) {
 	}()
 }
 
-func sendNotificationToUser(vkUserID int, message string) {
+func sendNotificationToUser(vkUserID int, message string, fragments ...string) {
 	go func() {
 		cfg := config.Load()
-		if cfg.VKOfficialGroupToken == "" {
-			return
+		fragment := ""
+		if len(fragments) > 0 {
+			fragment = strings.TrimSpace(fragments[0])
 		}
-		client := vk.NewVKClient(cfg.VKOfficialGroupToken)
-		if err := client.SendDirectMessage(vkUserID, message); err != nil {
-			log.Printf("[VK Notifications] Failed to send DM to user %d: %v. Attempting bell notification...", vkUserID, err)
-			serviceKey := os.Getenv("VK_SERVICE_KEY")
-			if serviceKey != "" {
-				serviceClient := vk.NewVKClient(serviceKey)
-				if notifErr := serviceClient.SendNotification(strconv.Itoa(vkUserID), message); notifErr != nil {
-					log.Printf("[VK Notifications] Failed to send bell notification to user %d: %v", vkUserID, notifErr)
-				} else {
-					log.Printf("[VK Notifications] Successfully sent bell notification to user %d", vkUserID)
-				}
-			}
+
+		var client *vk.VKClient
+		if strings.TrimSpace(cfg.VKOfficialGroupToken) != "" {
+			client = vk.NewVKClient(cfg.VKOfficialGroupToken)
+		}
+		var serviceClient *vk.VKClient
+		if strings.TrimSpace(cfg.VKMiniAppServiceKey) != "" {
+			serviceClient = vk.NewVKClient(cfg.VKMiniAppServiceKey)
+		}
+
+		channel, err := sendDirectOrBellNotification(client, serviceClient, vkUserID, message, fragment)
+		if err != nil {
+			log.Printf("[VK Notifications] Failed to notify user %d: %v", vkUserID, err)
 		} else {
-			log.Printf("[VK Notifications] Successfully sent DM to user %d", vkUserID)
+			log.Printf("[VK Notifications] Successfully notified user %d via %s", vkUserID, channel)
 		}
 	}()
 }
@@ -3567,19 +3602,27 @@ func testNotificationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := config.Load()
-	if cfg.VKOfficialGroupToken == "" {
-		utils.RespondError(w, http.StatusInternalServerError, "Official group token not configured")
+	var client *vk.VKClient
+	if strings.TrimSpace(cfg.VKOfficialGroupToken) != "" {
+		client = vk.NewVKClient(cfg.VKOfficialGroupToken)
+	}
+	var serviceClient *vk.VKClient
+	if strings.TrimSpace(cfg.VKMiniAppServiceKey) != "" {
+		serviceClient = vk.NewVKClient(cfg.VKMiniAppServiceKey)
+	}
+	if client == nil && serviceClient == nil {
+		utils.RespondError(w, http.StatusInternalServerError, "Notification tokens are not configured")
 		return
 	}
-	client := vk.NewVKClient(cfg.VKOfficialGroupToken)
 
 	message := "Привет! Это тестовое сообщение от ЗооПлатформы. Уведомления работают отлично! 🎉"
-	if err := client.SendDirectMessage(ctx.UserID, message); err != nil {
+	channel, err := sendDirectOrBellNotification(client, serviceClient, ctx.UserID, message, "")
+	if err != nil {
 		log.Printf("[Test Notification] Failed to send to %d: %v", ctx.UserID, err)
 		utils.RespondError(w, http.StatusBadRequest, fmt.Sprintf("Ошибка ВК: %v", err))
 		return
 	}
 
-	log.Printf("[Test Notification] Successfully sent to %d", ctx.UserID)
-	utils.RespondSuccess(w, map[string]string{"status": "ok"})
+	log.Printf("[Test Notification] Successfully sent to %d via %s", ctx.UserID, channel)
+	utils.RespondSuccess(w, map[string]string{"status": "ok", "channel": channel})
 }

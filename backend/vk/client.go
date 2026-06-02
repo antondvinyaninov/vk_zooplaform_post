@@ -281,12 +281,21 @@ func (c *VKClient) SendDirectMessage(userID int, message string) error {
 	return err
 }
 
-// SendNotification отправляет разовое уведомление пользователю в колокольчик
-// Требуется сервисный ключ доступа (Service Token).
+// SendNotification отправляет разовое уведомление пользователю в колокольчик.
+// Требуется сервисный ключ доступа мини-приложения.
 func (c *VKClient) SendNotification(userIDs string, message string) error {
+	return c.SendNotificationWithFragment(userIDs, message, "")
+}
+
+// SendNotificationWithFragment отправляет уведомление с hash-фрагментом для перехода
+// на конкретный экран мини-приложения.
+func (c *VKClient) SendNotificationWithFragment(userIDs string, message string, fragment string) error {
 	params := map[string]string{
 		"user_ids": userIDs,
 		"message":  message,
+	}
+	if fragment != "" {
+		params["fragment"] = fragment
 	}
 	_, err := c.CallMethod("notifications.sendMessage", params)
 	return err
