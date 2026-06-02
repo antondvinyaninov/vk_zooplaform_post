@@ -55,6 +55,7 @@ const MEDIA_DETAIL_LABELS = [
   "Missing attachments",
   "Remaining S3 keys",
   "Added attachments",
+  "Published attachments",
   "Attachments",
   "Error",
 ];
@@ -69,6 +70,7 @@ const MEDIA_DETAIL_FIELDS: Array<[string, string]> = [
   ["Expected attachments", "Ожидали на стене"],
   ["Actual attachments", "Фактически на стене"],
   ["Added attachments", "Добавили"],
+  ["Published attachments", "Опубликованные вложения"],
   ["Expected", "Ожидали загрузить"],
   ["Uploaded", "Загрузили"],
   ["Attachments", "Вложения"],
@@ -94,9 +96,18 @@ const MEDIA_ACTION_HINTS: Record<string, string> = {
   MEDIA_PATCH_SUCCESS: "медиа дозагружены и проверены",
 };
 
+const MEDIA_SUCCESS_ACTIONS = new Set([
+  "MEDIA_VERIFY_OK",
+  "MEDIA_VERIFY_PARTIAL_OK",
+  "MEDIA_VERIFY_REPAIR_SUCCESS",
+  "MEDIA_PATCH_SUCCESS",
+]);
+
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const isMediaDiagnostic = (action: string) => action.startsWith("MEDIA_");
+
+const isSuccessfulMediaDiagnostic = (action: string) => MEDIA_SUCCESS_ACTIONS.has(action);
 
 const parseMediaDetails = (details: string) => {
   const labelPattern = MEDIA_DETAIL_LABELS.map(escapeRegExp).join("|");
@@ -113,43 +124,73 @@ const parseMediaDetails = (details: string) => {
   }, {});
 };
 
+const countListItems = (value?: string) => {
+  if (!value) {
+    return 0;
+  }
+
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+};
+
 function MediaDiagnostics({ log }: { log: SystemLog }) {
   if (!log.details || !isMediaDiagnostic(log.action)) {
     return null;
   }
 
   const parsedDetails = parseMediaDetails(log.details);
-  const visibleFields = MEDIA_DETAIL_FIELDS
+  const isSuccess = isSuccessfulMediaDiagnostic(log.action);
+  const attachmentsCount = countListItems(parsedDetails["Attachments"] || parsedDetails["Published attachments"] || parsedDetails["Added attachments"]);
+  const successFields: Array<{ key: string; label: string; value: string }> = [
+    { key: "Attempts", label: "Попытки проверки", value: parsedDetails["Attempts"] },
+    { key: "attachments_count", label: "Вложений проверено", value: attachmentsCount ? String(attachmentsCount) : "" },
+    { key: "VK Post ID", label: "VK post_id", value: parsedDetails["VK Post ID"] },
+    { key: "Post ID", label: "Внутренний post_id", value: parsedDetails["Post ID"] },
+  ].filter((field) => field.value);
+  const diagnosticFields = MEDIA_DETAIL_FIELDS
+    .filter(([key]) => !isSuccess || !["Attachments", "Published attachments", "Added attachments"].includes(key))
     .map(([key, label]) => ({ key, label, value: parsedDetails[key] }))
     .filter((field) => field.value);
+  const visibleFields = isSuccess ? successFields : diagnosticFields;
+  const toneClassName = isSuccess
+    ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/70 dark:bg-emerald-950/30"
+    : "border-amber-200 bg-amber-50/70 dark:border-amber-900/70 dark:bg-amber-950/30";
+  const badgeClassName = isSuccess
+    ? "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+    : "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200";
+  const hintClassName = isSuccess
+    ? "text-emerald-900 dark:text-emerald-200"
+    : "text-amber-900 dark:text-amber-200";
 
   return (
-    <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/70 p-2 text-xs dark:border-amber-900/70 dark:bg-amber-950/30">
+    <div className={`mt-2 max-w-full rounded-md border p-2 text-xs ${toneClassName}`}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          Диагностика медиа
+        <Badge variant="outline" className={badgeClassName}>
+          {isSuccess ? "Медиа проверено" : "Диагностика медиа"}
         </Badge>
         {MEDIA_ACTION_HINTS[log.action] && (
-          <span className="text-amber-900 dark:text-amber-200">{MEDIA_ACTION_HINTS[log.action]}</span>
+          <span className={hintClassName}>{MEDIA_ACTION_HINTS[log.action]}</span>
         )}
       </div>
 
       {visibleFields.length > 0 && (
-        <div className="grid gap-2 md:grid-cols-2">
+        <div className="grid min-w-0 gap-2 md:grid-cols-2">
           {visibleFields.map((field) => (
-            <div key={field.key} className="rounded border border-border/60 bg-background/80 p-2">
+            <div key={field.key} className="min-w-0 rounded border border-border/60 bg-background/80 p-2">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{field.label}</div>
-              <div className="mt-1 break-words font-mono text-[11px] text-foreground">{field.value}</div>
+              <div className="mt-1 break-all font-mono text-[11px] text-foreground">{field.value}</div>
             </div>
           ))}
         </div>
       )}
 
       <details className="mt-2">
-        <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+        <summary className="cursor-pointer rounded px-1 py-0.5 text-[11px] font-medium text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Технические детали полностью
         </summary>
-        <pre className="mt-1 max-w-xs whitespace-pre-wrap break-words rounded bg-background/80 p-2 font-mono text-[11px] text-muted-foreground md:max-w-md">
+        <pre className="mt-1 max-w-full whitespace-pre-wrap break-all rounded bg-background/80 p-2 font-mono text-[11px] text-muted-foreground">
           {log.details}
         </pre>
       </details>
