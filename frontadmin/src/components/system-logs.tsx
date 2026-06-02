@@ -41,6 +41,122 @@ interface SystemLog {
   };
 }
 
+const MEDIA_DETAIL_LABELS = [
+  "Post ID",
+  "Group ID",
+  "VK Post ID",
+  "Attempts",
+  "Expected",
+  "Uploaded",
+  "Missing S3 keys",
+  "Failures",
+  "Expected attachments",
+  "Actual attachments",
+  "Missing attachments",
+  "Remaining S3 keys",
+  "Added attachments",
+  "Attachments",
+  "Error",
+];
+
+const MEDIA_DETAIL_FIELDS: Array<[string, string]> = [
+  ["Failures", "Сбой при загрузке"],
+  ["Error", "Ошибка"],
+  ["Missing attachments", "Не найдено на стене"],
+  ["Missing S3 keys", "Не найдено в S3"],
+  ["Remaining S3 keys", "Осталось в S3"],
+  ["Attempts", "Попытки проверки"],
+  ["Expected attachments", "Ожидали на стене"],
+  ["Actual attachments", "Фактически на стене"],
+  ["Added attachments", "Добавили"],
+  ["Expected", "Ожидали загрузить"],
+  ["Uploaded", "Загрузили"],
+  ["Attachments", "Вложения"],
+  ["VK Post ID", "VK post_id"],
+  ["Post ID", "Внутренний post_id"],
+  ["Group ID", "group_id"],
+];
+
+const MEDIA_ACTION_HINTS: Record<string, string> = {
+  MEDIA_PARTIAL_UPLOAD: "часть файлов не загрузилась в VK",
+  MEDIA_VERIFY_FAILED: "не удалось проверить пост на стене VK",
+  MEDIA_VERIFY_MISSING: "VK опубликовал пост без части вложений",
+  MEDIA_VERIFY_REPAIR_FAILED: "не удалось восстановить вложения через wall.edit",
+  MEDIA_VERIFY_REPAIR_CHECK_FAILED: "не удалось проверить результат восстановления",
+  MEDIA_VERIFY_REPAIR_INCOMPLETE: "после wall.edit часть вложений всё ещё отсутствует",
+  MEDIA_VERIFY_REPAIR_SUCCESS: "вложения восстановлены через wall.edit",
+  MEDIA_VERIFY_PARTIAL_OK: "часть вложений не загрузилась, но опубликованные вложения проверены",
+  MEDIA_VERIFY_OK: "вложения проверены на стене VK",
+  MEDIA_PATCH_FAILED: "не удалось дозагрузить медиа из S3",
+  MEDIA_PATCH_WALL_EDIT_FAILED: "не удалось добавить дозагруженные медиа через wall.edit",
+  MEDIA_PATCH_VERIFY_FAILED: "не удалось проверить результат дозагрузки",
+  MEDIA_PATCH_INCOMPLETE: "после дозагрузки часть вложений всё ещё отсутствует",
+  MEDIA_PATCH_SUCCESS: "медиа дозагружены и проверены",
+};
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const isMediaDiagnostic = (action: string) => action.startsWith("MEDIA_");
+
+const parseMediaDetails = (details: string) => {
+  const labelPattern = MEDIA_DETAIL_LABELS.map(escapeRegExp).join("|");
+
+  return MEDIA_DETAIL_FIELDS.reduce<Record<string, string>>((acc, [key]) => {
+    const keyPattern = escapeRegExp(key);
+    const match = details.match(new RegExp(`${keyPattern}:\\s*(.*?)(?=,\\s*(?:${labelPattern}):|$)`));
+
+    if (match?.[1]) {
+      acc[key] = match[1].trim();
+    }
+
+    return acc;
+  }, {});
+};
+
+function MediaDiagnostics({ log }: { log: SystemLog }) {
+  if (!log.details || !isMediaDiagnostic(log.action)) {
+    return null;
+  }
+
+  const parsedDetails = parseMediaDetails(log.details);
+  const visibleFields = MEDIA_DETAIL_FIELDS
+    .map(([key, label]) => ({ key, label, value: parsedDetails[key] }))
+    .filter((field) => field.value);
+
+  return (
+    <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/70 p-2 text-xs dark:border-amber-900/70 dark:bg-amber-950/30">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          Диагностика медиа
+        </Badge>
+        {MEDIA_ACTION_HINTS[log.action] && (
+          <span className="text-amber-900 dark:text-amber-200">{MEDIA_ACTION_HINTS[log.action]}</span>
+        )}
+      </div>
+
+      {visibleFields.length > 0 && (
+        <div className="grid gap-2 md:grid-cols-2">
+          {visibleFields.map((field) => (
+            <div key={field.key} className="rounded border border-border/60 bg-background/80 p-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{field.label}</div>
+              <div className="mt-1 break-words font-mono text-[11px] text-foreground">{field.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <details className="mt-2">
+        <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">
+          Технические детали полностью
+        </summary>
+        <pre className="mt-1 max-w-xs whitespace-pre-wrap break-words rounded bg-background/80 p-2 font-mono text-[11px] text-muted-foreground md:max-w-md">
+          {log.details}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
 export function SystemLogs() {
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,7 +255,7 @@ export function SystemLogs() {
                       <div className="font-medium">{log.message}</div>
                       
                       {/* Enriched Group & Post visualization */}
-                      {(log.group || log.post) ? (
+                      {(log.group || log.post) && (
                         <div className="mt-2 flex flex-col gap-2">
                           {log.group && (
                             <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-md border border-border/50">
@@ -157,8 +273,11 @@ export function SystemLogs() {
                             </div>
                           )}
                         </div>
+                      )}
+                      {log.details && isMediaDiagnostic(log.action) ? (
+                        <MediaDiagnostics log={log} />
                       ) : (
-                        log.details && (
+                        log.details && !(log.group || log.post) && (
                           <div className="text-xs text-muted-foreground mt-1 bg-muted p-1 rounded font-mono truncate max-w-xs md:max-w-md">
                             {log.details}
                           </div>
