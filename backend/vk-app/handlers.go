@@ -764,8 +764,14 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 	moderationURL := fmt.Sprintf("https://vk.com/app%s_-%d#/moderation_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 
-	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL))
-	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь %s %s предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, group.Name, moderationURL))
+	sendPostCreatedNotifications(
+		group.ID,
+		post.ID,
+		user.ID,
+		ctx.UserID,
+		fmt.Sprintf("Ваш пост отправлен на модерацию. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL),
+		fmt.Sprintf("Пользователь %s %s предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, group.Name, moderationURL),
+	)
 
 	models.LogInfo("POST_CREATED", "Пользователь предложил новую запись", &user.ID, fmt.Sprintf("Group ID: %d, Post ID: %d", group.ID, post.ID))
 
@@ -845,8 +851,16 @@ func suggestExistingPostHandler(w http.ResponseWriter, r *http.Request, postID i
 	appURL := fmt.Sprintf("https://vk.com/app%s_-%d#/post_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 	moderationURL := fmt.Sprintf("https://vk.com/app%s_-%d#/moderation_detail/%d", config.Load().VKMiniAppID, group.VKGroupID, post.ID)
 
-	sendNotificationToUser(ctx.UserID, fmt.Sprintf("Ваш пост отправлен на модерацию в новое сообщество. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL))
-	sendNotificationToAdmins(group.ID, fmt.Sprintf("Пользователь %s %s предложил существующий пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, group.Name, moderationURL))
+	sendPostCreatedNotifications(
+		group.ID,
+		post.ID,
+		user.ID,
+		ctx.UserID,
+		fmt.Sprintf("Ваш пост отправлен на модерацию в новое сообщество. Мы сообщим, когда он будет опубликован.\n\n[%s|Проверить статус]", appURL),
+		fmt.Sprintf("Пользователь %s %s предложил существующий пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, group.Name, moderationURL),
+	)
+
+	models.LogInfo("POST_CREATED", "Пользователь предложил запись в новое сообщество", &user.ID, fmt.Sprintf("Group ID: %d, Post ID: %d", group.ID, post.ID))
 
 	response, err := serializePost(post, group.ID, nil)
 	if err != nil {
@@ -2956,6 +2970,124 @@ func getActiveVKToken() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(token), nil
+}
+
+type notificationDeliveryReport struct {
+	AdminsConfigured int
+	AdminsNotified   int
+	AdminFailures    []string
+	UserNotified     bool
+	UserChannel      string
+	UserFailure      string
+}
+
+func loadNotifyUserIDs(groupID int) ([]int, error) {
+	var notifyUserIDsStr string
+	err := database.QueryRow("SELECT notify_user_ids FROM groups WHERE id = ?", groupID).Scan(&notifyUserIDsStr)
+	if err != nil || notifyUserIDsStr == "" || notifyUserIDsStr == "[]" {
+		return nil, err
+	}
+
+	var notifyUserIDs []int
+	if err := json.Unmarshal([]byte(notifyUserIDsStr), &notifyUserIDs); err != nil {
+		return nil, err
+	}
+	return notifyUserIDs, nil
+}
+
+func sendDirectOrBellNotification(client *vk.VKClient, serviceClient *vk.VKClient, vkUserID int, message string) (string, error) {
+	var dmErr error
+	if client != nil {
+		if err := client.SendDirectMessage(vkUserID, message); err == nil {
+			return "dm", nil
+		} else {
+			dmErr = err
+		}
+	} else {
+		dmErr = fmt.Errorf("official_group_token_missing")
+	}
+
+	if serviceClient == nil {
+		return "", fmt.Errorf("dm: %w; bell: service_key_missing", dmErr)
+	}
+	if notifErr := serviceClient.SendNotification(strconv.Itoa(vkUserID), message); notifErr == nil {
+		return "bell", nil
+	} else {
+		return "", fmt.Errorf("dm: %v; bell: %v", dmErr, notifErr)
+	}
+}
+
+func formatNotificationFailures(failures []string) string {
+	if len(failures) == 0 {
+		return "none"
+	}
+	const maxFailuresInLog = 5
+	if len(failures) > maxFailuresInLog {
+		return strings.Join(failures[:maxFailuresInLog], "; ") + fmt.Sprintf("; ... and %d more", len(failures)-maxFailuresInLog)
+	}
+	return strings.Join(failures, "; ")
+}
+
+func sendPostCreatedNotifications(groupID int, postID int, userID int, vkUserID int, userMessage string, adminMessage string) {
+	go func() {
+		report := notificationDeliveryReport{}
+		cfg := config.Load()
+
+		notifyUserIDs, err := loadNotifyUserIDs(groupID)
+		if err != nil && err != sql.ErrNoRows {
+			report.AdminFailures = append(report.AdminFailures, fmt.Sprintf("load_admins: %v", err))
+		}
+		report.AdminsConfigured = len(notifyUserIDs)
+
+		var client *vk.VKClient
+		if cfg.VKOfficialGroupToken != "" {
+			client = vk.NewVKClient(cfg.VKOfficialGroupToken)
+		}
+		var serviceClient *vk.VKClient
+		if cfg.VKServiceKey != "" {
+			serviceClient = vk.NewVKClient(cfg.VKServiceKey)
+		}
+
+		for _, adminVKUserID := range notifyUserIDs {
+			channel, err := sendDirectOrBellNotification(client, serviceClient, adminVKUserID, adminMessage)
+			if err != nil {
+				report.AdminFailures = append(report.AdminFailures, fmt.Sprintf("admin %d: %v", adminVKUserID, err))
+				log.Printf("[VK Notifications] Failed to notify admin %d for post %d: %v", adminVKUserID, postID, err)
+				continue
+			}
+			report.AdminsNotified++
+			log.Printf("[VK Notifications] Successfully notified admin %d via %s for post %d", adminVKUserID, channel, postID)
+		}
+
+		channel, err := sendDirectOrBellNotification(client, serviceClient, vkUserID, userMessage)
+		if err != nil {
+			report.UserFailure = err.Error()
+			log.Printf("[VK Notifications] Failed to notify user %d for post %d: %v", vkUserID, postID, err)
+		} else {
+			report.UserNotified = true
+			report.UserChannel = channel
+			log.Printf("[VK Notifications] Successfully notified user %d via %s for post %d", vkUserID, channel, postID)
+		}
+
+		details := fmt.Sprintf(
+			"Group ID: %d, Post ID: %d, User VK ID: %d, Admins configured: %d, Admins notified: %d, Admin notification failures: %d, User notified: %t, User channel: %s, User failure: %s, Failures: %s",
+			groupID,
+			postID,
+			vkUserID,
+			report.AdminsConfigured,
+			report.AdminsNotified,
+			len(report.AdminFailures),
+			report.UserNotified,
+			report.UserChannel,
+			report.UserFailure,
+			formatNotificationFailures(report.AdminFailures),
+		)
+		if report.AdminsConfigured == 0 || report.AdminsNotified < report.AdminsConfigured || !report.UserNotified {
+			models.LogWarning("POST_CREATED_NOTIFICATIONS", "Не все уведомления по новой записи доставлены", &userID, details)
+			return
+		}
+		models.LogInfo("POST_CREATED_NOTIFICATIONS", "Уведомления по новой записи успешно отправлены", &userID, details)
+	}()
 }
 
 func sendNotificationToAdmins(groupID int, message string) {

@@ -106,16 +106,47 @@ const MEDIA_SUCCESS_ACTIONS = new Set([
   "MEDIA_PATCH_SUCCESS",
 ]);
 
+const NOTIFICATION_DETAIL_LABELS = [
+  "Group ID",
+  "Post ID",
+  "User VK ID",
+  "Admins configured",
+  "Admins notified",
+  "Admin notification failures",
+  "User notified",
+  "User channel",
+  "User failure",
+  "Failures",
+  "Error",
+];
+
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const isMediaDiagnostic = (action: string) => action.startsWith("MEDIA_");
 
 const isSuccessfulMediaDiagnostic = (action: string) => MEDIA_SUCCESS_ACTIONS.has(action);
 
+const isNotificationDiagnostic = (action: string) => action === "POST_CREATED_NOTIFICATIONS";
+
 const parseMediaDetails = (details: string) => {
   const labelPattern = MEDIA_DETAIL_LABELS.map(escapeRegExp).join("|");
 
   return MEDIA_DETAIL_FIELDS.reduce<Record<string, string>>((acc, [key]) => {
+    const keyPattern = escapeRegExp(key);
+    const match = details.match(new RegExp(`${keyPattern}:\\s*(.*?)(?=,\\s*(?:${labelPattern}):|$)`));
+
+    if (match?.[1]) {
+      acc[key] = match[1].trim();
+    }
+
+    return acc;
+  }, {});
+};
+
+const parseNotificationDetails = (details: string) => {
+  const labelPattern = NOTIFICATION_DETAIL_LABELS.map(escapeRegExp).join("|");
+
+  return NOTIFICATION_DETAIL_LABELS.reduce<Record<string, string>>((acc, key) => {
     const keyPattern = escapeRegExp(key);
     const match = details.match(new RegExp(`${keyPattern}:\\s*(.*?)(?=,\\s*(?:${labelPattern}):|$)`));
 
@@ -177,6 +208,51 @@ const getVKPostUrl = (log: SystemLog, parsedDetails: Record<string, string>) => 
 
   return `https://vk.com/wall-${vkGroupID}_${vkPostID}`;
 };
+
+function NotificationDiagnostics({ log }: { log: SystemLog }) {
+  if (!log.details || !isNotificationDiagnostic(log.action)) {
+    return null;
+  }
+
+  const parsedDetails = parseNotificationDetails(log.details);
+  const adminsConfigured = Number(parsedDetails["Admins configured"] || 0);
+  const adminsNotified = Number(parsedDetails["Admins notified"] || 0);
+  const adminFailures = Number(parsedDetails["Admin notification failures"] || 0);
+  const userNotified = parsedDetails["User notified"] === "true";
+  const userChannel = parsedDetails["User channel"];
+  const isSuccess = adminsConfigured > 0 && adminsNotified === adminsConfigured && adminFailures === 0 && userNotified;
+  const toneClassName = isSuccess
+    ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/70 dark:bg-emerald-950/30"
+    : "border-amber-200 bg-amber-50/70 dark:border-amber-900/70 dark:bg-amber-950/30";
+  const badgeClassName = isSuccess
+    ? "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+    : "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200";
+
+  return (
+    <div className={`mt-2 max-w-full rounded-md border px-2 py-1.5 text-xs ${toneClassName}`}>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Badge variant="outline" className={badgeClassName}>
+          Уведомления
+        </Badge>
+        <span className={isSuccess ? "text-emerald-900 dark:text-emerald-200" : "text-amber-900 dark:text-amber-200"}>
+          админам {adminsNotified}/{adminsConfigured}
+        </span>
+        <span className={userNotified ? "text-emerald-900 dark:text-emerald-200" : "text-amber-900 dark:text-amber-200"}>
+          пользователю {userNotified ? `отправлено${userChannel ? ` (${userChannel})` : ""}` : "не отправлено"}
+        </span>
+        {adminFailures > 0 && <span className="text-amber-900 dark:text-amber-200">ошибок админов: {adminFailures}</span>}
+        <details className="min-w-full">
+          <summary className="cursor-pointer rounded py-0.5 text-[11px] font-medium text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            Технические детали
+          </summary>
+          <pre className="mt-1 max-w-full whitespace-pre-wrap break-all rounded bg-background/80 p-2 font-mono text-[11px] text-muted-foreground">
+            {log.details}
+          </pre>
+        </details>
+      </div>
+    </div>
+  );
+}
 
 function MediaDiagnostics({ log }: { log: SystemLog }) {
   if (!log.details || !isMediaDiagnostic(log.action)) {
@@ -351,14 +427,14 @@ export function SystemLogs() {
           <div className="flex justify-center p-8 text-muted-foreground border border-dashed rounded-lg">Логи не найдены</div>
         ) : (
           <div className="rounded-md border overflow-x-auto">
-            <Table>
+            <Table className="min-w-[1100px] table-fixed">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[180px]">Время</TableHead>
                   <TableHead className="w-[120px]">Уровень</TableHead>
                   <TableHead className="w-[200px]">Действие</TableHead>
                   <TableHead>Сообщение</TableHead>
-                  <TableHead className="text-right w-[200px]">Пользователь</TableHead>
+                  <TableHead className="w-[220px] max-w-[220px] text-right">Пользователь</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -368,7 +444,7 @@ export function SystemLogs() {
                       {format(new Date(log.created_at), "dd MMM yyyy, HH:mm:ss", { locale: ru })}
                     </TableCell>
                     <TableCell>{getLevelBadge(log.level)}</TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell className="whitespace-normal text-sm">
                       <span className="font-semibold">{log.action}</span>
                     </TableCell>
                     <TableCell className="text-sm">
@@ -396,6 +472,8 @@ export function SystemLogs() {
                       )}
                       {log.details && isMediaDiagnostic(log.action) ? (
                         <MediaDiagnostics log={log} />
+                      ) : log.details && isNotificationDiagnostic(log.action) ? (
+                        <NotificationDiagnostics log={log} />
                       ) : (
                         log.details && !(log.group || log.post) && (
                           <div className="text-xs text-muted-foreground mt-1 bg-muted p-1 rounded font-mono truncate max-w-xs md:max-w-md">
@@ -404,17 +482,17 @@ export function SystemLogs() {
                         )
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-sm">
+                    <TableCell className="w-[220px] max-w-[220px] overflow-hidden whitespace-normal text-right text-sm">
                       {log.user ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="flex flex-col text-right">
-                            <span className="font-medium text-xs whitespace-nowrap">{log.user.first_name} {log.user.last_name}</span>
+                        <div className="flex min-w-0 items-center justify-end gap-2">
+                          <div className="flex min-w-0 flex-col text-right">
+                            <span className="max-w-[160px] truncate text-xs font-medium" title={`${log.user.first_name} ${log.user.last_name}`}>{log.user.first_name} {log.user.last_name}</span>
                             <span className="text-[10px] text-muted-foreground">ID: {log.user.id}</span>
                           </div>
-                          <img src={log.user.photo_200 || 'https://vk.com/images/camera_200.png'} alt="user" className="w-8 h-8 rounded-full bg-muted" />
+                          <img src={log.user.photo_200 || 'https://vk.com/images/camera_200.png'} alt="user" className="h-8 w-8 shrink-0 rounded-full bg-muted" />
                         </div>
                       ) : log.user_id ? (
-                        `ID: ${log.user_id}`
+                        <span className="block truncate">ID: {log.user_id}</span>
                       ) : (
                         <span className="text-muted-foreground">Система</span>
                       )}
