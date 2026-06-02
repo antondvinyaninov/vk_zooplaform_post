@@ -16,8 +16,12 @@ import {
 } from '@vkontakte/vkui';
 import {
   Icon24PicturePlusOutline,
+  Icon24CheckCircleOutline,
+  Icon24ErrorCircleOutline,
   Icon28Cancel,
   Icon28CancelCircleFillRed,
+  Icon28CheckCircleOutline,
+  Icon28Notifications,
   Icon28UploadOutline,
   Icon28VideoOutline,
 } from '@vkontakte/icons';
@@ -37,12 +41,19 @@ type MediaItem = {
   thumbnail?: string;
 };
 
+type NotificationPermissionStatus = 'idle' | 'requesting' | 'allowed' | 'denied';
+
+const OFFICIAL_GROUP_ID = 165434330;
+
 export const CreatePost: FC<NavIdProps> = ({ id }) => {
   const routeNavigator = useRouteNavigator();
   const [settings, setSettings] = useState<any>(null);
   const [text, setText] = useState('');
   const [files, setFiles] = useState<MediaItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedPostId, setSubmittedPostId] = useState<number | null>(null);
+  const [notificationStatus, setNotificationStatus] = useState<NotificationPermissionStatus>('idle');
+  const [notificationError, setNotificationError] = useState('');
   const [selectedPostTypeId, setSelectedPostTypeId] = useState<string | null>(null);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string | boolean>>({});
   const [isCompact, setIsCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
@@ -189,6 +200,56 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const clearDraftAfterSubmit = () => {
+    objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrlsRef.current = [];
+    setText('');
+    setFiles([]);
+    setMediaDimensions({});
+    setSelectedPostTypeId(null);
+    setCustomFieldValues({});
+  };
+
+  const requestStatusNotifications = async () => {
+    setNotificationStatus('requesting');
+    setNotificationError('');
+
+    let messagesAllowed = false;
+    let notificationsAllowed = false;
+    const errors: string[] = [];
+
+    try {
+      await bridge.send('VKWebAppAllowMessagesFromGroup', {
+        group_id: OFFICIAL_GROUP_ID,
+        key: 'post_status_updates'
+      });
+      messagesAllowed = true;
+    } catch (error: any) {
+      errors.push(error?.message || error?.error_type || 'messages_denied');
+    }
+
+    try {
+      await bridge.send('VKWebAppAllowNotifications');
+      notificationsAllowed = true;
+    } catch (error: any) {
+      errors.push(error?.message || error?.error_type || 'notifications_denied');
+    }
+
+    if (messagesAllowed || notificationsAllowed) {
+      setNotificationStatus('allowed');
+      return;
+    }
+
+    setNotificationStatus('denied');
+    setNotificationError(errors.join('; ') || 'Пользователь отклонил запрос уведомлений');
+  };
+
+  const openOfficialGroupMessages = () => {
+    (bridge as any).send('VKWebAppOpenMessages', { peer_id: -OFFICIAL_GROUP_ID }).catch(() => {
+      window.location.href = `https://vk.com/im?sel=-${OFFICIAL_GROUP_ID}`;
+    });
+  };
+
   const getPreviewFrameStyle = (item: MediaItem): CSSProperties => {
     const dimensions = mediaDimensions[item.previewUrl];
     const ratio = dimensions?.width && dimensions?.height ? dimensions.width / dimensions.height : 1;
@@ -245,20 +306,6 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
 
     setIsSubmitting(true);
     try {
-      try {
-        await bridge.send('VKWebAppAllowMessagesFromGroup', {
-          group_id: 165434330,
-          key: 'post_status_updates'
-        });
-      } catch (e) {
-        // Игнорируем отказ от сообщений
-      }
-      try {
-        await bridge.send('VKWebAppAllowNotifications');
-      } catch (e) {
-        // Игнорируем отказ от уведомлений
-      }
-
       const s3MediaKeys: string[] = [];
 
       for (const item of files) {
@@ -280,8 +327,11 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
         s3MediaKeys.push(key);
       }
 
-      await createPost(text, s3MediaKeys, [], finalPostTypeId, finalCustomFields);
-      routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`);
+      const createdPost = await createPost(text, s3MediaKeys, [], finalPostTypeId, finalCustomFields);
+      setSubmittedPostId(createdPost.id);
+      setNotificationStatus('idle');
+      setNotificationError('');
+      clearDraftAfterSubmit();
     } catch (error: any) {
       alert(`Ошибка при сохранении: ${error?.message || String(error)}`);
     } finally {
@@ -290,6 +340,130 @@ export const CreatePost: FC<NavIdProps> = ({ id }) => {
   };
 
   const canSubmit = text.trim().length >= 10 && !isSubmitting;
+
+  if (submittedPostId) {
+    return (
+      <Panel id={id}>
+        <PanelHeader style={{ textAlign: 'center' }}>Заявка отправлена</PanelHeader>
+        <Group>
+          <Div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 18,
+              paddingTop: isCompact ? 28 : 44,
+              paddingBottom: isCompact ? 24 : 44,
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: 24,
+                background: 'linear-gradient(135deg, #DFF7E8 0%, #EAF2FF 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon28CheckCircleOutline width={44} height={44} fill="var(--vkui--color_icon_positive)" />
+            </div>
+
+            <div style={{ maxWidth: 460 }}>
+              <Text weight="2" style={{ fontSize: 24, lineHeight: 1.18, marginBottom: 8 }}>
+                Объявление ушло на модерацию
+              </Text>
+              <Text style={{ color: 'var(--vkui--color_text_secondary)', fontSize: 16, lineHeight: 1.45 }}>
+                Включите уведомления, чтобы узнать, когда администратор опубликует пост или поставит его в расписание.
+              </Text>
+            </div>
+
+            <div
+              style={{
+                width: '100%',
+                maxWidth: 460,
+                border: '1px solid var(--vkui--color_separator_primary)',
+                borderRadius: 18,
+                background: 'var(--vkui--color_background_secondary)',
+                padding: 16,
+                boxSizing: 'border-box',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <Icon28Notifications width={32} height={32} fill="var(--vkui--color_icon_accent)" style={{ flexShrink: 0 }} />
+                <div>
+                  <Text weight="2" style={{ fontSize: 17, marginBottom: 4 }}>
+                    Подписка на статус объявления
+                  </Text>
+                  <Text style={{ color: 'var(--vkui--color_text_secondary)', fontSize: 14, lineHeight: 1.4 }}>
+                    Мы попросим VK разрешить сообщения от ЗооПлатформы и уведомления приложения. Это нужно только для статусов ваших объявлений.
+                  </Text>
+                </div>
+              </div>
+
+              <Button
+                size="l"
+                stretched
+                mode={notificationStatus === 'allowed' ? 'secondary' : 'primary'}
+                loading={notificationStatus === 'requesting'}
+                disabled={notificationStatus === 'allowed'}
+                onClick={requestStatusNotifications}
+                before={notificationStatus === 'allowed' ? <Icon24CheckCircleOutline /> : undefined}
+                style={{ marginTop: 16 }}
+              >
+                {notificationStatus === 'allowed' ? 'Уведомления включены' : 'Включить уведомления о статусе'}
+              </Button>
+
+              {notificationStatus === 'denied' && (
+                <div style={{ marginTop: 12 }}>
+                  <Text style={{ color: 'var(--vkui--color_text_negative)', fontSize: 14, lineHeight: 1.4 }}>
+                    Не получилось включить автоматически. Можно открыть диалог с ЗооПлатформой и написать любое сообщение — после этого VK разрешит присылать статусы.
+                  </Text>
+                  {notificationError && (
+                    <Text style={{ color: 'var(--vkui--color_text_secondary)', fontSize: 12, marginTop: 6 }}>
+                      Технически: {notificationError}
+                    </Text>
+                  )}
+                  <Button
+                    size="m"
+                    mode="secondary"
+                    onClick={openOfficialGroupMessages}
+                    before={<Icon24ErrorCircleOutline />}
+                    style={{ marginTop: 10 }}
+                  >
+                    Открыть диалог
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <Div style={{ width: '100%', maxWidth: 460, padding: 0 }}>
+              <Button
+                size="l"
+                stretched
+                mode="secondary"
+                onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.POST_DETAIL}/${submittedPostId}`)}
+                style={{ marginBottom: 10 }}
+              >
+                Посмотреть заявку
+              </Button>
+              <Button
+                size="l"
+                stretched
+                mode="tertiary"
+                onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.HOME}`)}
+              >
+                На главную
+              </Button>
+            </Div>
+          </Div>
+        </Group>
+      </Panel>
+    );
+  }
 
   const renderTextEditor = () => (
     <Div style={{ paddingTop: isCompact ? 12 : 12, paddingBottom: 0 }}>
