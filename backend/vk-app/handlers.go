@@ -123,16 +123,108 @@ func formatMediaUploadFailures(failures []mediaUploadFailure) string {
 	return strings.Join(parts, "; ")
 }
 
-func appendAttachmentToPost(post *models.Post, attachment string, attachmentURL string) {
-	var oldParts []string
-	if post.Attachments != "" {
-		if strings.HasPrefix(post.Attachments, "[") {
-			json.Unmarshal([]byte(post.Attachments), &oldParts)
-		} else {
-			oldParts = strings.Split(post.Attachments, ",")
+func cleanAttachmentID(attachment string) string {
+	attachment = strings.TrimSpace(attachment)
+	if attachment == "" {
+		return ""
+	}
+	switch strings.ToLower(attachment) {
+	case "null", "undefined":
+		return ""
+	default:
+		return attachment
+	}
+}
+
+func cleanAttachmentURL(attachmentURL string) string {
+	attachmentURL = strings.TrimSpace(attachmentURL)
+	switch strings.ToLower(attachmentURL) {
+	case "", "null", "undefined":
+		return ""
+	default:
+		return attachmentURL
+	}
+}
+
+func cleanStoredAttachmentPart(part string) string {
+	idAndURL := strings.SplitN(strings.TrimSpace(part), "|", 2)
+	attachmentID := cleanAttachmentID(idAndURL[0])
+	if attachmentID == "" {
+		return ""
+	}
+	if len(idAndURL) == 2 {
+		if attachmentURL := cleanAttachmentURL(idAndURL[1]); attachmentURL != "" {
+			return attachmentID + "|" + attachmentURL
 		}
 	}
-	if attachmentURL != "" {
+	return attachmentID
+}
+
+func parseStoredAttachmentParts(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+
+	var parts []string
+	if strings.HasPrefix(raw, "[") {
+		if err := json.Unmarshal([]byte(raw), &parts); err != nil {
+			parts = nil
+		}
+	} else {
+		parts = strings.Split(raw, ",")
+	}
+
+	cleaned := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if cleanedPart := cleanStoredAttachmentPart(part); cleanedPart != "" {
+			cleaned = append(cleaned, cleanedPart)
+		}
+	}
+	return cleaned
+}
+
+func storedAttachmentIDs(raw string) []string {
+	parts := parseStoredAttachmentParts(raw)
+	ids := make([]string, 0, len(parts))
+	for _, part := range parts {
+		idAndURL := strings.SplitN(part, "|", 2)
+		if attachmentID := cleanAttachmentID(idAndURL[0]); attachmentID != "" {
+			ids = append(ids, attachmentID)
+		}
+	}
+	return ids
+}
+
+func sanitizeAttachmentIDs(attachments []string) []string {
+	cleaned := make([]string, 0, len(attachments))
+	for _, attachment := range attachments {
+		if attachmentID := cleanAttachmentID(attachment); attachmentID != "" {
+			cleaned = append(cleaned, attachmentID)
+		}
+	}
+	return cleaned
+}
+
+func attachmentKind(attachment string) string {
+	attachment = normalizeAttachmentID(attachment)
+	switch {
+	case strings.HasPrefix(attachment, "photo"):
+		return "photo"
+	case strings.HasPrefix(attachment, "video"):
+		return "video"
+	default:
+		return ""
+	}
+}
+
+func appendAttachmentToPost(post *models.Post, attachment string, attachmentURL string) {
+	attachment = cleanAttachmentID(attachment)
+	if attachment == "" {
+		return
+	}
+	oldParts := parseStoredAttachmentParts(post.Attachments)
+	if attachmentURL = cleanAttachmentURL(attachmentURL); attachmentURL != "" {
 		oldParts = append(oldParts, attachment+"|"+attachmentURL)
 	} else {
 		oldParts = append(oldParts, attachment)
@@ -159,7 +251,7 @@ func wallAttachmentIDs(attachments []vk.Attachment) []string {
 }
 
 func normalizeAttachmentID(attachment string) string {
-	attachment = strings.TrimSpace(attachment)
+	attachment = cleanAttachmentID(attachment)
 	if strings.HasPrefix(attachment, "video") {
 		parts := strings.SplitN(attachment, "_", 3)
 		if len(parts) >= 2 {
@@ -170,28 +262,48 @@ func normalizeAttachmentID(attachment string) string {
 }
 
 func missingAttachmentIDs(expected []string, actual []string) []string {
-	actualSet := make(map[string]struct{}, len(actual))
+	expected = sanitizeAttachmentIDs(expected)
+	actual = sanitizeAttachmentIDs(actual)
+	actualCounts := make(map[string]int, len(actual))
+	actualKindCounts := make(map[string]int)
 	for _, attachment := range actual {
 		normalized := normalizeAttachmentID(attachment)
 		if normalized != "" {
-			actualSet[normalized] = struct{}{}
+			actualCounts[normalized]++
+			if kind := attachmentKind(normalized); kind != "" {
+				actualKindCounts[kind]++
+			}
 		}
 	}
 
 	var missing []string
 	for _, attachment := range expected {
-		attachment = strings.TrimSpace(attachment)
-		if attachment == "" {
+		normalized := normalizeAttachmentID(attachment)
+		if normalized == "" {
 			continue
 		}
-		if _, ok := actualSet[normalizeAttachmentID(attachment)]; !ok {
-			missing = append(missing, attachment)
+		if actualCounts[normalized] > 0 {
+			actualCounts[normalized]--
+			if kind := attachmentKind(normalized); kind != "" && actualKindCounts[kind] > 0 {
+				actualKindCounts[kind]--
+			}
+			continue
 		}
+
+		// VK может заменить ID фотографии при публикации на стену сообщества.
+		// Для фото считаем достаточным совпадение количества, для видео оставляем точный ID.
+		if attachmentKind(normalized) == "photo" && actualKindCounts["photo"] > 0 {
+			actualKindCounts["photo"]--
+			continue
+		}
+
+		missing = append(missing, attachment)
 	}
 	return missing
 }
 
 func verifyWallAttachments(client *vk.VKClient, ownerID string, postID int, expected []string) ([]string, []string, error) {
+	expected = sanitizeAttachmentIDs(expected)
 	if len(expected) == 0 {
 		return nil, nil, nil
 	}
@@ -564,7 +676,7 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 			for _, att := range atts {
 				parts := strings.Split(att, ",")
 				for _, part := range parts {
-					cleaned := strings.TrimSpace(part)
+					cleaned := cleanStoredAttachmentPart(part)
 					if cleaned != "" {
 						uploadedAttachments = append(uploadedAttachments, cleaned)
 					}
@@ -958,7 +1070,13 @@ func updatePostContentHandler(w http.ResponseWriter, r *http.Request, postID int
 	if req.S3VideoKeys != nil {
 		post.S3VideoKey = strings.Join(req.S3VideoKeys, ",")
 	}
-	post.Attachments = req.Attachments
+	if strings.TrimSpace(req.Attachments) != "" {
+		cleanedAttachments := parseStoredAttachmentParts(req.Attachments)
+		attachmentsBytes, _ := json.Marshal(cleanedAttachments)
+		post.Attachments = string(attachmentsBytes)
+	} else {
+		post.Attachments = ""
+	}
 
 	if err := updatePost(post); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, err.Error())
@@ -1142,19 +1260,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}()
 
 		client := vk.NewVKClient(adminToken)
-		var attachments []string
-		if post.Attachments != "" {
-			var parts []string
-			if strings.HasPrefix(post.Attachments, "[") {
-				json.Unmarshal([]byte(post.Attachments), &parts)
-			} else {
-				parts = strings.Split(post.Attachments, ",")
-			}
-			for _, p := range parts {
-				idAndUrl := strings.SplitN(p, "|", 2)
-				attachments = append(attachments, idAndUrl[0])
-			}
-		}
+		attachments := storedAttachmentIDs(post.Attachments)
 
 		// Считаем сколько медиа ожидается из S3 и сохраняем список ключей,
 		// чтобы при частичной загрузке точно знать, какие файлы нужно догрузить.
@@ -1229,6 +1335,12 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 						}
 
 						// Успешно загружено в VK
+						att = cleanAttachmentID(att)
+						if att == "" {
+							lastFailure = mediaUploadFailure{Key: key, Stage: "vk_upload", Err: fmt.Errorf("VK returned empty attachment id")}
+							log.Printf("[Moderate] VK upload attempt %d/%d returned empty attachment for %s", attempt, maxRetries, key)
+							continue
+						}
 						attachments = append(attachments, att)
 						appendAttachmentToPost(post, att, attURL)
 
@@ -1264,6 +1376,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			)
 		}
 
+		attachments = sanitizeAttachmentIDs(attachments)
 		messageToPost := post.Message
 
 		var authorLink string
@@ -1550,6 +1663,12 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 							log.Printf("[PatchMedia] VK upload attempt %d/%d failed: %v", attempt, patchMaxRetries, uploadErr)
 							continue
 						}
+						att = cleanAttachmentID(att)
+						if att == "" {
+							lastFailure = mediaUploadFailure{Key: key, Stage: "vk_upload", Err: fmt.Errorf("VK returned empty attachment id")}
+							log.Printf("[PatchMedia] VK upload attempt %d/%d returned empty attachment for %s", attempt, patchMaxRetries, key)
+							continue
+						}
 
 						newAttachments = append(newAttachments, att)
 						recoveredMediaFiles = append(recoveredMediaFiles, recoveredMedia{Key: key, Attachment: att, AttachmentURL: attURL})
@@ -1578,7 +1697,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 				}
 
 				// Патчим опубликованный пост — добавляем к существующим вложениям новые
-				allAttachments := append(capturedAttachments, newAttachments...)
+				allAttachments := sanitizeAttachmentIDs(append(capturedAttachments, newAttachments...))
 				ownerID := "-" + strconv.Itoa(capturedGroupID)
 				if err := patchClient.WallEdit(ownerID, capturedVKPostID, capturedMessage, allAttachments); err != nil {
 					log.Printf("[PatchMedia] ❌ wall.edit failed for VK post %d: %v", capturedVKPostID, err)

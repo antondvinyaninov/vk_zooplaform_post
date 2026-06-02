@@ -12,6 +12,20 @@ type WallPostResponse struct {
 	PostID int `json:"post_id"`
 }
 
+func cleanWallAttachments(attachments []string) []string {
+	cleaned := make([]string, 0, len(attachments))
+	for _, attachment := range attachments {
+		attachment = strings.TrimSpace(attachment)
+		switch strings.ToLower(attachment) {
+		case "", "null", "undefined":
+			continue
+		default:
+			cleaned = append(cleaned, attachment)
+		}
+	}
+	return cleaned
+}
+
 // WallPost публикует пост на стене
 func (c *VKClient) WallPost(ownerID, message string, attachments []string, fromGroup bool, publishDate int64) (int, error) {
 	params := map[string]string{
@@ -23,8 +37,9 @@ func (c *VKClient) WallPost(ownerID, message string, attachments []string, fromG
 		params["from_group"] = "1"
 	}
 
-	if len(attachments) > 0 {
-		params["attachments"] = strings.Join(attachments, ",")
+	cleanedAttachments := cleanWallAttachments(attachments)
+	if len(cleanedAttachments) > 0 {
+		params["attachments"] = strings.Join(cleanedAttachments, ",")
 	}
 
 	if publishDate > 0 {
@@ -179,7 +194,7 @@ func (c *VKClient) WallGetById(posts string, extended bool) (*WallGetByIdExtende
 	// Когда extended=1 возвращается объект {items, profiles, groups}.
 	// Когда extended=0 возвращается массив постов.
 	// API VK возвращает разные типы в зависимости от флага.
-	
+
 	if extended {
 		var extendedResp WallGetByIdExtendedResponse
 		if err := json.Unmarshal(resp, &extendedResp); err != nil {
@@ -205,8 +220,9 @@ func (c *VKClient) WallEdit(ownerID string, postID int, message string, attachme
 	if message != "" {
 		params["message"] = message
 	}
-	if len(attachments) > 0 {
-		params["attachments"] = strings.Join(attachments, ",")
+	cleanedAttachments := cleanWallAttachments(attachments)
+	if len(cleanedAttachments) > 0 {
+		params["attachments"] = strings.Join(cleanedAttachments, ",")
 	}
 	_, err := c.CallMethod("wall.edit", params)
 	return err
