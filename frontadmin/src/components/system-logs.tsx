@@ -120,6 +120,16 @@ const NOTIFICATION_DETAIL_LABELS = [
   "Error",
 ];
 
+const POST_CREATED_DETAIL_LABELS = [
+  "Group ID",
+  "Post ID",
+  "Media total",
+  "Photo count",
+  "Video count",
+  "Unknown media count",
+  "Error",
+];
+
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const isMediaDiagnostic = (action: string) => action.startsWith("MEDIA_");
@@ -127,6 +137,8 @@ const isMediaDiagnostic = (action: string) => action.startsWith("MEDIA_");
 const isSuccessfulMediaDiagnostic = (action: string) => MEDIA_SUCCESS_ACTIONS.has(action);
 
 const isNotificationDiagnostic = (action: string) => action === "POST_CREATED_NOTIFICATIONS";
+
+const isPostCreatedDiagnostic = (action: string) => action === "POST_CREATED";
 
 const parseMediaDetails = (details: string) => {
   const labelPattern = MEDIA_DETAIL_LABELS.map(escapeRegExp).join("|");
@@ -147,6 +159,21 @@ const parseNotificationDetails = (details: string) => {
   const labelPattern = NOTIFICATION_DETAIL_LABELS.map(escapeRegExp).join("|");
 
   return NOTIFICATION_DETAIL_LABELS.reduce<Record<string, string>>((acc, key) => {
+    const keyPattern = escapeRegExp(key);
+    const match = details.match(new RegExp(`${keyPattern}:\\s*(.*?)(?=,\\s*(?:${labelPattern}):|$)`));
+
+    if (match?.[1]) {
+      acc[key] = match[1].trim();
+    }
+
+    return acc;
+  }, {});
+};
+
+const parsePostCreatedDetails = (details: string) => {
+  const labelPattern = POST_CREATED_DETAIL_LABELS.map(escapeRegExp).join("|");
+
+  return POST_CREATED_DETAIL_LABELS.reduce<Record<string, string>>((acc, key) => {
     const keyPattern = escapeRegExp(key);
     const match = details.match(new RegExp(`${keyPattern}:\\s*(.*?)(?=,\\s*(?:${labelPattern}):|$)`));
 
@@ -208,6 +235,34 @@ const getVKPostUrl = (log: SystemLog, parsedDetails: Record<string, string>) => 
 
   return `https://vk.com/wall-${vkGroupID}_${vkPostID}`;
 };
+
+function PostCreatedDiagnostics({ log }: { log: SystemLog }) {
+  if (!log.details || !isPostCreatedDiagnostic(log.action)) {
+    return null;
+  }
+
+  const parsedDetails = parsePostCreatedDetails(log.details);
+  if (!parsedDetails["Media total"]) {
+    return null;
+  }
+
+  const total = Number(parsedDetails["Media total"] || 0);
+  const photos = Number(parsedDetails["Photo count"] || 0);
+  const videos = Number(parsedDetails["Video count"] || 0);
+  const unknown = Number(parsedDetails["Unknown media count"] || 0);
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-blue-200 bg-blue-50/70 px-2 py-1.5 text-xs dark:border-blue-900/70 dark:bg-blue-950/30">
+      <Badge variant="outline" className="border-blue-300 bg-blue-100 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+        Вложения
+      </Badge>
+      <span className="text-blue-900 dark:text-blue-200">{formatMediaCount(total) || "0 вложений"}</span>
+      <span className="text-muted-foreground">фото: {photos}</span>
+      <span className="text-muted-foreground">видео: {videos}</span>
+      {unknown > 0 && <span className="text-muted-foreground">не распознано: {unknown}</span>}
+    </div>
+  );
+}
 
 function NotificationDiagnostics({ log }: { log: SystemLog }) {
   if (!log.details || !isNotificationDiagnostic(log.action)) {
@@ -474,6 +529,8 @@ export function SystemLogs() {
                         <MediaDiagnostics log={log} />
                       ) : log.details && isNotificationDiagnostic(log.action) ? (
                         <NotificationDiagnostics log={log} />
+                      ) : log.details && isPostCreatedDiagnostic(log.action) ? (
+                        <PostCreatedDiagnostics log={log} />
                       ) : (
                         log.details && !(log.group || log.post) && (
                           <div className="text-xs text-muted-foreground mt-1 bg-muted p-1 rounded font-mono truncate max-w-xs md:max-w-md">

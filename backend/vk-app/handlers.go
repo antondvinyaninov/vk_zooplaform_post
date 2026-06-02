@@ -81,6 +81,13 @@ type wallAttachmentVerification struct {
 	Attempts int
 }
 
+type postMediaStats struct {
+	Total   int
+	Photos  int
+	Videos  int
+	Unknown int
+}
+
 var mediaVerifyRetryDelays = []time.Duration{
 	5 * time.Second,
 	15 * time.Second,
@@ -121,6 +128,54 @@ func formatMediaUploadFailures(failures []mediaUploadFailure) string {
 		parts = append(parts, fmt.Sprintf("%s [%s]: %s", failure.Key, failure.Stage, errText))
 	}
 	return strings.Join(parts, "; ")
+}
+
+func classifyMediaByExt(fileName string) string {
+	switch strings.ToLower(filepath.Ext(fileName)) {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp":
+		return "photo"
+	case ".mp4", ".mov", ".qt", ".m4v", ".avi", ".webm":
+		return "video"
+	default:
+		return ""
+	}
+}
+
+func countMediaKind(stats *postMediaStats, kind string) {
+	stats.Total++
+	switch kind {
+	case "photo":
+		stats.Photos++
+	case "video":
+		stats.Videos++
+	default:
+		stats.Unknown++
+	}
+}
+
+func collectPostMediaStats(attachmentsRaw string, s3KeysRaw string) postMediaStats {
+	var stats postMediaStats
+
+	for _, attachment := range storedAttachmentIDs(attachmentsRaw) {
+		countMediaKind(&stats, attachmentKind(attachment))
+	}
+	for _, key := range parseMediaKeys(s3KeysRaw) {
+		countMediaKind(&stats, classifyMediaByExt(key))
+	}
+
+	return stats
+}
+
+func formatPostCreatedDetails(groupID int, postID int, stats postMediaStats) string {
+	return fmt.Sprintf(
+		"Group ID: %d, Post ID: %d, Media total: %d, Photo count: %d, Video count: %d, Unknown media count: %d",
+		groupID,
+		postID,
+		stats.Total,
+		stats.Photos,
+		stats.Videos,
+		stats.Unknown,
+	)
 }
 
 func cleanAttachmentID(attachment string) string {
@@ -773,7 +828,8 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("Пользователь %s %s предложил новый пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, group.Name, moderationURL),
 	)
 
-	models.LogInfo("POST_CREATED", "Пользователь предложил новую запись", &user.ID, fmt.Sprintf("Group ID: %d, Post ID: %d", group.ID, post.ID))
+	mediaStats := collectPostMediaStats(post.Attachments, post.S3VideoKey)
+	models.LogInfo("POST_CREATED", "Пользователь предложил новую запись", &user.ID, formatPostCreatedDetails(group.ID, post.ID, mediaStats))
 
 	response, err := serializePost(post, group.ID, nil)
 	if err != nil {
@@ -860,7 +916,8 @@ func suggestExistingPostHandler(w http.ResponseWriter, r *http.Request, postID i
 		fmt.Sprintf("Пользователь %s %s предложил существующий пост в группу \"%s\". Проверьте панель модерации!\n\n[%s|Перейти к модерации поста]", user.FirstName, user.LastName, group.Name, moderationURL),
 	)
 
-	models.LogInfo("POST_CREATED", "Пользователь предложил запись в новое сообщество", &user.ID, fmt.Sprintf("Group ID: %d, Post ID: %d", group.ID, post.ID))
+	mediaStats := collectPostMediaStats(post.Attachments, post.S3VideoKey)
+	models.LogInfo("POST_CREATED", "Пользователь предложил запись в новое сообщество", &user.ID, formatPostCreatedDetails(group.ID, post.ID, mediaStats))
 
 	response, err := serializePost(post, group.ID, nil)
 	if err != nil {
