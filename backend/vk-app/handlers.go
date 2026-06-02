@@ -74,6 +74,19 @@ type mediaUploadFailure struct {
 	Err   error
 }
 
+type wallAttachmentVerification struct {
+	Actual   []string
+	Missing  []string
+	Err      error
+	Attempts int
+}
+
+var mediaVerifyRetryDelays = []time.Duration{
+	5 * time.Second,
+	15 * time.Second,
+	30 * time.Second,
+}
+
 func parseMediaKeys(keys string) []string {
 	var result []string
 	for _, key := range strings.Split(keys, ",") {
@@ -181,6 +194,30 @@ func verifyWallAttachments(client *vk.VKClient, ownerID string, postID int, expe
 
 	actual := wallAttachmentIDs(resp.Items[0].Attachments)
 	return actual, missingAttachmentIDs(expected, actual), nil
+}
+
+func verifyWallAttachmentsWithRetry(client *vk.VKClient, ownerID string, postID int, expected []string, delays []time.Duration) wallAttachmentVerification {
+	var result wallAttachmentVerification
+	for attempt := 0; ; attempt++ {
+		if attempt > 0 {
+			time.Sleep(delays[attempt-1])
+		}
+
+		actual, missing, err := verifyWallAttachments(client, ownerID, postID, expected)
+		result = wallAttachmentVerification{
+			Actual:   actual,
+			Missing:  missing,
+			Err:      err,
+			Attempts: attempt + 1,
+		}
+
+		if err == nil && len(missing) == 0 {
+			return result
+		}
+		if attempt >= len(delays) {
+			return result
+		}
+	}
 }
 
 type groupSummary struct {
@@ -1284,22 +1321,26 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 
 		if os.Getenv("IS_TESTING") != "true" && req.Status == "published" && len(attachments) > 0 {
-			actualAttachments, missingAttachments, verifyErr := verifyWallAttachments(client, ownerID, vkPostID, attachments)
+			verifyResult := verifyWallAttachmentsWithRetry(client, ownerID, vkPostID, attachments, mediaVerifyRetryDelays)
+			actualAttachments := verifyResult.Actual
+			missingAttachments := verifyResult.Missing
+			verifyErr := verifyResult.Err
 			if verifyErr != nil {
-				log.Printf("[MediaVerify] ⚠️ Could not verify VK post %d attachments: %v", vkPostID, verifyErr)
+				log.Printf("[MediaVerify] ⚠️ Could not verify VK post %d attachments after %d checks: %v", vkPostID, verifyResult.Attempts, verifyErr)
 				models.LogWarning("MEDIA_VERIFY_FAILED",
 					"Не удалось проверить, все ли медиа появились в опубликованном посте",
 					nil,
-					fmt.Sprintf("Post ID: %d, VK Post ID: %d, Expected attachments: %s, Error: %v", post.ID, vkPostID, strings.Join(attachments, ","), verifyErr),
+					fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Expected attachments: %s, Error: %v",
+						post.ID, vkPostID, verifyResult.Attempts, strings.Join(attachments, ","), verifyErr),
 				)
 			} else if len(missingAttachments) > 0 {
-				log.Printf("[MediaVerify] ⚠️ VK post %d is missing attachments after wall.post: expected=%s actual=%s missing=%s",
-					vkPostID, strings.Join(attachments, ","), strings.Join(actualAttachments, ","), strings.Join(missingAttachments, ","))
+				log.Printf("[MediaVerify] ⚠️ VK post %d is missing attachments after wall.post and %d checks: expected=%s actual=%s missing=%s",
+					vkPostID, verifyResult.Attempts, strings.Join(attachments, ","), strings.Join(actualAttachments, ","), strings.Join(missingAttachments, ","))
 				models.LogWarning("MEDIA_VERIFY_MISSING",
-					"VK опубликовал пост, но часть вложений не найдена на стене. Пробуем восстановить через wall.edit",
+					"VK опубликовал пост, но после ожидания часть вложений не найдена на стене. Пробуем восстановить через wall.edit",
 					nil,
-					fmt.Sprintf("Post ID: %d, VK Post ID: %d, Expected attachments: %s, Actual attachments: %s, Missing attachments: %s",
-						post.ID, vkPostID, strings.Join(attachments, ","), strings.Join(actualAttachments, ","), strings.Join(missingAttachments, ",")),
+					fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Expected attachments: %s, Actual attachments: %s, Missing attachments: %s",
+						post.ID, vkPostID, verifyResult.Attempts, strings.Join(attachments, ","), strings.Join(actualAttachments, ","), strings.Join(missingAttachments, ",")),
 				)
 
 				if editErr := client.WallEdit(ownerID, vkPostID, messageToPost, attachments); editErr != nil {
@@ -1310,46 +1351,49 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Missing attachments: %s, Error: %v", post.ID, vkPostID, strings.Join(missingAttachments, ","), editErr),
 					)
 				} else {
-					actualAfterRepair, missingAfterRepair, repairVerifyErr := verifyWallAttachments(client, ownerID, vkPostID, attachments)
+					repairResult := verifyWallAttachmentsWithRetry(client, ownerID, vkPostID, attachments, mediaVerifyRetryDelays)
+					actualAfterRepair := repairResult.Actual
+					missingAfterRepair := repairResult.Missing
+					repairVerifyErr := repairResult.Err
 					if repairVerifyErr != nil {
-						log.Printf("[MediaVerify] ⚠️ Could not verify wall.edit repair for VK post %d: %v", vkPostID, repairVerifyErr)
+						log.Printf("[MediaVerify] ⚠️ Could not verify wall.edit repair for VK post %d after %d checks: %v", vkPostID, repairResult.Attempts, repairVerifyErr)
 						models.LogWarning("MEDIA_VERIFY_REPAIR_CHECK_FAILED",
 							"wall.edit выполнен, но повторная проверка вложений не удалась",
 							nil,
-							fmt.Sprintf("Post ID: %d, VK Post ID: %d, Error: %v", post.ID, vkPostID, repairVerifyErr),
+							fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Error: %v", post.ID, vkPostID, repairResult.Attempts, repairVerifyErr),
 						)
 					} else if len(missingAfterRepair) > 0 {
-						log.Printf("[MediaVerify] ❌ VK post %d still missing attachments after wall.edit: actual=%s missing=%s",
-							vkPostID, strings.Join(actualAfterRepair, ","), strings.Join(missingAfterRepair, ","))
+						log.Printf("[MediaVerify] ❌ VK post %d still missing attachments after wall.edit and %d checks: actual=%s missing=%s",
+							vkPostID, repairResult.Attempts, strings.Join(actualAfterRepair, ","), strings.Join(missingAfterRepair, ","))
 						models.LogWarning("MEDIA_VERIFY_REPAIR_INCOMPLETE",
-							"После wall.edit часть вложений всё ещё отсутствует на стене",
+							"После wall.edit и повторного ожидания часть вложений всё ещё отсутствует на стене",
 							nil,
-							fmt.Sprintf("Post ID: %d, VK Post ID: %d, Actual attachments: %s, Missing attachments: %s",
-								post.ID, vkPostID, strings.Join(actualAfterRepair, ","), strings.Join(missingAfterRepair, ",")),
+							fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Actual attachments: %s, Missing attachments: %s",
+								post.ID, vkPostID, repairResult.Attempts, strings.Join(actualAfterRepair, ","), strings.Join(missingAfterRepair, ",")),
 						)
 					} else {
-						log.Printf("[MediaVerify] ✅ VK post %d attachments repaired via wall.edit", vkPostID)
+						log.Printf("[MediaVerify] ✅ VK post %d attachments repaired via wall.edit after %d checks", vkPostID, repairResult.Attempts)
 						models.LogInfo("MEDIA_VERIFY_REPAIR_SUCCESS",
 							"Отсутствующие вложения восстановлены через wall.edit",
 							nil,
-							fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attachments: %s", post.ID, vkPostID, strings.Join(attachments, ",")),
+							fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Attachments: %s", post.ID, vkPostID, repairResult.Attempts, strings.Join(attachments, ",")),
 						)
 					}
 				}
 			} else {
-				log.Printf("[MediaVerify] ✅ VK post %d has all expected attachments: %s", vkPostID, strings.Join(attachments, ","))
+				log.Printf("[MediaVerify] ✅ VK post %d has all expected attachments after %d checks: %s", vkPostID, verifyResult.Attempts, strings.Join(attachments, ","))
 				if hasPartialMedia {
 					models.LogInfo("MEDIA_VERIFY_PARTIAL_OK",
 						"Проверили опубликованную часть медиа. Оставшиеся файлы будут догружены через wall.edit",
 						nil,
-						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Published attachments: %s, Remaining S3 keys: %s",
-							post.ID, vkPostID, strings.Join(attachments, ","), strings.Join(remainingS3Keys, ",")),
+						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Published attachments: %s, Remaining S3 keys: %s",
+							post.ID, vkPostID, verifyResult.Attempts, strings.Join(attachments, ","), strings.Join(remainingS3Keys, ",")),
 					)
 				} else {
 					models.LogInfo("MEDIA_VERIFY_OK",
 						"Проверка медиа после публикации прошла успешно",
 						nil,
-						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attachments: %s", post.ID, vkPostID, strings.Join(attachments, ",")),
+						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Attachments: %s", post.ID, vkPostID, verifyResult.Attempts, strings.Join(attachments, ",")),
 					)
 				}
 			}
@@ -1521,36 +1565,39 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 					}
 				}
 
-				actualAttachments, missingAttachments, verifyErr := verifyWallAttachments(patchClient, ownerID, capturedVKPostID, allAttachments)
+				verifyResult := verifyWallAttachmentsWithRetry(patchClient, ownerID, capturedVKPostID, allAttachments, mediaVerifyRetryDelays)
+				actualAttachments := verifyResult.Actual
+				missingAttachments := verifyResult.Missing
+				verifyErr := verifyResult.Err
 				if verifyErr != nil {
-					log.Printf("[PatchMedia] ⚠️ Could not verify patched post %d: %v", capturedVKPostID, verifyErr)
+					log.Printf("[PatchMedia] ⚠️ Could not verify patched post %d after %d checks: %v", capturedVKPostID, verifyResult.Attempts, verifyErr)
 					models.LogWarning("MEDIA_PATCH_VERIFY_FAILED",
 						"wall.edit выполнен, но проверка вложений через wall.getById не удалась",
 						nil,
-						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Expected attachments: %s, Error: %v",
-							capturedPostID, capturedVKPostID, strings.Join(allAttachments, ","), verifyErr),
+						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Expected attachments: %s, Error: %v",
+							capturedPostID, capturedVKPostID, verifyResult.Attempts, strings.Join(allAttachments, ","), verifyErr),
 					)
 					return
 				}
 
 				if len(missingAttachments) > 0 {
-					log.Printf("[PatchMedia] ❌ Post %d still misses media after wall.edit: expected=%s actual=%s missing=%s",
-						capturedVKPostID, strings.Join(allAttachments, ","), strings.Join(actualAttachments, ","), strings.Join(missingAttachments, ","))
+					log.Printf("[PatchMedia] ❌ Post %d still misses media after wall.edit and %d checks: expected=%s actual=%s missing=%s",
+						capturedVKPostID, verifyResult.Attempts, strings.Join(allAttachments, ","), strings.Join(actualAttachments, ","), strings.Join(missingAttachments, ","))
 					models.LogWarning("MEDIA_PATCH_INCOMPLETE",
-						"После wall.edit часть медиа всё ещё отсутствует на стене",
+						"После wall.edit и повторного ожидания часть медиа всё ещё отсутствует на стене",
 						nil,
-						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Expected attachments: %s, Actual attachments: %s, Missing attachments: %s, Remaining S3 keys: %s, Failures: %s",
-							capturedPostID, capturedVKPostID, strings.Join(allAttachments, ","), strings.Join(actualAttachments, ","), strings.Join(missingAttachments, ","), strings.Join(remainingPatchKeys, ","), formatMediaUploadFailures(patchFailures)),
+						fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Expected attachments: %s, Actual attachments: %s, Missing attachments: %s, Remaining S3 keys: %s, Failures: %s",
+							capturedPostID, capturedVKPostID, verifyResult.Attempts, strings.Join(allAttachments, ","), strings.Join(actualAttachments, ","), strings.Join(missingAttachments, ","), strings.Join(remainingPatchKeys, ","), formatMediaUploadFailures(patchFailures)),
 					)
 					return
 				}
 
-				log.Printf("[PatchMedia] ✅ Post %d patched and verified successfully: added %d missing media via wall.edit", capturedVKPostID, len(newAttachments))
+				log.Printf("[PatchMedia] ✅ Post %d patched and verified successfully after %d checks: added %d missing media via wall.edit", capturedVKPostID, verifyResult.Attempts, len(newAttachments))
 				models.LogInfo("MEDIA_PATCH_SUCCESS",
 					fmt.Sprintf("Успешно дозагружено и проверено %d медиафайлов через wall.edit", len(newAttachments)),
 					nil,
-					fmt.Sprintf("Post ID: %d, VK Post ID: %d, Added attachments: %s, Actual attachments: %s, Remaining S3 keys: %s",
-						capturedPostID, capturedVKPostID, strings.Join(newAttachments, ","), strings.Join(actualAttachments, ","), strings.Join(remainingPatchKeys, ",")),
+					fmt.Sprintf("Post ID: %d, VK Post ID: %d, Attempts: %d, Added attachments: %s, Actual attachments: %s, Remaining S3 keys: %s",
+						capturedPostID, capturedVKPostID, verifyResult.Attempts, strings.Join(newAttachments, ","), strings.Join(actualAttachments, ","), strings.Join(remainingPatchKeys, ",")),
 				)
 			}()
 		}
