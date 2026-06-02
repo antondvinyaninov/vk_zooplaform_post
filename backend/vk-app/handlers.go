@@ -3172,8 +3172,12 @@ func sendPostCreatedNotifications(groupID int, postID int, userID int, vkUserID 
 			report.UserFailure,
 			formatNotificationFailures(report.AdminFailures),
 		)
-		if report.AdminsConfigured == 0 || report.AdminsNotified < report.AdminsConfigured || !report.UserNotified {
+		if report.AdminsConfigured == 0 || report.AdminsNotified < report.AdminsConfigured {
 			models.LogWarning("POST_CREATED_NOTIFICATIONS", "Не все уведомления по новой записи доставлены", &userID, details)
+			return
+		}
+		if !report.UserNotified {
+			models.LogInfo("POST_CREATED_NOTIFICATIONS", "Уведомления админам отправлены, пользовательские уведомления недоступны", &userID, details)
 			return
 		}
 		models.LogInfo("POST_CREATED_NOTIFICATIONS", "Уведомления по новой записи успешно отправлены", &userID, details)
