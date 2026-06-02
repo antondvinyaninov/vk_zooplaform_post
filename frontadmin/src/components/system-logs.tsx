@@ -31,12 +31,15 @@ interface SystemLog {
   };
   group?: {
     id: number;
+    vk_group_id?: number;
     name: string;
     screen_name: string;
     photo_200: string;
   };
   post?: {
     id: number;
+    vk_post_id?: number;
+    vk_group_id?: number;
     message: string;
   };
 }
@@ -135,6 +138,46 @@ const countListItems = (value?: string) => {
     .filter(Boolean).length;
 };
 
+const formatMediaCount = (count: number) => {
+  if (!count) {
+    return "";
+  }
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const word = mod10 === 1 && mod100 !== 11
+    ? "вложение"
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+      ? "вложения"
+      : "вложений";
+  return `${count} ${word}`;
+};
+
+const formatAttemptCount = (value?: string) => {
+  const count = Number(value || 0);
+  if (!count) {
+    return "";
+  }
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  const word = mod10 === 1 && mod100 !== 11
+    ? "попытка"
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+      ? "попытки"
+      : "попыток";
+  return `${count} ${word}`;
+};
+
+const getVKPostUrl = (log: SystemLog, parsedDetails: Record<string, string>) => {
+  const vkPostID = Number(parsedDetails["VK Post ID"] || log.post?.vk_post_id || 0);
+  const vkGroupID = Number(log.post?.vk_group_id || log.group?.vk_group_id || 0);
+
+  if (!vkPostID || !vkGroupID) {
+    return "";
+  }
+
+  return `https://vk.com/wall-${vkGroupID}_${vkPostID}`;
+};
+
 function MediaDiagnostics({ log }: { log: SystemLog }) {
   if (!log.details || !isMediaDiagnostic(log.action)) {
     return null;
@@ -143,6 +186,7 @@ function MediaDiagnostics({ log }: { log: SystemLog }) {
   const parsedDetails = parseMediaDetails(log.details);
   const isSuccess = isSuccessfulMediaDiagnostic(log.action);
   const attachmentsCount = countListItems(parsedDetails["Attachments"] || parsedDetails["Published attachments"] || parsedDetails["Added attachments"]);
+  const vkPostUrl = getVKPostUrl(log, parsedDetails);
   const successFields: Array<{ key: string; label: string; value: string }> = [
     { key: "Attempts", label: "Попытки проверки", value: parsedDetails["Attempts"] },
     { key: "attachments_count", label: "Вложений проверено", value: attachmentsCount ? String(attachmentsCount) : "" },
@@ -163,6 +207,41 @@ function MediaDiagnostics({ log }: { log: SystemLog }) {
   const hintClassName = isSuccess
     ? "text-emerald-900 dark:text-emerald-200"
     : "text-amber-900 dark:text-amber-200";
+
+  if (isSuccess) {
+    const mediaCountText = formatMediaCount(attachmentsCount);
+    const attemptCountText = formatAttemptCount(parsedDetails["Attempts"]);
+
+    return (
+      <div className={`mt-2 max-w-full rounded-md border px-2 py-1.5 text-xs ${toneClassName}`}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Badge variant="outline" className={badgeClassName}>
+            Медиа проверено
+          </Badge>
+          {mediaCountText && <span className={hintClassName}>{mediaCountText}</span>}
+          {attemptCountText && <span className="text-muted-foreground">{attemptCountText}</span>}
+          {vkPostUrl && (
+            <a
+              href={vkPostUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-200"
+            >
+              Открыть пост
+            </a>
+          )}
+          <details className="min-w-full">
+            <summary className="cursor-pointer rounded py-0.5 text-[11px] font-medium text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              Технические детали
+            </summary>
+            <pre className="mt-1 max-w-full whitespace-pre-wrap break-all rounded bg-background/80 p-2 font-mono text-[11px] text-muted-foreground">
+              {log.details}
+            </pre>
+          </details>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`mt-2 max-w-full rounded-md border p-2 text-xs ${toneClassName}`}>

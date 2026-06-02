@@ -28,14 +28,17 @@ type UserSummary struct {
 
 type GroupSummary struct {
 	ID         int    `json:"id"`
+	VKGroupID  int    `json:"vk_group_id"`
 	Name       string `json:"name"`
 	ScreenName string `json:"screen_name"`
 	Photo200   string `json:"photo_200"`
 }
 
 type PostSummary struct {
-	ID      int    `json:"id"`
-	Message string `json:"message"`
+	ID        int    `json:"id"`
+	VKPostID  int    `json:"vk_post_id,omitempty"`
+	VKGroupID int    `json:"vk_group_id,omitempty"`
+	Message   string `json:"message"`
 }
 
 func CreateSystemLog(level, action, message string, userID *int, details string) {

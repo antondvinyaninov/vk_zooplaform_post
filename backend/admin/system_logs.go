@@ -37,7 +37,7 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 		FROM system_logs
 	`
 	var args []interface{}
-	
+
 	if levelFilter != "" && levelFilter != "ALL" {
 		query += ` WHERE level = ?`
 		args = append(args, levelFilter)
@@ -81,6 +81,13 @@ func logsHandler(w http.ResponseWriter, r *http.Request) {
 
 var groupIDRegex = regexp.MustCompile(`Group ID: (\d+)`)
 var postIDRegex = regexp.MustCompile(`Post ID: (\d+)`)
+var vkPostIDRegex = regexp.MustCompile(`VK Post ID: (\d+)`)
+
+type publicationVKTarget struct {
+	PostID    int
+	VKPostID  int
+	VKGroupID int
+}
 
 func enrichLogsWithDetails(logs []models.SystemLog) {
 	if len(logs) == 0 {
@@ -110,6 +117,7 @@ func enrichLogsWithDetails(logs []models.SystemLog) {
 	users := fetchUsers(userIDsMap)
 	groups := fetchGroups(groupIDsMap)
 	posts := fetchPosts(postIDsMap)
+	publicationTargets := fetchPublicationVKTargets(postIDsMap)
 
 	for i, l := range logs {
 		if l.UserID != nil {
@@ -127,6 +135,17 @@ func enrichLogsWithDetails(logs []models.SystemLog) {
 		if matches := postIDRegex.FindStringSubmatch(l.Details); len(matches) > 1 {
 			if id, err := strconv.Atoi(matches[1]); err == nil {
 				if p, ok := posts[id]; ok {
+					if matches := vkPostIDRegex.FindStringSubmatch(l.Details); len(matches) > 1 {
+						if vkPostID, err := strconv.Atoi(matches[1]); err == nil {
+							p.VKPostID = vkPostID
+							if target, ok := publicationTargets[publicationTargetKey(id, vkPostID)]; ok {
+								p.VKGroupID = target.VKGroupID
+							}
+						}
+					}
+					if p.VKGroupID == 0 && logs[i].Group != nil {
+						p.VKGroupID = logs[i].Group.VKGroupID
+					}
 					logs[i].Post = &p
 				}
 			}
@@ -165,7 +184,7 @@ func fetchGroups(idsMap map[int]bool) map[int]models.GroupSummary {
 	if len(ids) == 0 {
 		return res
 	}
-	query := `SELECT id, name, screen_name, photo_200 FROM groups WHERE id IN (` + joinInts(ids) + `)`
+	query := `SELECT id, vk_group_id, name, screen_name, photo_200 FROM groups WHERE id IN (` + joinInts(ids) + `)`
 	rows, err := database.Query(query)
 	if err != nil {
 		return res
@@ -174,7 +193,7 @@ func fetchGroups(idsMap map[int]bool) map[int]models.GroupSummary {
 	for rows.Next() {
 		var g models.GroupSummary
 		var screen, photo sql.NullString
-		if err := rows.Scan(&g.ID, &g.Name, &screen, &photo); err == nil {
+		if err := rows.Scan(&g.ID, &g.VKGroupID, &g.Name, &screen, &photo); err == nil {
 			if screen.Valid {
 				g.ScreenName = screen.String
 			}
@@ -182,6 +201,36 @@ func fetchGroups(idsMap map[int]bool) map[int]models.GroupSummary {
 				g.Photo200 = photo.String
 			}
 			res[g.ID] = g
+		}
+	}
+	return res
+}
+
+func publicationTargetKey(postID int, vkPostID int) string {
+	return strconv.Itoa(postID) + ":" + strconv.Itoa(vkPostID)
+}
+
+func fetchPublicationVKTargets(idsMap map[int]bool) map[string]publicationVKTarget {
+	res := make(map[string]publicationVKTarget)
+	ids := getKeys(idsMap)
+	if len(ids) == 0 {
+		return res
+	}
+	query := `
+		SELECT pp.post_id, pp.vk_post_id, g.vk_group_id
+		FROM post_publications pp
+		INNER JOIN groups g ON pp.group_id = g.id
+		WHERE pp.post_id IN (` + joinInts(ids) + `) AND pp.vk_post_id IS NOT NULL
+	`
+	rows, err := database.Query(query)
+	if err != nil {
+		return res
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var target publicationVKTarget
+		if err := rows.Scan(&target.PostID, &target.VKPostID, &target.VKGroupID); err == nil {
+			res[publicationTargetKey(target.PostID, target.VKPostID)] = target
 		}
 	}
 	return res
