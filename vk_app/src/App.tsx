@@ -35,6 +35,21 @@ const ModerationModal = lazy(() => import('./panels/ModerationModal'));
 const PostByLink = lazy(() => import('./panels/PostByLink').then(m => ({ default: m.PostByLink })));
 const DeletePostModal = lazy(() => import('./panels/DeletePostModal').then(m => ({ default: m.DeletePostModal })));
 
+const BRIDGE_TIMEOUT_MS = 3500;
+
+const withBridgeTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timed out`)), BRIDGE_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+};
+
 const STORY_IDS = {
   HOME: 'home_story',
 
@@ -126,7 +141,10 @@ export const App = () => {
         }
         
         console.log('Attempting to get user info...');
-        const user = await vkBridge.send('VKWebAppGetUserInfo');
+        const user = await withBridgeTimeout<UserInfo>(
+          vkBridge.send('VKWebAppGetUserInfo') as Promise<UserInfo>,
+          'VKWebAppGetUserInfo'
+        );
         console.log('User info received:', user);
         
         // СНАЧАЛА устанавливаем данные пользователя

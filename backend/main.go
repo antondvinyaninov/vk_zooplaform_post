@@ -62,12 +62,6 @@ func main() {
 
 	// VK Mini App - поддержка обоих вариантов написания (через дефис и через подчеркивание)
 	vkAppHandler := func(w http.ResponseWriter, r *http.Request) {
-		// Определяем какой префикс используется
-		prefix := "/vk_app/"
-		if strings.HasPrefix(r.URL.Path, "/vk-app/") {
-			prefix = "/vk-app/"
-		}
-
 		// Заголовки для работы в VK iframe
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -77,6 +71,24 @@ func main() {
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
+		}
+
+		if r.URL.Path == "/vk-app" || r.URL.Path == "/vk_app" || r.URL.Path == "/groups/vk_app" || r.URL.Path == "/groups/vk_app/" {
+			targetPath := r.URL.Path + "/"
+			if strings.HasPrefix(r.URL.Path, "/groups/") {
+				targetPath = "/vk_app/"
+			}
+			if r.URL.RawQuery != "" {
+				targetPath += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, targetPath, http.StatusFound)
+			return
+		}
+
+		// Определяем какой префикс используется
+		prefix := "/vk_app/"
+		if strings.HasPrefix(r.URL.Path, "/vk-app/") {
+			prefix = "/vk-app/"
 		}
 
 		// Убираем префикс из пути для поиска файла
@@ -106,8 +118,6 @@ func main() {
 		http.ServeFile(w, r, filePath)
 	}
 
-	// Убраны редиректы для путей без слеша в конце
-	// так как Yandex API Gateway обрезает слеши при передаче в /{path+}
 	mux.HandleFunc("/vk_app", vkAppHandler)
 	mux.HandleFunc("/vk-app", vkAppHandler)
 
