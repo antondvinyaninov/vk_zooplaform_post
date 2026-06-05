@@ -3,6 +3,16 @@ info:
   title: VK Proxy
   version: 1.0.0
 paths:
+  /vk-app:
+    head:
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/vk-app/'
+        method: HEAD
+    get:
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/vk-app/'
   /vk-app/:
     head:
       x-yc-apigateway-integration:
@@ -13,6 +23,26 @@ paths:
       x-yc-apigateway-integration:
         type: http
         url: 'https://vk.zooplatforma.ru/vk-app/'
+  /vk_app:
+    head:
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/vk_app/'
+        method: HEAD
+    get:
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/vk_app/'
+  /vk_app/:
+    head:
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/vk_app/'
+        method: HEAD
+    get:
+      x-yc-apigateway-integration:
+        type: http
+        url: 'https://vk.zooplatforma.ru/vk_app/'
   /{path+}:
     options:
       parameters:

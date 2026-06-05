@@ -73,18 +73,6 @@ func main() {
 			return
 		}
 
-		if r.URL.Path == "/vk-app" || r.URL.Path == "/vk_app" || r.URL.Path == "/groups/vk_app" || r.URL.Path == "/groups/vk_app/" {
-			targetPath := r.URL.Path + "/"
-			if strings.HasPrefix(r.URL.Path, "/groups/") {
-				targetPath = "/vk_app/"
-			}
-			if r.URL.RawQuery != "" {
-				targetPath += "?" + r.URL.RawQuery
-			}
-			http.Redirect(w, r, targetPath, http.StatusFound)
-			return
-		}
-
 		// Определяем какой префикс используется
 		prefix := "/vk_app/"
 		if strings.HasPrefix(r.URL.Path, "/vk-app/") {
@@ -191,6 +179,15 @@ func main() {
 			}
 			http.ServeFile(w, r, filePath)
 			return
+		}
+
+		if strings.HasPrefix(r.URL.Path, "/assets/") {
+			vkAssetPath := "/usr/share/nginx/html/vk_app" + r.URL.Path
+			if _, err := os.Stat(vkAssetPath); err == nil {
+				w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+				http.ServeFile(w, r, vkAssetPath)
+				return
+			}
 		}
 
 		// 404
