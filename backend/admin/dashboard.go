@@ -143,3 +143,37 @@ func dashboardStatsHandler(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, response)
 }
+
+func authorsStatsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+		return
+	}
+
+	var days7, days30, days90, allTime int
+
+	query := `
+		SELECT 
+			COALESCE(COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN user_id END), 0) as days_7,
+			COALESCE(COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN user_id END), 0) as days_30,
+			COALESCE(COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL '90 days' THEN user_id END), 0) as days_90,
+			COALESCE(COUNT(DISTINCT user_id), 0) as all_time
+		FROM posts
+		WHERE user_id IS NOT NULL 
+		  AND user_id > 0 
+		  AND group_id IN (SELECT id FROM groups WHERE is_test = false)
+	`
+	
+	err := database.QueryRow(query).Scan(&days7, &days30, &days90, &allTime)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load authors stats"})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]int{
+		"days_7":   days7,
+		"days_30":  days30,
+		"days_90":  days90,
+		"all_time": allTime,
+	})
+}

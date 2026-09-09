@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -477,4 +478,97 @@ func disconnectGroupHandler(w http.ResponseWriter, r *http.Request) {
 	models.LogInfo("GROUP_DISCONNECTED", "Сообщество отключено от платформы", nil, fmt.Sprintf("Group ID: %d", req.GroupID))
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "success"})
+}
+
+// testGroupPublishHandler публикует одно тестовое фото токеном сообщества.
+// Только для групп с is_test=true, чтобы не трогать боевые стены.
+func testGroupPublishHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
+		return
+	}
+
+	var req struct {
+		VKGroupID int `json:"vk_group_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.VKGroupID == 0 {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "vk_group_id is required"})
+		return
+	}
+
+	var (
+		name      string
+		token     string
+		isTest    bool
+		groupID   int
+		vkGroupID int
+	)
+	err := database.QueryRow(`
+		SELECT id, vk_group_id, name, COALESCE(access_token, ''), is_test
+		FROM groups
+		WHERE vk_group_id = ?
+	`, req.VKGroupID).Scan(&groupID, &vkGroupID, &name, &token, &isTest)
+	if err == sql.ErrNoRows {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "group not found"})
+		return
+	}
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	if !isTest {
+		respondJSON(w, http.StatusForbidden, map[string]string{"error": "test publish is allowed only for is_test groups"})
+		return
+	}
+	if strings.TrimSpace(token) == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "group token is empty"})
+		return
+	}
+
+	tmp, err := os.CreateTemp("", "group_token_test_*.jpg")
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if _, err := tmp.Write(minimalJPEG); err != nil {
+		tmp.Close()
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	tmp.Close()
+
+	client := vk.NewVKClient(token)
+	gid := fmt.Sprintf("%d", vkGroupID)
+	att, _, err := client.UploadPhotoToWall(tmpPath, gid)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "UploadPhotoToWall: " + err.Error()})
+		return
+	}
+
+	postID, err := client.WallPost("-"+gid, "Тест публикации токеном группы ZooPlatforma (можно удалить)", []string{att}, true, 0)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "wall.post: " + err.Error()})
+		return
+	}
+
+	models.LogInfo("TEST_GROUP_PUBLISH", "Тестовая публикация токеном сообщества", nil, fmt.Sprintf("Group ID: %d, VK Group ID: %d, VK Post ID: %d", groupID, vkGroupID, postID))
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"ok":         true,
+		"group":      name,
+		"vk_post_id": postID,
+		"url":        fmt.Sprintf("https://vk.com/wall-%d_%d", vkGroupID, postID),
+	})
+}
+
+// 1x1 JPEG for a one-shot VK upload test.
+var minimalJPEG = []byte{
+	0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+	0xFF, 0xDB, 0x00, 0x43, 0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09, 0x09, 0x08, 0x0A, 0x0C,
+	0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12, 0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20,
+	0x24, 0x2E, 0x27, 0x20, 0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29, 0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27,
+	0x39, 0x3D, 0x38, 0x32, 0x3C, 0x2E, 0x33, 0x34, 0x32, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00,
+	0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00, 0x01, 0x05, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
+	0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x7B, 0x94, 0x80, 0x01, 0xFF, 0xD9,
 }
