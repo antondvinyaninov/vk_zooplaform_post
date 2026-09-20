@@ -202,6 +202,31 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 	return attachmentFromSavedPhotos(savedResp)
 }
 
+// ProbeWallPhotoUpload проверяет, что токен умеет photos.getWallUploadServer для группы.
+func (c *VKClient) ProbeWallPhotoUpload(groupID string) error {
+	if c == nil {
+		return fmt.Errorf("%s", GroupWallTokenMissing)
+	}
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return fmt.Errorf("group_id required")
+	}
+	raw, err := c.CallMethod("photos.getWallUploadServer", map[string]string{"group_id": groupID})
+	if err != nil {
+		return err
+	}
+	var resp struct {
+		UploadURL string `json:"upload_url"`
+	}
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return fmt.Errorf("failed to parse getWallUploadServer: %w", err)
+	}
+	if strings.TrimSpace(resp.UploadURL) == "" {
+		return fmt.Errorf("photos.getWallUploadServer: empty upload_url")
+	}
+	return nil
+}
+
 // UploadPhotoForGroupWall сначала пробует ключ сообщества, при VK 27 грузит
 // файл user-токеном (photos.getWallUploadServer). wall.post остаётся на ключе группы.
 func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID string) (string, string, error) {

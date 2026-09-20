@@ -45,6 +45,7 @@ export interface PostType {
 export interface AppGroupSettings extends AppGroup {
   is_active: boolean;
   has_token: boolean;
+  has_photos_token?: boolean;
   notify_user_ids: number[];
   post_types: PostType[];
   enable_post_types: boolean;
@@ -349,6 +350,18 @@ export const saveGroupToken = async (groupId: number, token: string, replace = f
       vk_group_id: groupId,
       access_token: token,
       replace,
+    }),
+  });
+};
+
+export const savePhotosUserToken = async (accessToken: string, extras?: { user_name?: string; user_photo?: string; expires_in?: number }) => {
+  return fetchJSON<{ ok: boolean; has_photos_token: boolean }>(`${API_URL}/photos-token`, {
+    method: 'POST',
+    body: JSON.stringify({
+      access_token: accessToken,
+      user_name: extras?.user_name || '',
+      user_photo: extras?.user_photo || '',
+      expires_in: extras?.expires_in || 0,
     }),
   });
 };

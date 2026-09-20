@@ -9,11 +9,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"backend/database"
 	"backend/models"
+	"backend/vk"
 
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -357,5 +359,44 @@ func TestModerateUsesGroupTokenWhenVKAccountExists(t *testing.T) {
 	err := database.DB.QueryRow("SELECT status FROM post_publications WHERE post_id = $1", postID).Scan(&status)
 	require.NoError(t, err)
 	require.Equal(t, "published", status)
+}
+
+func TestSavePhotosUserTokenProbesWallUpload(t *testing.T) {
+	clearDB(t)
+	vkUserID := 81306887
+	vkGroupID := 227624792
+	setupMockUser(t, vkUserID)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !strings.Contains(r.URL.Path, "photos.getWallUploadServer") {
+			http.NotFound(w, r)
+			return
+		}
+		_ = r.ParseForm()
+		if r.FormValue("access_token") != "mini-app-photos" {
+			fmt.Fprint(w, `{"error":{"error_code":27,"error_msg":"Group authorization failed: method is unavailable with group auth."}}`)
+			return
+		}
+		fmt.Fprint(w, `{"response":{"upload_url":"https://pu.vk.com/u"}}`)
+	}))
+	t.Cleanup(srv.Close)
+
+	prev := vk.VKAPIURL
+	vk.VKAPIURL = srv.URL
+	t.Cleanup(func() { vk.VKAPIURL = prev })
+
+	body, _ := json.Marshal(map[string]string{"access_token": "mini-app-photos", "user_name": "Admin"})
+	req := httptest.NewRequest("POST", "/api/app/photos-token", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=admin", vkUserID, vkGroupID))
+	w := httptest.NewRecorder()
+	savePhotosUserTokenHandler(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode, w.Body.String())
+
+	var token string
+	err := database.DB.QueryRow(`SELECT access_token FROM vk_accounts WHERE vk_user_id = $1 AND is_active = true`, vkUserID).Scan(&token)
+	require.NoError(t, err)
+	require.Equal(t, "mini-app-photos", token)
 }
 

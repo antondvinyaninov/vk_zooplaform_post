@@ -21,7 +21,7 @@ import {
 } from '@vkontakte/vkui';
 import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline, Icon24ArticleOutline, Icon16CopyOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
+import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, savePhotosUserToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
 
 const POST_TYPE_COLORS = [
   '#86efac', // Green (distinct)
@@ -223,8 +223,63 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
 
           <Group>
             <FormStatus mode="default">
-              Постинг на стену идёт ключом сообщества из VK: Управление → Дополнительно → Работа с API, галки «Стена» и «Фотографии» (и «Сообщения», если нужен бот). Кнопка ниже — только Callback/бот; токен Mini App Bridge без Стены wall.post не вызывает. Не логин на /vk-connect.
+              Текст на стену — ключом группы (поле ниже). Картинка — кнопкой «Разрешить загрузку фото»: VK выдаст токен вашего Mini App, не Kate и не /vk-connect.
             </FormStatus>
+            <FormItem top="Фото на стену (токен вашего приложения)">
+              <Button
+                size="l"
+                stretched
+                mode="primary"
+                disabled={saving}
+                onClick={async () => {
+                  try {
+                    const launchParams = (window as any).vkLaunchParams || {};
+                    const appId = Number(launchParams.vk_app_id);
+                    if (!appId) {
+                      throw new Error("Откройте настройки из Mini App внутри группы VK");
+                    }
+                    setSaving(true);
+                    setError(null);
+                    const result = await vkBridge.send('VKWebAppGetAuthToken', {
+                      app_id: appId,
+                      scope: 'photos,video',
+                    });
+                    if (!result?.access_token) {
+                      throw new Error("VK не вернул токен");
+                    }
+                    let userName = '';
+                    let userPhoto = '';
+                    try {
+                      const info = await vkBridge.send('VKWebAppGetUserInfo');
+                      userName = [info?.first_name, info?.last_name].filter(Boolean).join(' ');
+                      userPhoto = info?.photo_200 || '';
+                    } catch {
+                      // имя не обязательно
+                    }
+                    await savePhotosUserToken(result.access_token, {
+                      user_name: userName,
+                      user_photo: userPhoto,
+                    });
+                    setSettings(prev => prev ? { ...prev, has_photos_token: true } : null);
+                    setSnackbar(
+                      <Snackbar
+                        onClose={() => setSnackbar(null)}
+                        onClosed={() => setSnackbar(null)}
+                        before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+                      >
+                        Загрузка фото на стену разрешена
+                      </Snackbar>
+                    );
+                  } catch (e: any) {
+                    setError(e?.error_data?.error_reason || e?.message || "Не удалось получить токен фото");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+              >
+                {settings?.has_photos_token ? 'Обновить разрешение на фото' : 'Разрешить загрузку фото на стену'}
+              </Button>
+            </FormItem>
             {!settings?.has_token && (
               <FormItem top="Подключение Callback API (обязательно для работы бота)">
                 <Button 

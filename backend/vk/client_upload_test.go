@@ -11,6 +11,39 @@ import (
 	"testing"
 )
 
+func TestProbeWallPhotoUploadAcceptsUserToken(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !strings.Contains(r.URL.Path, "photos.getWallUploadServer") {
+			http.NotFound(w, r)
+			return
+		}
+		_ = r.ParseForm()
+		if r.FormValue("access_token") == "mini-app-user" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"response": map[string]any{"upload_url": "https://pu.vk.com/upload"},
+			})
+			return
+		}
+		io.WriteString(w, `{"error":{"error_code":27,"error_msg":"Group authorization failed: method is unavailable with group auth."}}`)
+	}))
+	t.Cleanup(srv.Close)
+	prev := VKAPIURL
+	VKAPIURL = srv.URL
+	t.Cleanup(func() { VKAPIURL = prev })
+
+	ok := NewVKClient("mini-app-user")
+	ok.HTTPClient = srv.Client()
+	if err := ok.ProbeWallPhotoUpload("227624792"); err != nil {
+		t.Fatalf("user token should probe ok: %v", err)
+	}
+	bad := NewVKClient("group-key")
+	bad.HTTPClient = srv.Client()
+	if err := bad.ProbeWallPhotoUpload("227624792"); !IsUnavailableWithGroupAuth(err) {
+		t.Fatalf("group key should be 27, got %v", err)
+	}
+}
+
 func TestUploadPhotoToWallDoesNotUseMessagesAlbum(t *testing.T) {
 	var wallUploadHits, messagesHits int
 	mux := http.NewServeMux()

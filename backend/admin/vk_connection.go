@@ -323,9 +323,7 @@ func loadVKConnections() (*vkConnectionsResponse, error) {
 		}
 		item.IsActive = isActive.Valid && isActive.Bool
 		item.HasToken = accessToken.Valid && strings.TrimSpace(accessToken.String) != ""
-		if item.IsActive {
-			item.AccessToken = accessToken.String
-		}
+		item.AccessToken = ""
 
 		accounts = append(accounts, item)
 		if item.IsActive {
