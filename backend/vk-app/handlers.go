@@ -441,6 +441,7 @@ type groupSettingsResponse struct {
 	CityTitle       *string    `json:"city_title"`
 	IsActive        bool       `json:"is_active"`
 	HasToken        bool       `json:"has_token"`
+	HasWall         bool       `json:"has_wall"`
 	HasPhotosToken  bool       `json:"has_photos_token"`
 	NotifyUserIDs   []int      `json:"notify_user_ids"`
 	PostTypes       []PostType `json:"post_types"`
@@ -2370,6 +2371,10 @@ func groupToSettings(group *models.Group) *groupSettingsResponse {
 		HasToken:        group.AccessToken != "",
 		HasPhotosToken:  hasActivePhotosUserToken(),
 		EnablePostTypes: group.EnablePostTypes,
+	}
+	if group.AccessToken != "" {
+		hasWall, err := vk.CommunityTokenHasWall(group.AccessToken)
+		resp.HasWall = err == nil && hasWall
 	}
 
 	if group.NotifyUserIDs != "" {
