@@ -282,9 +282,9 @@ func PostPhotoToUploadURL(filePath, uploadURL string) (*PhotoUploadResponse, err
 	return NewVKClient("").uploadPhotoFile(filePath, uploadURL)
 }
 
-// UploadPhotoForGroupWall сначала пробует photos.getWallUploadServer.
-// Ключ сообщества даёт VK 27 — тогда грузим photos.getMessagesUploadServer:
-// saveMessagesPhoto возвращает photo-{group}_{id} (не user), wall.post таким вложением проходит.
+// UploadPhotoForGroupWall сначала пробует photos.getWallUploadServer ключом сообщества.
+// Это VK 27 — тогда грузим user-токеном photos.saveWallPhoto (альбом стены).
+// photos.saveMessagesPhoto на стене не рисуется: только текст, без превью.
 func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID string) (string, string, error) {
 	if groupClient == nil {
 		return "", "", fmt.Errorf("%s", GroupWallTokenMissing)
@@ -296,16 +296,11 @@ func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID
 	if !IsUnavailableWithGroupAuth(err) {
 		return "", "", err
 	}
-	log.Printf("[UploadPhotoToWall] community token cannot photos.getWallUploadServer (VK 27); trying group messages album")
-	att, photoURL, msgErr := groupClient.UploadPhotoViaGroupMessages(filePath)
-	if msgErr == nil {
-		return att, photoURL, nil
-	}
 	userToken = strings.TrimSpace(userToken)
 	if userToken == "" {
-		return "", "", fmt.Errorf("%s (%v)", GroupCannotUploadWallPhoto, msgErr)
+		return "", "", fmt.Errorf("%s (%v)", GroupCannotUploadWallPhoto, err)
 	}
-	log.Printf("[UploadPhotoToWall] messages album failed (%v); uploading with user photos token", msgErr)
+	log.Printf("[UploadPhotoToWall] community token cannot photos.getWallUploadServer (VK 27); uploading with user photos token")
 	return NewVKClient(userToken).UploadPhotoToWall(filePath, groupID)
 }
 

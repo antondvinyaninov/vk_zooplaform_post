@@ -108,6 +108,12 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	postID, err := client.WallPost(ownerID, message, attachments, fromGroup == 1, publishDate)
+	if err != nil && vk.IsAccessDenied(err) {
+		if userTok := getActiveAccountTokenOrEmpty(); userTok != "" && userTok != token {
+			log.Printf("[vkPost] group wall.post denied (%v); retrying user token from_group=1", err)
+			postID, err = vk.NewVKClient(userTok).WallPost(ownerID, message, attachments, true, publishDate)
+		}
+	}
 	if err != nil {
 		log.Printf("[vkPost] VK wall.post error: %v", err)
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": vk.ExplainWallError(err)})
