@@ -45,6 +45,7 @@ export interface PostType {
 export interface AppGroupSettings extends AppGroup {
   is_active: boolean;
   has_token: boolean;
+  has_wall?: boolean;
   has_photos_token?: boolean;
   notify_user_ids: number[];
   post_types: PostType[];
@@ -372,7 +373,7 @@ export const moderatePost = async (
 };
 
 export const saveGroupToken = async (groupId: number, token: string, replace = false) => {
-  return fetchJSON<{ group: AppGroup }>(`${API_URL}/groups/token`, {
+  return fetchJSON<{ group: AppGroupSettings }>(`${API_URL}/groups/token`, {
     method: 'POST',
     body: JSON.stringify({
       vk_group_id: groupId,
@@ -380,6 +381,30 @@ export const saveGroupToken = async (groupId: number, token: string, replace = f
       replace,
     }),
   });
+};
+
+export const connectCurrentCommunity = async (replace = false) => {
+  const { appId, groupId } = miniAppLaunchIds();
+  const community = await vkBridge.send('VKWebAppGetCommunityToken', {
+    app_id: appId,
+    group_id: groupId,
+    scope: 'messages,manage,photos,docs,wall',
+  });
+  if (!community?.access_token) {
+    throw new Error(
+      'VK не выдал ключ сообщества. В кабинете Mini App включите права сообщества: Стена, Сообщения, Фото, Документы, Управление.'
+    );
+  }
+  const saved = await saveGroupToken(groupId, community.access_token, replace);
+  try {
+    const photos = await grantMiniAppPhotosToken();
+    return { group: saved.group, photos };
+  } catch (e: any) {
+    throw new Error(
+      'Ключ сообщества сохранён. Осталось разрешить photos во втором окне: ' +
+        (e?.message || 'ошибка Mini App')
+    );
+  }
 };
 
 export const savePhotosUserToken = async (
