@@ -361,6 +361,50 @@ func TestModerateUsesGroupTokenWhenVKAccountExists(t *testing.T) {
 	require.Equal(t, "published", status)
 }
 
+func TestModerateUsesCommunityWallPostForMiniAppPhotos(t *testing.T) {
+	clearDB(t)
+
+	vkUserID := 557
+	vkGroupID := 779
+	setupMockUser(t, vkUserID)
+
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	writer.WriteField("message", "Photo from Mini App, wall.post by group key")
+	writer.WriteField("s3_media_keys", "wall-photo.jpg")
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/api/app/posts", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=member", vkUserID, vkGroupID))
+	w := httptest.NewRecorder()
+	createPostHandler(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode, w.Body.String())
+
+	var createResp map[string]interface{}
+	require.NoError(t, json.NewDecoder(w.Result().Body).Decode(&createResp))
+	postID := int(createResp["id"].(float64))
+
+	setGroupWallToken(t, vkGroupID, "mock_group_wall_token")
+
+	modBody := bytes.NewBufferString(`{"status":"published","wall_attachments":["photo81306887_457326240"]}`)
+	reqMod := httptest.NewRequest("POST", fmt.Sprintf("/api/app/posts/%d/moderate", postID), modBody)
+	reqMod.Header.Set("Content-Type", "application/json")
+	reqMod.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=admin", vkUserID, vkGroupID))
+	wMod := httptest.NewRecorder()
+	moderatePostHandler(wMod, reqMod, postID)
+	require.Equal(t, http.StatusOK, wMod.Result().StatusCode, wMod.Body.String())
+	require.NotContains(t, wMod.Body.String(), `"vk_post_id"`)
+
+	time.Sleep(100 * time.Millisecond)
+	var status string
+	var vkPostID int
+	err := database.DB.QueryRow("SELECT status, COALESCE(vk_post_id, 0) FROM post_publications WHERE post_id = $1", postID).Scan(&status, &vkPostID)
+	require.NoError(t, err)
+	require.Equal(t, "published", status)
+	require.Equal(t, 99999, vkPostID)
+}
+
 func TestSavePhotosUserTokenProbesWallUpload(t *testing.T) {
 	clearDB(t)
 	vkUserID := 81306887

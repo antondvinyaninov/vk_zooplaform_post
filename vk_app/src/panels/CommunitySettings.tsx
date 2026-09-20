@@ -223,7 +223,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
 
           <Group>
             <FormStatus mode="default">
-              Текст на стену — ключом группы (поле ниже). Картинка — кнопкой ниже: VK спросит право photos у вашего Mini App. Красная ошибка про «Работа с API» к этой кнопке не относится.
+              Пост на стену публикует сервер ключом группы (поле ниже, право «Стена»). Картинка при модерации грузится из Mini App (кнопка ниже, право photos). Mini App больше не вызывает wall.post.
             </FormStatus>
             <FormItem top="Фото на стену (токен вашего приложения)">
               <Button
@@ -278,7 +278,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                       const result = await vkBridge.send('VKWebAppGetCommunityToken', {
                         app_id: appId,
                         group_id: groupId,
-                        scope: 'messages,manage,photos,docs'
+                        scope: 'messages,manage,photos,docs,wall'
                       });
                       
                       if (result.access_token) {

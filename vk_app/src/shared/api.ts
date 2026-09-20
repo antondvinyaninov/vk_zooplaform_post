@@ -344,40 +344,20 @@ export const moderatePost = async (
     });
   }
 
-  const { groupId } = miniAppLaunchIds();
   const post = await getPostById(id);
   let wall_attachments: string[] = [];
-  try {
-    wall_attachments = await attachWallPhotosViaMiniApp(post);
-  } catch (e) {
-    console.error('Mini App wall photos skipped', e);
-  }
-
-  let vk_post_id = 0;
-  try {
-    const accessToken = await getMiniAppPhotosAccessToken();
-    const params: Record<string, string | number> = {
-      owner_id: -groupId,
-      message: post.message || '',
-      from_group: 1,
-      access_token: accessToken,
-    };
-    if (wall_attachments.length) {
-      params.attachments = wall_attachments.join(',');
+  if (photoS3Keys(post).length) {
+    try {
+      wall_attachments = await attachWallPhotosViaMiniApp(post);
+    } catch (e: any) {
+      throw new Error(
+        (e?.message || 'Не удалось загрузить фото на стену из Mini App') +
+          ' Нужно право photos. Сам пост публикует сервер ключом сообщества.'
+      );
     }
-    if (status === 'scheduled' && publishDate) {
-      params.publish_date = Math.floor(publishDate.getTime() / 1000);
+    if (!wall_attachments.length) {
+      throw new Error('VK не сохранил фото на стену из Mini App.');
     }
-    const posted = await bridgeCallVk('wall.post', params);
-    vk_post_id = Number(posted?.response?.post_id || 0);
-    if (!vk_post_id) {
-      throw new Error('VK не вернул id поста. ' + bridgeVkError(posted));
-    }
-  } catch (e: any) {
-    throw new Error(
-      (e?.message || 'Не удалось опубликовать из Mini App') +
-        ' Разрешите право «Стена» в окне VK, не только фото.'
-    );
   }
 
   return fetchJSON<AppPost>(`${API_URL}/posts/${id}/moderate`, {
@@ -387,7 +367,6 @@ export const moderatePost = async (
       publish_date: publishDate?.toISOString(),
       reject_reason: rejectReason,
       wall_attachments,
-      vk_post_id,
     }),
   });
 };
@@ -440,7 +419,7 @@ const getMiniAppPhotosAccessToken = async () => {
   const { appId } = miniAppLaunchIds();
   const result = await vkBridge.send('VKWebAppGetAuthToken', {
     app_id: appId,
-    scope: 'photos,video,wall',
+    scope: 'photos,video',
   });
   if (!result?.access_token) {
     throw new Error('VK не вернул токен');
