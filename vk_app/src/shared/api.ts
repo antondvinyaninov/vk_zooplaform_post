@@ -334,15 +334,52 @@ export const moderatePost = async (
   publishDate?: Date,
   rejectReason?: string,
 ) => {
-  let wall_attachments: string[] = [];
-  if (status === 'published' || status === 'scheduled') {
-    try {
-      const post = await getPostById(id);
-      wall_attachments = await attachWallPhotosViaMiniApp(post);
-    } catch (e) {
-      console.error('Mini App wall photos skipped, publishing text anyway', e);
-    }
+  if (status === 'rejected') {
+    return fetchJSON<AppPost>(`${API_URL}/posts/${id}/moderate`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status,
+        reject_reason: rejectReason,
+      }),
+    });
   }
+
+  const { groupId } = miniAppLaunchIds();
+  const post = await getPostById(id);
+  let wall_attachments: string[] = [];
+  try {
+    wall_attachments = await attachWallPhotosViaMiniApp(post);
+  } catch (e) {
+    console.error('Mini App wall photos skipped', e);
+  }
+
+  let vk_post_id = 0;
+  try {
+    const accessToken = await getMiniAppPhotosAccessToken();
+    const params: Record<string, string | number> = {
+      owner_id: -groupId,
+      message: post.message || '',
+      from_group: 1,
+      access_token: accessToken,
+    };
+    if (wall_attachments.length) {
+      params.attachments = wall_attachments.join(',');
+    }
+    if (status === 'scheduled' && publishDate) {
+      params.publish_date = Math.floor(publishDate.getTime() / 1000);
+    }
+    const posted = await bridgeCallVk('wall.post', params);
+    vk_post_id = Number(posted?.response?.post_id || 0);
+    if (!vk_post_id) {
+      throw new Error('VK не вернул id поста. ' + bridgeVkError(posted));
+    }
+  } catch (e: any) {
+    throw new Error(
+      (e?.message || 'Не удалось опубликовать из Mini App') +
+        ' Разрешите право «Стена» в окне VK, не только фото.'
+    );
+  }
+
   return fetchJSON<AppPost>(`${API_URL}/posts/${id}/moderate`, {
     method: 'PATCH',
     body: JSON.stringify({
@@ -350,6 +387,7 @@ export const moderatePost = async (
       publish_date: publishDate?.toISOString(),
       reject_reason: rejectReason,
       wall_attachments,
+      vk_post_id,
     }),
   });
 };
@@ -479,11 +517,6 @@ const attachWallPhotosViaMiniApp = async (post: AppPost): Promise<string[]> => {
     const photo = saved?.response?.[0];
     if (!photo?.id) {
       throw new Error('VK не сохранил фото на стену. ' + bridgeVkError(saved));
-    }
-    const ownerId = Number(photo.owner_id);
-    if (ownerId !== -groupId) {
-      console.warn('photos.saveWallPhoto returned user-owned photo', photo);
-      continue;
     }
     let att = `photo${photo.owner_id}_${photo.id}`;
     if (photo.access_key) {

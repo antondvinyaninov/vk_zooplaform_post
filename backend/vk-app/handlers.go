@@ -1225,6 +1225,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		PublishDate     string   `json:"publish_date"`
 		RejectReason    string   `json:"reject_reason"`
 		WallAttachments []string `json:"wall_attachments"`
+		ClientVKPostID  int      `json:"vk_post_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -1309,6 +1310,48 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		publishUnix = publishDate.Unix()
 	} else {
 		currentPub.PublishDate = time.Time{}
+	}
+
+	if req.ClientVKPostID > 0 {
+		for _, raw := range req.WallAttachments {
+			att := cleanAttachmentID(raw)
+			if att == "" {
+				continue
+			}
+			appendAttachmentToPost(post, att, "")
+		}
+		if len(req.WallAttachments) > 0 {
+			kept := make([]string, 0)
+			for _, key := range parseMediaKeys(post.S3VideoKey) {
+				if classifyMediaByExt(key) == "photo" {
+					go s3DeleteVideoKey(key)
+					continue
+				}
+				kept = append(kept, key)
+			}
+			post.S3VideoKey = strings.Join(kept, ",")
+		}
+		currentPub.VKPostID = req.ClientVKPostID
+		currentPub.Status = req.Status
+		if err := updatePublication(currentPub); err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if err := updatePost(post); err != nil {
+			utils.RespondError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		models.LogInfo("POST_PUBLISHED", "Запись опубликована из Mini App (Bridge wall.post)", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, VK Post ID: %d", group.ID, post.ID, req.ClientVKPostID))
+		if author, err := getUserByID(post.UserID); err == nil && author != nil {
+			switch req.Status {
+			case "published":
+				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост был успешно опубликован!\n\n[%s|Открыть пост]", appURL), postDetailFragment(post.ID))
+			case "scheduled":
+				sendNotificationToUser(author.VKUserID, fmt.Sprintf("Ваш предложенный пост поставлен в очередь на публикацию: %s\n\n[%s|Открыть пост]", currentPub.PublishDate.Format("02.01.2006 15:04"), appURL), postDetailFragment(post.ID))
+			}
+		}
+		utils.RespondSuccess(w, map[string]interface{}{"success": true, "status": req.Status, "vk_post_id": req.ClientVKPostID})
+		return
 	}
 
 	wallClient, err := vk.NewWallClient(group)
