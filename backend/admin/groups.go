@@ -545,9 +545,29 @@ func testGroupPublishHandler(w http.ResponseWriter, r *http.Request) {
 	client := vk.NewVKClient(token)
 	gid := fmt.Sprintf("%d", vkGroupID)
 	msg := "Проверка картинки ZooPlatforma API (640x360 JPEG). Можно удалить."
-	postID, att, err := vk.WallPostWithPhoto(client, getActiveAccountTokenOrEmpty(), "-"+gid, msg, tmpPath)
-	if err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK API: " + vk.ExplainWallError(err)})
+	userTokens := listUserPhotoTokens()
+	var (
+		postID int
+		att    string
+		err2   error
+	)
+	if len(userTokens) == 0 {
+		postID, att, err2 = vk.WallPostWithPhoto(client, "", "-"+gid, msg, tmpPath)
+	} else {
+		for i, ut := range userTokens {
+			postID, att, err2 = vk.WallPostWithPhoto(client, ut, "-"+gid, msg, tmpPath)
+			if err2 == nil {
+				break
+			}
+			log.Printf("[TEST_GROUP_PUBLISH] user token %d/%d failed: %v", i+1, len(userTokens), err2)
+		}
+	}
+	if err2 != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{
+			"error":     "VK API: " + vk.ExplainWallError(err2),
+			"vk_detail": err2.Error(),
+			"tried":     fmt.Sprintf("group_key + %d user tokens", len(userTokens)),
+		})
 		return
 	}
 
