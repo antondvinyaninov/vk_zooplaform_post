@@ -49,6 +49,27 @@ const GroupWallTokenMissing = "У сообщества нет ключа API с�
 
 const GroupCannotUploadWallPhoto = "Ключ сообщества не загружает фото на стену: photos.getWallUploadServer даёт VK 27. Фото из альбома сообщений на стене не видны. Нужен user-токен с правом photos только для загрузки файла; публикация (wall.post) остаётся ключом группы."
 
+const PhotosUserTokenRejected = "Сервер не принял токен Mini App (VK ошибка 5). Это ожидаемо: такой токен часто работает только внутри приложения. Нажмите «Разрешить загрузку фото» ещё раз и дождитесь окна прав photos — после проверки из Mini App токен сохранится."
+
+func ExplainPhotosUserTokenError(err error) string {
+	if err == nil {
+		return ""
+	}
+	if e := AsVKError(err); e != nil {
+		switch e.ErrorCode {
+		case 5:
+			return PhotosUserTokenRejected + " Ответ VK: " + e.ErrorMsg
+		case 15:
+			return "VK не дал photos.getWallUploadServer (ошибка 15). Нужно право photos у Mini App и чтобы вы были админом этой группы."
+		case 27:
+			return "Передан ключ сообщества, а для загрузки фото на стену нужен личный токен. Нажмите «Разрешить загрузку фото»."
+		default:
+			return fmt.Sprintf("Не удалось проверить загрузку фото (VK %d): %s", e.ErrorCode, e.ErrorMsg)
+		}
+	}
+	return "Не удалось проверить загрузку фото: " + err.Error()
+}
+
 func WallToken(group *models.Group) string {
 	if group == nil {
 		return ""

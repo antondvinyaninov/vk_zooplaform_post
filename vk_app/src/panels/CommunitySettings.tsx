@@ -223,7 +223,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
 
           <Group>
             <FormStatus mode="default">
-              Текст на стену — ключом группы (поле ниже). Картинка — кнопкой «Разрешить загрузку фото»: VK выдаст токен вашего Mini App, не Kate и не /vk-connect.
+              Текст на стену — ключом группы (поле ниже). Картинка — кнопкой ниже: VK спросит право photos у вашего Mini App. Красная ошибка про «Работа с API» к этой кнопке не относится.
             </FormStatus>
             <FormItem top="Фото на стену (токен вашего приложения)">
               <Button

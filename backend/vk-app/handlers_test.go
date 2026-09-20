@@ -253,10 +253,10 @@ func TestCreatePostWithMedia(t *testing.T) {
 	writer.WriteField("message", "Post with media")
 	writer.WriteField("post_type_id", "cat_media")
 	writer.WriteField("custom_fields", `[{"id":"field1","value":"test"}]`)
-	
+
 	// Simulate S3 media keys
 	writer.WriteField("s3_media_keys", "test-video-123.mp4,test-image-123.jpg")
-	
+
 	writer.Close()
 
 	req := httptest.NewRequest("POST", "/api/app/posts", body)
@@ -386,7 +386,7 @@ func TestSavePhotosUserTokenProbesWallUpload(t *testing.T) {
 	vk.VKAPIURL = srv.URL
 	t.Cleanup(func() { vk.VKAPIURL = prev })
 
-	body, _ := json.Marshal(map[string]string{"access_token": "mini-app-photos", "user_name": "Admin"})
+	body, _ := json.Marshal(map[string]any{"access_token": "mini-app-photos", "user_name": "Admin", "client_verified": true})
 	req := httptest.NewRequest("POST", "/api/app/photos-token", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=admin", vkUserID, vkGroupID))
@@ -400,3 +400,74 @@ func TestSavePhotosUserTokenProbesWallUpload(t *testing.T) {
 	require.Equal(t, "mini-app-photos", token)
 }
 
+func TestSavePhotosUserTokenServerError5WithoutClientVerify(t *testing.T) {
+	clearDB(t)
+	vkUserID := 42
+	vkGroupID := 227624792
+	setupMockUser(t, vkUserID)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"error":{"error_code":5,"error_msg":"User authorization failed"}}`)
+	}))
+	t.Cleanup(srv.Close)
+	prev := vk.VKAPIURL
+	vk.VKAPIURL = srv.URL
+	t.Cleanup(func() { vk.VKAPIURL = prev })
+
+	body, _ := json.Marshal(map[string]string{"access_token": "mini-app-photos"})
+	req := httptest.NewRequest("POST", "/api/app/photos-token", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=admin", vkUserID, vkGroupID))
+	w := httptest.NewRecorder()
+	savePhotosUserTokenHandler(w, req)
+	require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+	require.Contains(t, w.Body.String(), "Mini App")
+	require.NotContains(t, w.Body.String(), "Ключ сообщества отклонён")
+	require.NotContains(t, w.Body.String(), "Проверьте ключ в Настройки группы")
+}
+
+func TestSavePhotosUserTokenClientVerifiedAllowsServer5(t *testing.T) {
+	clearDB(t)
+	vkUserID := 43
+	vkGroupID := 227624792
+	setupMockUser(t, vkUserID)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"error":{"error_code":5,"error_msg":"User authorization failed"}}`)
+	}))
+	t.Cleanup(srv.Close)
+	prev := vk.VKAPIURL
+	vk.VKAPIURL = srv.URL
+	t.Cleanup(func() { vk.VKAPIURL = prev })
+
+	body, _ := json.Marshal(map[string]any{"access_token": "bridge-ok", "client_verified": true})
+	req := httptest.NewRequest("POST", "/api/app/photos-token", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=admin", vkUserID, vkGroupID))
+	w := httptest.NewRecorder()
+	savePhotosUserTokenHandler(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode, w.Body.String())
+	var token string
+	err := database.DB.QueryRow(`SELECT access_token FROM vk_accounts WHERE vk_user_id = $1 AND is_active = true`, vkUserID).Scan(&token)
+	require.NoError(t, err)
+	require.Equal(t, "bridge-ok", token)
+}
+
+func TestPushWallPhotoRejectsBadUploadURL(t *testing.T) {
+	clearDB(t)
+	vkUserID := 44
+	vkGroupID := 227624792
+	setupMockUser(t, vkUserID)
+	body, _ := json.Marshal(map[string]any{
+		"upload_url": "https://evil.example/steal",
+		"s3_key":     "photo.jpg",
+		"post_id":    1,
+	})
+	req := httptest.NewRequest("POST", "/api/app/wall-photo/push", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=admin", vkUserID, vkGroupID))
+	w := httptest.NewRecorder()
+	pushWallPhotoUploadHandler(w, req)
+	require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
+	require.Contains(t, w.Body.String(), "upload_url")
+}

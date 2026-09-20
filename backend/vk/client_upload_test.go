@@ -44,6 +44,21 @@ func TestProbeWallPhotoUploadAcceptsUserToken(t *testing.T) {
 	}
 }
 
+func TestIsAllowedVKUploadURL(t *testing.T) {
+	if !IsAllowedVKUploadURL("https://pu.vk.com/c123/upload.php?act=add") {
+		t.Fatal("pu.vk.com must be allowed")
+	}
+	if !IsAllowedVKUploadURL("https://pu.vk.ru/upload") {
+		t.Fatal("vk.ru must be allowed")
+	}
+	if IsAllowedVKUploadURL("https://evil.example/upload") {
+		t.Fatal("foreign host must be rejected")
+	}
+	if IsAllowedVKUploadURL("not-a-url") {
+		t.Fatal("garbage must be rejected")
+	}
+}
+
 func TestUploadPhotoToWallDoesNotUseMessagesAlbum(t *testing.T) {
 	var wallUploadHits, messagesHits int
 	mux := http.NewServeMux()

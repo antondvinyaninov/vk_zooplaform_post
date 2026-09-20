@@ -14,7 +14,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/app/posts", middleware.CORSFunc(postsHandler))
 	mux.HandleFunc("/api/app/posts/video-upload-url", middleware.CORSFunc(videoUploadUrlHandler))
 	mux.HandleFunc("/api/app/posts/my", middleware.CORSFunc(myPostsHandler))
-	
+
 	mux.HandleFunc("/api/app/vk/post-by-link", middleware.CORSFunc(appPostByLinkPreviewHandler))
 	mux.HandleFunc("/api/app/vk/publish-post-by-link", middleware.CORSFunc(appPublishPostByLinkHandler))
 
@@ -24,6 +24,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/app/groups/me/managers", middleware.CORSFunc(groupManagersHandler))
 	mux.HandleFunc("/api/app/groups/token", middleware.CORSFunc(saveGroupTokenHandler))
 	mux.HandleFunc("/api/app/photos-token", middleware.CORSFunc(savePhotosUserTokenHandler))
+	mux.HandleFunc("/api/app/wall-photo/push", middleware.CORSFunc(pushWallPhotoUploadHandler))
 	mux.HandleFunc("/api/app/cities", middleware.CORSFunc(citiesHandler))
 	mux.HandleFunc("/api/app/upload/presign", middleware.CORSFunc(s3PresignHandler))
 	mux.HandleFunc("/api/app/notifications/test", middleware.CORSFunc(testNotificationHandler))

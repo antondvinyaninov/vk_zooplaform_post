@@ -61,3 +61,13 @@ func TestExplainWallErrorDoesNotSendUserToVKConnect(t *testing.T) {
 		t.Fatalf("flood: %q", flood)
 	}
 }
+
+func TestExplainPhotosUserTokenErrorIsNotCommunityKey(t *testing.T) {
+	msg := ExplainPhotosUserTokenError(&VKError{ErrorCode: 5, ErrorMsg: "User authorization failed"})
+	if strings.Contains(msg, "Проверьте ключ в Настройки группы") || strings.Contains(msg, "Ключ сообщества отклонён") {
+		t.Fatalf("photos token 5 must not look like a community API key error: %q", msg)
+	}
+	if !strings.Contains(msg, "Mini App") {
+		t.Fatalf("expected Mini App hint, got %q", msg)
+	}
+}

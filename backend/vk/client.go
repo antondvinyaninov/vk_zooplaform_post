@@ -227,6 +227,31 @@ func (c *VKClient) ProbeWallPhotoUpload(groupID string) error {
 	return nil
 }
 
+// IsAllowedVKUploadURL проверяет, что URL — загрузка VK, а не произвольный хост.
+func IsAllowedVKUploadURL(raw string) bool {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" {
+		return false
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "vk.com" || host == "vk.ru" || host == "userapi.com" {
+		return true
+	}
+	return strings.HasSuffix(host, ".vk.com") || strings.HasSuffix(host, ".vk.ru") || strings.HasSuffix(host, ".userapi.com")
+}
+
+// PostPhotoToUploadURL шлёт файл на upload_url от photos.getWallUploadServer.
+// Сам POST на pu.vk.com не требует access_token.
+func PostPhotoToUploadURL(filePath, uploadURL string) (*PhotoUploadResponse, error) {
+	if !IsAllowedVKUploadURL(uploadURL) {
+		return nil, fmt.Errorf("upload_url is not a VK photo host")
+	}
+	return NewVKClient("").uploadPhotoFile(filePath, uploadURL)
+}
+
 // UploadPhotoForGroupWall сначала пробует ключ сообщества, при VK 27 грузит
 // файл user-токеном (photos.getWallUploadServer). wall.post остаётся на ключе группы.
 func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID string) (string, string, error) {

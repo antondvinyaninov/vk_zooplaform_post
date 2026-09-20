@@ -1221,9 +1221,10 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 
 	var req struct {
-		Status       string `json:"status"`
-		PublishDate  string `json:"publish_date"`
-		RejectReason string `json:"reject_reason"`
+		Status          string   `json:"status"`
+		PublishDate     string   `json:"publish_date"`
+		RejectReason    string   `json:"reject_reason"`
+		WallAttachments []string `json:"wall_attachments"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondError(w, http.StatusBadRequest, "invalid JSON")
@@ -1337,9 +1338,31 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		client := wallClient
 		attachments := storedAttachmentIDs(post.Attachments)
 
+		var miniAppWallPhotos []string
+		for _, raw := range req.WallAttachments {
+			att := cleanAttachmentID(raw)
+			if att == "" || !strings.HasPrefix(strings.ToLower(att), "photo") {
+				continue
+			}
+			miniAppWallPhotos = append(miniAppWallPhotos, att)
+			attachments = append(attachments, att)
+			appendAttachmentToPost(post, att, "")
+		}
+
 		// Считаем сколько медиа ожидается из S3 и сохраняем список ключей,
 		// чтобы при частичной загрузке точно знать, какие файлы нужно догрузить.
 		s3Keys := parseMediaKeys(post.S3VideoKey)
+		if len(miniAppWallPhotos) > 0 {
+			kept := make([]string, 0, len(s3Keys))
+			for _, key := range s3Keys {
+				if classifyMediaByExt(key) == "photo" {
+					go s3DeleteVideoKey(key)
+					continue
+				}
+				kept = append(kept, key)
+			}
+			s3Keys = kept
+		}
 		remainingS3Keys := append([]string(nil), s3Keys...)
 		expectedS3Count := len(s3Keys)
 		uploadedFromS3Count := 0
@@ -3476,10 +3499,11 @@ func savePhotosUserTokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		AccessToken string `json:"access_token"`
-		UserName    string `json:"user_name"`
-		UserPhoto   string `json:"user_photo"`
-		ExpiresIn   int    `json:"expires_in"`
+		AccessToken    string `json:"access_token"`
+		UserName       string `json:"user_name"`
+		UserPhoto      string `json:"user_photo"`
+		ExpiresIn      int    `json:"expires_in"`
+		ClientVerified bool   `json:"client_verified"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		utils.RespondError(w, http.StatusBadRequest, "invalid json")
@@ -3491,10 +3515,17 @@ func savePhotosUserTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := vk.NewVKClient(token)
-	if err := client.ProbeWallPhotoUpload(strconv.Itoa(ctx.GroupID)); err != nil {
-		utils.RespondError(w, http.StatusBadRequest, vk.ExplainWallError(err))
-		return
+	// Mini App token from VKWebAppGetAuthToken often fails photos.getWallUploadServer
+	// from our server (VK 5) even when Bridge in the app succeeds. Skip the server
+	// probe if the client already got upload_url via VKWebAppCallAPIMethod.
+	if req.ClientVerified {
+		log.Printf("[savePhotosUserToken] skip server probe, client Bridge verified (user=%d group=%d)", ctx.UserID, ctx.GroupID)
+	} else {
+		client := vk.NewVKClient(token)
+		if err := client.ProbeWallPhotoUpload(strconv.Itoa(ctx.GroupID)); err != nil {
+			utils.RespondError(w, http.StatusBadRequest, vk.ExplainPhotosUserTokenError(err))
+			return
+		}
 	}
 
 	expires := req.ExpiresIn
@@ -3517,6 +3548,117 @@ func savePhotosUserTokenHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondSuccess(w, map[string]interface{}{
 		"ok":               true,
 		"has_photos_token": true,
+	})
+}
+
+func pushWallPhotoUploadHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !isModerator(ctx.GroupRole) {
+		utils.RespondError(w, http.StatusForbidden, "only community admins can upload wall photos")
+		return
+	}
+
+	var req struct {
+		UploadURL string `json:"upload_url"`
+		S3Key     string `json:"s3_key"`
+		PostID    int    `json:"post_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if !vk.IsAllowedVKUploadURL(req.UploadURL) {
+		utils.RespondError(w, http.StatusBadRequest, "upload_url must be a VK photo host")
+		return
+	}
+	key := strings.TrimSpace(req.S3Key)
+	if key == "" || req.PostID <= 0 {
+		utils.RespondError(w, http.StatusBadRequest, "s3_key and post_id required")
+		return
+	}
+
+	post, err := getPostByID(req.PostID)
+	if err != nil || post == nil {
+		utils.RespondError(w, http.StatusNotFound, "post not found")
+		return
+	}
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil || group == nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
+		return
+	}
+	belongs := false
+	for _, pub := range post.Publications {
+		if pub.GroupID == group.ID {
+			belongs = true
+			break
+		}
+	}
+	if !belongs {
+		utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
+		return
+	}
+	foundKey := false
+	for _, existing := range parseMediaKeys(post.S3VideoKey) {
+		if existing == key {
+			foundKey = true
+			break
+		}
+	}
+	if !foundKey {
+		utils.RespondError(w, http.StatusBadRequest, "s3_key is not on this post")
+		return
+	}
+
+	s3, err := s3client.New()
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "s3 unavailable")
+		return
+	}
+	rc, _, err := s3.GetObject(r.Context(), key)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "failed to download media from storage")
+		return
+	}
+	defer rc.Close()
+
+	tmpFile, err := os.CreateTemp("", "wall_photo_*"+filepath.Ext(key))
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "temp file failed")
+		return
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+	if _, err := io.Copy(tmpFile, rc); err != nil {
+		tmpFile.Close()
+		utils.RespondError(w, http.StatusInternalServerError, "failed to copy media")
+		return
+	}
+	tmpFile.Close()
+
+	uploaded, err := vk.PostPhotoToUploadURL(tmpPath, req.UploadURL)
+	if err != nil {
+		log.Printf("[pushWallPhoto] %v", err)
+		utils.RespondError(w, http.StatusBadRequest, "failed to push photo to VK upload_url")
+		return
+	}
+	if uploaded == nil || strings.TrimSpace(uploaded.Photo) == "" {
+		utils.RespondError(w, http.StatusBadRequest, "VK upload_url returned empty photo")
+		return
+	}
+
+	utils.RespondSuccess(w, map[string]interface{}{
+		"photo":  uploaded.Photo,
+		"server": uploaded.Server,
+		"hash":   uploaded.Hash,
 	})
 }
 
