@@ -60,6 +60,10 @@ func TestExplainWallErrorDoesNotSendUserToVKConnect(t *testing.T) {
 	if !strings.Contains(flood, "Flood") {
 		t.Fatalf("flood: %q", flood)
 	}
+	denied := &VKError{ErrorCode: 15, ErrorMsg: "Access denied"}
+	if !IsAccessDenied(denied) {
+		t.Fatal("expected 15 to be access denied")
+	}
 }
 
 func TestExplainPhotosUserTokenErrorIsNotCommunityKey(t *testing.T) {

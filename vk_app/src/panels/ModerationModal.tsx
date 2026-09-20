@@ -10,6 +10,7 @@ import {
   DateInput,
   Div,
   Button,
+  FormStatus,
 } from '@vkontakte/vkui';
 import { useParams, useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { moderatePost } from '../shared/api';
@@ -30,12 +31,14 @@ export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => 
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const closeModal = () => routeNavigator.hideModal();
 
   const handleConfirm = async () => {
     if (params?.id && !isSubmitting) {
       setIsSubmitting(true);
+      setError(null);
       const postId = Number(params.id);
       try {
         await moderatePost(postId, pubType === 'scheduled' ? 'scheduled' : 'published', pubType === 'scheduled' ? scheduledDate : undefined);
@@ -46,8 +49,9 @@ export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => 
           window.dispatchEvent(new CustomEvent('postModerated', { detail: { postId } }));
           closeModal();
         }
-      } catch (error) {
-        console.error('Failed to moderate post:', error);
+      } catch (err: any) {
+        console.error('Failed to moderate post:', err);
+        setError(err?.message || 'Не удалось опубликовать');
       } finally {
         setIsSubmitting(false);
       }
@@ -68,6 +72,9 @@ export const ModerationModal: FC<ModerationModalProps> = ({ id, onConfirm }) => 
       }
     >
       <Group>
+        {error && (
+          <FormStatus mode="error">{error}</FormStatus>
+        )}
         <FormItem top="Время публикации">
           <Radio 
             name="pubType" 

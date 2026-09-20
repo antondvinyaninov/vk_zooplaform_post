@@ -336,8 +336,12 @@ export const moderatePost = async (
 ) => {
   let wall_attachments: string[] = [];
   if (status === 'published' || status === 'scheduled') {
-    const post = await getPostById(id);
-    wall_attachments = await attachWallPhotosViaMiniApp(post);
+    try {
+      const post = await getPostById(id);
+      wall_attachments = await attachWallPhotosViaMiniApp(post);
+    } catch (e) {
+      console.error('Mini App wall photos skipped, publishing text anyway', e);
+    }
   }
   return fetchJSON<AppPost>(`${API_URL}/posts/${id}/moderate`, {
     method: 'PATCH',
@@ -398,7 +402,7 @@ const getMiniAppPhotosAccessToken = async () => {
   const { appId } = miniAppLaunchIds();
   const result = await vkBridge.send('VKWebAppGetAuthToken', {
     app_id: appId,
-    scope: 'photos,video',
+    scope: 'photos,video,wall',
   });
   if (!result?.access_token) {
     throw new Error('VK не вернул токен');
@@ -407,11 +411,15 @@ const getMiniAppPhotosAccessToken = async () => {
 };
 
 const bridgeCallVk = async (method: string, params: Record<string, string | number>) => {
+  const stringParams: Record<string, string> = {};
+  for (const [key, value] of Object.entries(params)) {
+    stringParams[key] = String(value);
+  }
   return vkBridge.send('VKWebAppCallAPIMethod', {
     method,
     request_id: method.replace(/\./g, '_') + '_' + Date.now(),
     params: {
-      ...params,
+      ...stringParams,
       v: '5.199',
     },
   });
@@ -471,6 +479,11 @@ const attachWallPhotosViaMiniApp = async (post: AppPost): Promise<string[]> => {
     const photo = saved?.response?.[0];
     if (!photo?.id) {
       throw new Error('VK не сохранил фото на стену. ' + bridgeVkError(saved));
+    }
+    const ownerId = Number(photo.owner_id);
+    if (ownerId !== -groupId) {
+      console.warn('photos.saveWallPhoto returned user-owned photo', photo);
+      continue;
     }
     let att = `photo${photo.owner_id}_${photo.id}`;
     if (photo.access_key) {

@@ -1559,6 +1559,16 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			vkPostID = 99999
 		} else {
 			vkPostID, err = client.WallPost(ownerID, messageToPost, attachments, true, publishUnix)
+			if err != nil && len(attachments) > 0 && vk.IsAccessDenied(err) {
+				log.Printf("[Moderate] wall.post access denied with attachments=%s for group %d post %d: %v; retrying text only",
+					strings.Join(attachments, ","), group.VKGroupID, post.ID, err)
+				models.LogWarning("PUBLISH_ATTACHMENTS_DENIED",
+					"VK не принял вложения ключом сообщества (часто фото Mini App принадлежит пользователю). Публикуем текст без картинки.",
+					nil,
+					fmt.Sprintf("Group ID: %d, Post ID: %d, Attachments: %s, Error: %s", group.VKGroupID, post.ID, strings.Join(attachments, ","), vk.ExplainWallError(err)),
+				)
+				vkPostID, err = client.WallPost(ownerID, messageToPost, nil, true, publishUnix)
+			}
 		}
 
 		if err != nil {

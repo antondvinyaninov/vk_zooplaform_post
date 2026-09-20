@@ -45,6 +45,13 @@ func IsUserAuthorizationFailed(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "User authorization failed")
 }
 
+func IsAccessDenied(err error) bool {
+	if e := AsVKError(err); e != nil {
+		return e.ErrorCode == 15 || e.ErrorCode == 214
+	}
+	return false
+}
+
 const GroupWallTokenMissing = "У сообщества нет ключа API со Стеной (Настройки группы → Работа с API). Публикация идёт этим ключом, а не через /vk-connect."
 
 const GroupCannotUploadWallPhoto = "Ключ сообщества не загружает фото на стену: photos.getWallUploadServer даёт VK 27. Фото из альбома сообщений на стене не видны. Нужен user-токен с правом photos только для загрузки файла; публикация (wall.post) остаётся ключом группы."
@@ -113,7 +120,7 @@ func ExplainWallError(err error) string {
 		case 18:
 			return "VK: пользователь удалён или забанен (ошибка 18). Это аккаунт user-токена, не ключ сообщества."
 		case 15, 214:
-			return "VK отказал в публикации на стену (ошибка " + strconv.Itoa(e.ErrorCode) + "). Ключ сохранён, но без права «Стена», либо это токен Mini App Bridge. Нужен ключ из Работа с API с галкой Стена."
+			return "VK отказал в публикации на стену (ошибка " + strconv.Itoa(e.ErrorCode) + "). Если во вложении фото Mini App (owner — человек, не группа), ключ сообщества его не примет и отбросит весь пост. Текст публикуем без этого фото. Нужен ключ из Работа с API с галкой Стена, а картинка — photo-{group}_id."
 		case 27:
 			return "Метод недоступен ключу сообщества: " + e.ErrorMsg
 		}
