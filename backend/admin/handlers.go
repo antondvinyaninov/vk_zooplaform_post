@@ -96,10 +96,19 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 			if out, err := os.Create(tmpPath); err == nil {
 				io.Copy(out, f)
 				out.Close()
-				if att, _, err := vk.UploadPhotoForGroupWall(client, getActiveAccountTokenOrEmpty(), tmpPath, groupIDStr); err == nil {
-					attachments = append(attachments, att)
-				} else {
-					log.Printf("[vkPost] photo upload error: %v", err)
+				var att string
+				var upErr error
+				tokens := listUserPhotoTokens()
+				if len(tokens) == 0 {
+					tokens = []string{""}
+				}
+				for _, ut := range tokens {
+					att, _, upErr = vk.UploadPhotoForGroupWall(client, ut, tmpPath, groupIDStr)
+					if upErr == nil {
+						attachments = append(attachments, att)
+						break
+					}
+					log.Printf("[vkPost] photo upload error: %v", upErr)
 				}
 				os.Remove(tmpPath)
 			}
@@ -109,9 +118,15 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	postID, err := client.WallPost(ownerID, message, attachments, fromGroup == 1, publishDate)
 	if err != nil && vk.IsAccessDenied(err) {
-		if userTok := getActiveAccountTokenOrEmpty(); userTok != "" && userTok != token {
-			log.Printf("[vkPost] group wall.post denied (%v); retrying user token from_group=1", err)
+		for _, userTok := range listUserPhotoTokens() {
+			if userTok == token {
+				continue
+			}
+			log.Printf("[vkPost] group wall.post denied (%v); retrying another user token from_group=1", err)
 			postID, err = vk.NewVKClient(userTok).WallPost(ownerID, message, attachments, true, publishDate)
+			if err == nil {
+				break
+			}
 		}
 	}
 	if err != nil {
