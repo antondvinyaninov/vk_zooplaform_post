@@ -47,4 +47,17 @@ func TestExplainWallErrorDoesNotSendUserToVKConnect(t *testing.T) {
 	if !strings.Contains(photoMsg, "не видны") {
 		t.Fatalf("photo error should explain invisible messages photos, got %q", photoMsg)
 	}
+
+	blocked := ExplainWallError(&VKError{ErrorCode: 5, ErrorMsg: "User authorization failed: user is blocked"})
+	if strings.Contains(blocked, "please login") || !strings.Contains(blocked, "Kate") {
+		t.Fatalf("blocked user token should mention Kate, got %q", blocked)
+	}
+	invalid := ExplainWallError(&VKError{ErrorCode: 5, ErrorMsg: "User authorization failed: invalid access_token (4)."})
+	if !strings.Contains(invalid, "протухший") {
+		t.Fatalf("invalid user token: %q", invalid)
+	}
+	flood := ExplainWallError(&VKError{ErrorCode: 9, ErrorMsg: "Flood control"})
+	if !strings.Contains(flood, "Flood") {
+		t.Fatalf("flood: %q", flood)
+	}
 }

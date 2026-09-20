@@ -79,7 +79,18 @@ func ExplainWallError(err error) string {
 	if e := AsVKError(err); e != nil {
 		switch e.ErrorCode {
 		case 5:
+			low := strings.ToLower(e.ErrorMsg)
+			if strings.Contains(low, "blocked") {
+				return "VK заблокировал user-авторизацию (ошибка 5: user is blocked). Это Kate-токен из /vk-connect после флуда, не ключ из Настройки группы → Работа с API."
+			}
+			if strings.Contains(low, "invalid access_token") {
+				return "VK отклонил токен (ошибка 5: invalid access_token). На проде это обычно протухший user-токен из /vk-connect. wall.post должен идти ключом сообщества; мёртвый Kate-токен публикации не спасёт."
+			}
 			return "Ключ сообщества отклонён VK (ошибка 5). Проверьте ключ в Настройки группы → Работа с API — это не логин на /vk-connect."
+		case 9:
+			return "VK ограничил частоту запросов (ошибка 9 Flood control). Один user-токен на все группы быстро ловит флуд и потом бан. Публикация wall.post — ключом сообщества."
+		case 18:
+			return "VK: пользователь удалён или забанен (ошибка 18). Это аккаунт user-токена, не ключ сообщества."
 		case 15, 214:
 			return "VK отказал в публикации на стену (ошибка " + strconv.Itoa(e.ErrorCode) + "). Ключ сохранён, но без права «Стена», либо это токен Mini App Bridge. Нужен ключ из Работа с API с галкой Стена."
 		case 27:
