@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -390,4 +391,33 @@ func getActiveAccountTokenOrEmpty() string {
 		return ""
 	}
 	return token
+}
+
+func listUserPhotoTokens() []string {
+	rows, err := database.Query(`
+		SELECT access_token
+		FROM vk_accounts
+		WHERE COALESCE(access_token, '') <> ''
+		ORDER BY is_active ASC, updated_at DESC
+	`)
+	if err != nil {
+		log.Printf("[vk_accounts] list tokens: %v", err)
+		return nil
+	}
+	defer rows.Close()
+	var out []string
+	seen := map[string]bool{}
+	for rows.Next() {
+		var token string
+		if err := rows.Scan(&token); err != nil {
+			continue
+		}
+		token = strings.TrimSpace(token)
+		if token == "" || seen[token] {
+			continue
+		}
+		seen[token] = true
+		out = append(out, token)
+	}
+	return out
 }
