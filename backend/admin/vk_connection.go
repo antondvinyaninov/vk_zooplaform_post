@@ -398,7 +398,7 @@ func listUserPhotoTokens() []string {
 		SELECT access_token
 		FROM vk_accounts
 		WHERE COALESCE(access_token, '') <> ''
-		ORDER BY is_active DESC, updated_at DESC
+		ORDER BY is_active ASC, updated_at DESC
 	`)
 	if err != nil {
 		log.Printf("[vk_accounts] list tokens: %v", err)

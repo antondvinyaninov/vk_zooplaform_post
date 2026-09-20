@@ -542,7 +542,6 @@ func testGroupPublishHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := vk.NewVKClient(token)
 	gid := fmt.Sprintf("%d", vkGroupID)
 	msg := "Проверка картинки ZooPlatforma API (640x360 JPEG). Можно удалить."
 	userTokens := listUserPhotoTokens()
@@ -551,16 +550,20 @@ func testGroupPublishHandler(w http.ResponseWriter, r *http.Request) {
 		att    string
 		err2   error
 	)
-	if len(userTokens) == 0 {
-		postID, att, err2 = vk.WallPostWithPhoto(client, "", "-"+gid, msg, tmpPath)
-	} else {
-		for i, ut := range userTokens {
-			postID, att, err2 = vk.WallPostWithPhoto(client, ut, "-"+gid, msg, tmpPath)
-			if err2 == nil {
-				break
-			}
-			log.Printf("[TEST_GROUP_PUBLISH] user token %d/%d failed: %v", i+1, len(userTokens), err2)
+	// Сначала любые vk_accounts (Mini App / другие), не активный Kate.
+	for i, ut := range userTokens {
+		postID, att, err2 = vk.WallPostWithPhoto(vk.NewVKClient(ut), ut, "-"+gid, msg, tmpPath)
+		if err2 == nil {
+			break
 		}
+		log.Printf("[TEST_GROUP_PUBLISH] stored token %d/%d failed: %v", i+1, len(userTokens), err2)
+	}
+	if err2 != nil {
+		fallback := ""
+		if len(userTokens) > 0 {
+			fallback = userTokens[0]
+		}
+		postID, att, err2 = vk.WallPostWithPhoto(vk.NewVKClient(token), fallback, "-"+gid, msg, tmpPath)
 	}
 	if err2 != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{
