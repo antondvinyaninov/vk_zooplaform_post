@@ -105,10 +105,10 @@ func TestUploadPhotoToWallDoesNotUseMessagesAlbum(t *testing.T) {
 
 	_, _, err = UploadPhotoForGroupWall(client, "", tmp, "227624792")
 	if err == nil {
-		t.Fatal("messages upload URL is invalid, expected error")
+		t.Fatal("without user token, VK 27 must fail rather than attach a messages photo")
 	}
-	if messagesHits != 1 {
-		t.Fatalf("group-wall helper should try messages album after 27, hits=%d", messagesHits)
+	if messagesHits != 0 {
+		t.Fatalf("must not call messages upload after 27, hits=%d", messagesHits)
 	}
 }
 
@@ -173,7 +173,8 @@ func TestUploadPhotoForGroupWallFallsBackToUserToken(t *testing.T) {
 	}
 }
 
-func TestUploadPhotoForGroupWallUsesMessagesAlbum(t *testing.T) {
+func TestUploadPhotoForGroupWallSkipsMessagesAlbum(t *testing.T) {
+	messagesHits := 0
 	mux := http.NewServeMux()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
@@ -185,16 +186,9 @@ func TestUploadPhotoForGroupWallUsesMessagesAlbum(t *testing.T) {
 		io.WriteString(w, `{"error":{"error_code":27,"error_msg":"Group authorization failed: method is unavailable with group auth."}}`)
 	})
 	mux.HandleFunc("/photos.getMessagesUploadServer", func(w http.ResponseWriter, r *http.Request) {
+		messagesHits++
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"response": map[string]any{"upload_url": srv.URL + "/mupload"}})
-	})
-	mux.HandleFunc("/mupload", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"server":2,"photo":"[mphoto]","hash":"mh"}`)
-	})
-	mux.HandleFunc("/photos.saveMessagesPhoto", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"response":[{"id":456,"owner_id":-227624792,"access_key":"mk","sizes":[{"url":"https://example.com/m.jpg","type":"x"}]}]}`)
 	})
 
 	prev := VKAPIURL
@@ -207,14 +201,10 @@ func TestUploadPhotoForGroupWallUsesMessagesAlbum(t *testing.T) {
 	}
 	client := NewVKClient("group-community-key")
 	client.HTTPClient = srv.Client()
-	att, photoURL, err := UploadPhotoForGroupWall(client, "", tmp, "227624792")
-	if err != nil {
-		t.Fatalf("messages fallback: %v", err)
+	if _, _, err := UploadPhotoForGroupWall(client, "", tmp, "227624792"); err == nil {
+		t.Fatal("expected error without user token")
 	}
-	if att != "photo-227624792_456_mk" {
-		t.Fatalf("attachment %q", att)
-	}
-	if photoURL != "https://example.com/m.jpg" {
-		t.Fatalf("url %q", photoURL)
+	if messagesHits != 0 {
+		t.Fatalf("messages album must not be used, hits=%d", messagesHits)
 	}
 }

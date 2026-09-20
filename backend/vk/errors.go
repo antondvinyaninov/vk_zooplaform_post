@@ -54,7 +54,7 @@ func IsAccessDenied(err error) bool {
 
 const GroupWallTokenMissing = "У сообщества нет ключа API со Стеной (Настройки группы → Работа с API). Публикация идёт этим ключом, а не через /vk-connect."
 
-const GroupCannotUploadWallPhoto = "Ключ сообщества не загружает фото на стену: photos.getWallUploadServer даёт VK 27. Фото из альбома сообщений на стене не видны. Нужен user-токен с правом photos только для загрузки файла; публикация (wall.post) остаётся ключом группы."
+const GroupCannotUploadWallPhoto = "Ключ сообщества не загружает фото на стену: photos.getWallUploadServer даёт VK 27. Альбом сообщений на стене не виден. Нужен user-токен с правом photos для saveWallPhoto; если у ключа группы нет Стены, wall.post тоже идёт этим user-токеном (from_group=1)."
 
 const PhotosUserTokenRejected = "Сервер не принял токен Mini App (VK ошибка 5). Это ожидаемо: такой токен часто работает только внутри приложения. Нажмите «Разрешить загрузку фото» ещё раз и дождитесь окна прав photos — после проверки из Mini App токен сохранится."
 

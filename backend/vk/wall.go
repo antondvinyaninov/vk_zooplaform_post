@@ -59,6 +59,36 @@ func (c *VKClient) WallPost(ownerID, message string, attachments []string, fromG
 	return postResp.PostID, nil
 }
 
+// WallPostWithPhoto грузит JPEG в альбом стены и публикует post с вложением.
+// Ключ сообщества: wall.post ок, photos.getWallUploadServer = 27.
+// Если wall.post ключом группы даёт 15 — повторяем user-токеном from_group=1.
+func WallPostWithPhoto(groupClient *VKClient, userToken, ownerID, message, filePath string) (int, string, error) {
+	if groupClient == nil {
+		return 0, "", fmt.Errorf("%s", GroupWallTokenMissing)
+	}
+	gid := strings.TrimPrefix(strings.TrimSpace(ownerID), "-")
+	att, _, err := UploadPhotoForGroupWall(groupClient, userToken, filePath, gid)
+	if err != nil {
+		return 0, "", err
+	}
+	postID, err := groupClient.WallPost(ownerID, message, []string{att}, true, 0)
+	if err == nil {
+		return postID, att, nil
+	}
+	if !IsAccessDenied(err) {
+		return 0, att, err
+	}
+	userToken = strings.TrimSpace(userToken)
+	if userToken == "" {
+		return 0, att, err
+	}
+	postID, userErr := NewVKClient(userToken).WallPost(ownerID, message, []string{att}, true, 0)
+	if userErr != nil {
+		return 0, att, fmt.Errorf("group wall.post: %v; user wall.post: %w", err, userErr)
+	}
+	return postID, att, nil
+}
+
 // WallGetResponse ответ на получение постов
 type WallGetResponse struct {
 	Count int        `json:"count"`
