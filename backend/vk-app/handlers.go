@@ -788,7 +788,7 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// Грузим только фото для старых клиентов
-				att, attURL, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
+				att, attURL, err := vk.UploadPhotoForGroupWall(vkClient, userWallPhotoToken(), tmpPath, groupIDStr)
 				if err == nil {
 					if attURL != "" {
 						uploadedAttachments = append(uploadedAttachments, att+"|"+attURL)
@@ -1403,7 +1403,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 								}
 							}
 						} else {
-							att, attURL, uploadErr = client.UploadPhotoToWall(tmpPath, strconv.Itoa(group.VKGroupID))
+							att, attURL, uploadErr = vk.UploadPhotoForGroupWall(client, userWallPhotoToken(), tmpPath, strconv.Itoa(group.VKGroupID))
 						}
 						os.Remove(tmpPath)
 
@@ -1738,7 +1738,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 								}
 							}
 						} else {
-							att, attURL, uploadErr = patchClient.UploadPhotoToWall(tmpPath, strconv.Itoa(capturedGroupID))
+							att, attURL, uploadErr = vk.UploadPhotoForGroupWall(patchClient, userWallPhotoToken(), tmpPath, strconv.Itoa(capturedGroupID))
 						}
 						os.Remove(tmpPath)
 
@@ -3022,8 +3022,16 @@ func nullableTime(t time.Time) interface{} {
 	return t
 }
 
-// getActiveVKToken возвращает активный user-токен из vk_accounts
-// (парсер / запасной video.save). Публикация на стену его не использует.
+// getActiveVKToken — user-токен из vk_accounts: парсер, video.save и
+// запасная загрузка фото на стену (не wall.post).
+func userWallPhotoToken() string {
+	token, err := getActiveVKToken()
+	if err != nil {
+		return ""
+	}
+	return token
+}
+
 func getActiveVKToken() (string, error) {
 	var token string
 	err := database.QueryRow(`

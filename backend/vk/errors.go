@@ -47,6 +47,8 @@ func IsUserAuthorizationFailed(err error) bool {
 
 const GroupWallTokenMissing = "У сообщества нет ключа API со Стеной (Настройки группы → Работа с API). Публикация идёт этим ключом, а не через /vk-connect."
 
+const GroupCannotUploadWallPhoto = "Ключ сообщества не загружает фото на стену: photos.getWallUploadServer даёт VK 27. Фото из альбома сообщений на стене не видны. Нужен user-токен с правом photos только для загрузки файла; публикация (wall.post) остаётся ключом группы."
+
 func WallToken(group *models.Group) string {
 	if group == nil {
 		return ""
@@ -85,6 +87,9 @@ func ExplainWallError(err error) string {
 		}
 	}
 	msg := err.Error()
+	if strings.Contains(msg, GroupCannotUploadWallPhoto) {
+		return GroupCannotUploadWallPhoto
+	}
 	if strings.Contains(msg, GroupWallTokenMissing) {
 		return GroupWallTokenMissing
 	}

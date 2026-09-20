@@ -148,6 +148,7 @@ type PhotoUploadResponse struct {
 type SavedPhoto struct {
 	ID        int    `json:"id"`
 	OwnerID   int    `json:"owner_id"`
+	AccessKey string `json:"access_key,omitempty"`
 	Photo75   string `json:"photo_75"`
 	Photo130  string `json:"photo_130"`
 	Photo604  string `json:"photo_604"`
@@ -160,10 +161,9 @@ type SavedPhoto struct {
 	} `json:"sizes"`
 }
 
-// UploadPhotoToWall загружает фото для стены группы.
-// User-токен: photos.getWallUploadServer + photos.saveWallPhoto.
-// Ключ сообщества: эти методы дают VK 27, поэтому грузим через
-// photos.getMessagesUploadServer + photos.saveMessagesPhoto (owner = группа) и крепим к wall.post.
+// UploadPhotoToWall грузит фото в альбом стены: photos.getWallUploadServer + photos.saveWallPhoto.
+// Ключ сообщества даёт VK 27. Нельзя подменять это photos.saveMessagesPhoto:
+// такие фото в альбоме сообщений и на стене не видны.
 func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, string, error) {
 	params := map[string]string{}
 	if groupID != "" {
@@ -172,10 +172,6 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 
 	uploadServerResp, err := c.CallMethod("photos.getWallUploadServer", params)
 	if err != nil {
-		if IsUnavailableWithGroupAuth(err) {
-			log.Printf("[UploadPhotoToWall] photos.getWallUploadServer unavailable for group token, using messages upload")
-			return c.uploadPhotoViaMessages(filePath)
-		}
 		return "", "", fmt.Errorf("failed to get upload server: %w", err)
 	}
 
@@ -200,42 +196,31 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 
 	savedResp, err := c.CallMethod("photos.saveWallPhoto", saveParams)
 	if err != nil {
-		if IsUnavailableWithGroupAuth(err) {
-			log.Printf("[UploadPhotoToWall] photos.saveWallPhoto unavailable for group token, using messages upload")
-			return c.uploadPhotoViaMessages(filePath)
-		}
 		return "", "", fmt.Errorf("failed to save photo: %w", err)
 	}
 
 	return attachmentFromSavedPhotos(savedResp)
 }
 
-func (c *VKClient) uploadPhotoViaMessages(filePath string) (string, string, error) {
-	uploadServerResp, err := c.CallMethod("photos.getMessagesUploadServer", map[string]string{})
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get messages upload server: %w", err)
+// UploadPhotoForGroupWall сначала пробует ключ сообщества, при VK 27 грузит
+// файл user-токеном (photos.getWallUploadServer). wall.post остаётся на ключе группы.
+func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID string) (string, string, error) {
+	if groupClient == nil {
+		return "", "", fmt.Errorf("%s", GroupWallTokenMissing)
 	}
-
-	var uploadServer UploadServer
-	if err := json.Unmarshal(uploadServerResp, &uploadServer); err != nil {
-		return "", "", fmt.Errorf("failed to parse messages upload server: %w", err)
+	att, photoURL, err := groupClient.UploadPhotoToWall(filePath, groupID)
+	if err == nil {
+		return att, photoURL, nil
 	}
-
-	photoUpload, err := c.uploadPhotoFile(filePath, uploadServer.UploadURL)
-	if err != nil {
+	if !IsUnavailableWithGroupAuth(err) {
 		return "", "", err
 	}
-
-	savedResp, err := c.CallMethod("photos.saveMessagesPhoto", map[string]string{
-		"photo":  photoUpload.Photo,
-		"server": strconv.Itoa(photoUpload.Server),
-		"hash":   photoUpload.Hash,
-	})
-	if err != nil {
-		return "", "", fmt.Errorf("failed to save messages photo: %w", err)
+	userToken = strings.TrimSpace(userToken)
+	if userToken == "" {
+		return "", "", fmt.Errorf("%s", GroupCannotUploadWallPhoto)
 	}
-
-	return attachmentFromSavedPhotos(savedResp)
+	log.Printf("[UploadPhotoToWall] community token cannot photos.getWallUploadServer (VK 27); uploading with user photos token")
+	return NewVKClient(userToken).UploadPhotoToWall(filePath, groupID)
 }
 
 func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResponse, error) {
@@ -311,7 +296,11 @@ func attachmentFromSavedPhotos(savedResp json.RawMessage) (string, string, error
 		photoURL = photo.Photo75
 	}
 	log.Printf("[UploadPhotoToWall] Extracted photoURL: %s owner=%d id=%d", photoURL, photo.OwnerID, photo.ID)
-	return fmt.Sprintf("photo%d_%d", photo.OwnerID, photo.ID), photoURL, nil
+	att := fmt.Sprintf("photo%d_%d", photo.OwnerID, photo.ID)
+	if photo.AccessKey != "" {
+		att += "_" + photo.AccessKey
+	}
+	return att, photoURL, nil
 }
 
 // SendDirectMessage отправляет личное сообщение пользователю от имени группы

@@ -43,4 +43,8 @@ func TestExplainWallErrorDoesNotSendUserToVKConnect(t *testing.T) {
 	if !strings.Contains(msg, "Стена") {
 		t.Fatalf("expected wall-key hint, got %q", msg)
 	}
+	photoMsg := ExplainWallError(errors.New(GroupCannotUploadWallPhoto))
+	if !strings.Contains(photoMsg, "не видны") {
+		t.Fatalf("photo error should explain invisible messages photos, got %q", photoMsg)
+	}
 }

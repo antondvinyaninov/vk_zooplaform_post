@@ -385,3 +385,11 @@ func getActiveAccountToken() (string, error) {
 	}
 	return strings.TrimSpace(token), nil
 }
+
+func getActiveAccountTokenOrEmpty() string {
+	token, err := getActiveAccountToken()
+	if err != nil {
+		return ""
+	}
+	return token
+}
