@@ -40,47 +40,17 @@ func installedGroupsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1. Получаем все установленные группы из базы
+	// Источник правды — группы, подключённые через Mini App в БД.
+	// Не фильтруем через user-токен /vk-connect: он IP-bound и даёт VK 5,
+	// из-за этого админка показывала «Ошибка загрузки групп».
 	dbGroups, err := listInstalledGroups()
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to load groups"})
 		return
 	}
 
-	// 2. Получаем токен пользователя
-	token, err := getActiveAccountToken()
-	if err != nil || token == "" {
-		// Если токена нет, не можем фильтровать. Отдаем пустой список для безопасности.
-		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"groups": []installedGroupResponse{},
-		})
-		return
-	}
-
-	// 3. Запрашиваем группы пользователя в ВК
-	vkClient := vk.NewVKClient(token)
-	vkGroups, err := vkClient.GroupsGet(true, "")
-	if err != nil {
-		// Если ВК упал, отдаем ошибку
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-
-	// 4. Оставляем только те группы, которые есть и в базе, и в ВК
-	vkGroupsMap := make(map[int]bool)
-	for _, vg := range vkGroups.Items {
-		vkGroupsMap[vg.ID] = true
-	}
-
-	var filteredGroups []installedGroupResponse
-	for _, dg := range dbGroups {
-		if vkGroupsMap[dg.VKGroupID] {
-			filteredGroups = append(filteredGroups, dg)
-		}
-	}
-
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"groups": filteredGroups,
+		"groups": dbGroups,
 	})
 }
 
