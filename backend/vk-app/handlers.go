@@ -3518,6 +3518,16 @@ func saveGroupTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hasWall, permErr := vk.CommunityTokenHasWall(req.AccessToken)
+	if permErr != nil {
+		utils.RespondError(w, http.StatusBadRequest, "VK не принял ключ как ключ сообщества со Стеной: "+vk.ExplainWallError(permErr)+". Не вставляйте токен Mini App в «Ключ API группы».")
+		return
+	}
+	if !hasWall {
+		utils.RespondError(w, http.StatusBadRequest, "В ключе нет права «Стена». Откройте Настройки группы → Работа с API, выпустите ключ с галками Стена и Сообщения. Токен из кнопки «Разрешить загрузку фото» сюда не подходит.")
+		return
+	}
+
 	group.AccessToken = req.AccessToken
 	if err := updateGroup(group); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "failed to save token")

@@ -38,6 +38,36 @@ func NewVKClient(accessToken string) *VKClient {
 	}
 }
 
+// CommunityTokenHasWall проверяет groups.getTokenPermissions: галка «Стена».
+// Токен Mini App / user сюда не подходит (ошибка 5/15/28).
+func CommunityTokenHasWall(token string) (bool, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return false, nil
+	}
+	if os.Getenv("IS_TESTING") == "true" {
+		return true, nil
+	}
+	raw, err := NewVKClient(token).CallMethod("groups.getTokenPermissions", map[string]string{})
+	if err != nil {
+		return false, err
+	}
+	var resp struct {
+		Permissions []struct {
+			Name string `json:"name"`
+		} `json:"permissions"`
+	}
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return false, err
+	}
+	for _, p := range resp.Permissions {
+		if p.Name == "wall" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // VKError представляет ошибку VK API
 type VKError struct {
 	ErrorCode int    `json:"error_code"`
@@ -252,8 +282,9 @@ func PostPhotoToUploadURL(filePath, uploadURL string) (*PhotoUploadResponse, err
 	return NewVKClient("").uploadPhotoFile(filePath, uploadURL)
 }
 
-// UploadPhotoForGroupWall сначала пробует ключ сообщества, при VK 27 грузит
-// файл user-токеном (photos.getWallUploadServer). wall.post остаётся на ключе группы.
+// UploadPhotoForGroupWall сначала пробует photos.getWallUploadServer.
+// Ключ сообщества даёт VK 27 — тогда грузим photos.getMessagesUploadServer:
+// saveMessagesPhoto возвращает photo-{group}_{id} (не user), wall.post таким вложением проходит.
 func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID string) (string, string, error) {
 	if groupClient == nil {
 		return "", "", fmt.Errorf("%s", GroupWallTokenMissing)
@@ -265,12 +296,50 @@ func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID
 	if !IsUnavailableWithGroupAuth(err) {
 		return "", "", err
 	}
+	log.Printf("[UploadPhotoToWall] community token cannot photos.getWallUploadServer (VK 27); trying group messages album")
+	att, photoURL, msgErr := groupClient.UploadPhotoViaGroupMessages(filePath)
+	if msgErr == nil {
+		return att, photoURL, nil
+	}
 	userToken = strings.TrimSpace(userToken)
 	if userToken == "" {
-		return "", "", fmt.Errorf("%s", GroupCannotUploadWallPhoto)
+		return "", "", fmt.Errorf("%s (%v)", GroupCannotUploadWallPhoto, msgErr)
 	}
-	log.Printf("[UploadPhotoToWall] community token cannot photos.getWallUploadServer (VK 27); uploading with user photos token")
+	log.Printf("[UploadPhotoToWall] messages album failed (%v); uploading with user photos token", msgErr)
 	return NewVKClient(userToken).UploadPhotoToWall(filePath, groupID)
+}
+
+// UploadPhotoViaGroupMessages грузит JPEG ключом сообщества в альбом сообщений (-64).
+// Owner получается отрицательный (группа). Это не photos.saveWallPhoto, но вложение
+// photo-{group}_{id} принимается wall.post.
+func (c *VKClient) UploadPhotoViaGroupMessages(filePath string) (string, string, error) {
+	if c == nil {
+		return "", "", fmt.Errorf("%s", GroupWallTokenMissing)
+	}
+	raw, err := c.CallMethod("photos.getMessagesUploadServer", map[string]string{})
+	if err != nil {
+		return "", "", fmt.Errorf("photos.getMessagesUploadServer: %w", err)
+	}
+	var uploadServer UploadServer
+	if err := json.Unmarshal(raw, &uploadServer); err != nil {
+		return "", "", fmt.Errorf("failed to parse messages upload server: %w", err)
+	}
+	if strings.TrimSpace(uploadServer.UploadURL) == "" {
+		return "", "", fmt.Errorf("photos.getMessagesUploadServer: empty upload_url")
+	}
+	photoUpload, err := c.uploadPhotoFile(filePath, uploadServer.UploadURL)
+	if err != nil {
+		return "", "", err
+	}
+	savedResp, err := c.CallMethod("photos.saveMessagesPhoto", map[string]string{
+		"photo":  photoUpload.Photo,
+		"server": strconv.Itoa(photoUpload.Server),
+		"hash":   photoUpload.Hash,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("photos.saveMessagesPhoto: %w", err)
+	}
+	return attachmentFromSavedPhotos(savedResp)
 }
 
 func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResponse, error) {
