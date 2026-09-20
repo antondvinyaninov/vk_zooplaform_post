@@ -8,6 +8,7 @@
 - [VK Post Parameters](VK_POST_PARAMS.md) - Параметры постов VK
 - [VK API Methods](VK_API_METHODS.md) - Методы VK API
 - [VK API Authentication](VK_AUTH.md) - Авторизация VK
+- [Фото на стену: ключ сообщества vs SMM](community_token_wall_photos.md) - почему SMMBox постит картинки, а ключ группы — нет
 - [VK API Errors](VK_ERRORS.md) - Обработка ошибок VK API
 
 ### VK Mini Apps

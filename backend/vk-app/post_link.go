@@ -1,11 +1,13 @@
 package vkapp
 
 import (
+	"backend/config"
 	"backend/vk"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -47,14 +49,22 @@ func appPostByLinkPreviewHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	postIDStr := matches[1]
 
-	// Получаем глобальный токен админа для чтения публичных постов
-	adminToken, err := getActiveVKToken()
-	if err != nil || adminToken == "" {
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Admin VK token not found"})
+	// Получаем токен для чтения публичных постов: service key, иначе user, иначе ключ группы.
+	readToken := strings.TrimSpace(config.Load().VKMiniAppServiceKey)
+	if readToken == "" {
+		readToken = strings.TrimSpace(config.Load().VKServiceKey)
+	}
+	if readToken == "" {
+		if adminToken, err := getActiveVKToken(); err == nil {
+			readToken = adminToken
+		}
+	}
+	if readToken == "" {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Нет ключа для чтения поста по ссылке (service key). Публикация на стену при этом идёт ключом группы."})
 		return
 	}
 
-	client := vk.NewVKClient(adminToken)
+	client := vk.NewVKClient(readToken)
 	resp, err := client.WallGetById(postIDStr, true)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("VK API Error: %v", err)})
@@ -158,16 +168,19 @@ func appPublishPostByLinkHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Для публикации на стену группы требуется пользовательский токен администратора.
-	// Токен группы (community access token) не имеет прав на вызов wall.post.
-	adminToken, err := getActiveVKToken()
-	if err != nil || adminToken == "" {
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Could not find admin token to publish post"})
+	group, err := ensureGroup(vkCtx.GroupID)
+	if err != nil || group == nil {
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to get group"})
 		return
 	}
 
-	groupIDStr := fmt.Sprintf("%v", vkCtx.GroupID)
-	client := vk.NewVKClient(adminToken)
+	client, err := vk.NewWallClient(group)
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": vk.ExplainWallError(err)})
+		return
+	}
+
+	groupIDStr := strconv.Itoa(group.VKGroupID)
 
 	var atts []string
 	if req.Attachments != "" {
@@ -176,7 +189,7 @@ func appPublishPostByLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	postID, err := client.WallPost("-"+groupIDStr, req.Message, atts, true, 0)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("Failed to publish: %v", err)})
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": vk.ExplainWallError(err)})
 		return
 	}
 

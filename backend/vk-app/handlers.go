@@ -393,6 +393,9 @@ func verifyWallAttachmentsWithRetry(client *vk.VKClient, ownerID string, postID 
 		if err == nil && len(missing) == 0 {
 			return result
 		}
+		if vk.IsUnavailableWithGroupAuth(err) {
+			return result
+		}
 		if attempt >= len(delays) {
 			return result
 		}
@@ -438,6 +441,7 @@ type groupSettingsResponse struct {
 	CityTitle       *string    `json:"city_title"`
 	IsActive        bool       `json:"is_active"`
 	HasToken        bool       `json:"has_token"`
+	HasPhotosToken  bool       `json:"has_photos_token"`
 	NotifyUserIDs   []int      `json:"notify_user_ids"`
 	PostTypes       []PostType `json:"post_types"`
 	EnablePostTypes bool       `json:"enable_post_types"`
@@ -614,18 +618,22 @@ func videoUploadUrlHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adminToken, err := getActiveVKToken()
-	if err != nil || adminToken == "" {
-		utils.RespondError(w, http.StatusInternalServerError, "admin token not found")
+	vkClient, err := vk.NewWallClient(group)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, vk.ExplainWallError(err))
 		return
 	}
-
-	vkClient := vk.NewVKClient(adminToken)
 	groupIDStr := strconv.Itoa(group.VKGroupID)
 
 	resp, err := vkClient.GetVideoUploadUrl(groupIDStr, fileName)
+	if err != nil && (vk.IsUserAuthorizationFailed(err) || vk.IsUnavailableWithGroupAuth(err)) {
+		if userToken, tokenErr := getActiveVKToken(); tokenErr == nil && userToken != "" {
+			log.Printf("[videoUploadUrl] community token cannot video.save, falling back to user token for upload only")
+			resp, err = vk.NewVKClient(userToken).GetVideoUploadUrl(groupIDStr, fileName)
+		}
+	}
 	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get video upload url: %v", err))
+		utils.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Ключ сообщества не умеет video.save (%v). Отметьте «Видео» в ключе группы, если VK это даёт, либо оставьте фото.", vk.ExplainWallError(err)))
 		return
 	}
 
@@ -743,9 +751,10 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 	files := r.MultipartForm.File["media"]
 
 	if len(files) > 0 {
-		adminToken, err := getActiveVKToken()
-		if err == nil && adminToken != "" {
-			vkClient := vk.NewVKClient(adminToken)
+		vkClient, tokenErr := vk.NewWallClient(group)
+		if tokenErr != nil {
+			log.Printf("Legacy upload skipped: %v", tokenErr)
+		} else {
 			groupIDStr := strconv.Itoa(group.VKGroupID)
 
 			for _, fileHeader := range files {
@@ -780,7 +789,7 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// Грузим только фото для старых клиентов
-				att, attURL, err := vkClient.UploadPhotoToWall(tmpPath, groupIDStr)
+				att, attURL, err := vk.UploadPhotoForGroupWall(vkClient, userWallPhotoToken(), tmpPath, groupIDStr)
 				if err == nil {
 					if attURL != "" {
 						uploadedAttachments = append(uploadedAttachments, att+"|"+attURL)
@@ -1301,14 +1310,9 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		currentPub.PublishDate = time.Time{}
 	}
 
-	// Берём активный токен админа
-	adminToken, err := getActiveVKToken()
+	wallClient, err := vk.NewWallClient(group)
 	if err != nil {
-		utils.RespondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if adminToken == "" {
-		utils.RespondError(w, http.StatusBadRequest, "VK account is not connected — please login at /vk-connect in the admin panel")
+		utils.RespondError(w, http.StatusBadRequest, vk.ExplainWallError(err))
 		return
 	}
 
@@ -1330,7 +1334,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			}
 		}()
 
-		client := vk.NewVKClient(adminToken)
+		client := wallClient
 		attachments := storedAttachmentIDs(post.Attachments)
 
 		// Считаем сколько медиа ожидается из S3 и сохраняем список ключей,
@@ -1394,8 +1398,13 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 						if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
 							att, attURL, uploadErr = client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
+							if uploadErr != nil && (vk.IsUserAuthorizationFailed(uploadErr) || vk.IsUnavailableWithGroupAuth(uploadErr)) {
+								if userToken, tokenErr := getActiveVKToken(); tokenErr == nil && userToken != "" {
+									att, attURL, uploadErr = vk.NewVKClient(userToken).UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
+								}
+							}
 						} else {
-							att, attURL, uploadErr = client.UploadPhotoToWall(tmpPath, strconv.Itoa(group.VKGroupID))
+							att, attURL, uploadErr = vk.UploadPhotoForGroupWall(client, userWallPhotoToken(), tmpPath, strconv.Itoa(group.VKGroupID))
 						}
 						os.Remove(tmpPath)
 
@@ -1530,8 +1539,8 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		}
 
 		if err != nil {
-			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, err)
-			models.LogWarning("PUBLISH_FAILED", "Не удалось опубликовать запись во ВКонтакте", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, Error: %v", group.VKGroupID, post.ID, err))
+			log.Printf("[Moderate] VK wall.post error for group %d: %v", group.VKGroupID, vk.ExplainWallError(err))
+			models.LogWarning("PUBLISH_FAILED", "Не удалось опубликовать запись во ВКонтакте", nil, fmt.Sprintf("Group ID: %d, Post ID: %d, Error: %s", group.VKGroupID, post.ID, vk.ExplainWallError(err)))
 
 			currentPub.Status = "pending"
 			updatePublication(currentPub)
@@ -1669,7 +1678,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 					return
 				}
 
-				patchClient := vk.NewVKClient(adminToken)
+				patchClient := wallClient
 				var newAttachments []string
 				type recoveredMedia struct {
 					Key           string
@@ -1724,8 +1733,13 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 						var uploadErr error
 						if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
 							att, attURL, uploadErr = patchClient.UploadVideo(tmpPath, strconv.Itoa(capturedGroupID), filepath.Base(key))
+							if uploadErr != nil && (vk.IsUserAuthorizationFailed(uploadErr) || vk.IsUnavailableWithGroupAuth(uploadErr)) {
+								if userToken, tokenErr := getActiveVKToken(); tokenErr == nil && userToken != "" {
+									att, attURL, uploadErr = vk.NewVKClient(userToken).UploadVideo(tmpPath, strconv.Itoa(capturedGroupID), filepath.Base(key))
+								}
+							}
 						} else {
-							att, attURL, uploadErr = patchClient.UploadPhotoToWall(tmpPath, strconv.Itoa(capturedGroupID))
+							att, attURL, uploadErr = vk.UploadPhotoForGroupWall(patchClient, userWallPhotoToken(), tmpPath, strconv.Itoa(capturedGroupID))
 						}
 						os.Remove(tmpPath)
 
@@ -2275,6 +2289,7 @@ func groupToSettings(group *models.Group) *groupSettingsResponse {
 		CityTitle:       group.CityTitle,
 		IsActive:        group.IsActive,
 		HasToken:        group.AccessToken != "",
+		HasPhotosToken:  hasActivePhotosUserToken(),
 		EnablePostTypes: group.EnablePostTypes,
 	}
 
@@ -3009,8 +3024,16 @@ func nullableTime(t time.Time) interface{} {
 	return t
 }
 
-// getActiveVKToken возвращает активный access_token из vk_accounts
-// (тот, что подключён через страницу /vk-connect)
+// getActiveVKToken — user-токен из vk_accounts: парсер, video.save и
+// запасная загрузка фото на стену (не wall.post).
+func userWallPhotoToken() string {
+	token, err := getActiveVKToken()
+	if err != nil {
+		return ""
+	}
+	return token
+}
+
 func getActiveVKToken() (string, error) {
 	var token string
 	err := database.QueryRow(`
@@ -3267,13 +3290,17 @@ func groupManagersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := getActiveVKToken()
-	if err != nil || token == "" {
-		utils.RespondError(w, http.StatusBadRequest, "no active VK admin token")
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil || group == nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
 		return
 	}
 
-	client := vk.NewVKClient(token)
+	client, err := vk.NewWallClient(group)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, vk.ExplainWallError(err))
+		return
+	}
 	resp, err := client.CallMethod("groups.getMembers", map[string]string{
 		"group_id": strconv.Itoa(ctx.GroupID),
 		"filter":   "managers",
@@ -3386,6 +3413,7 @@ func saveGroupTokenHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		VKGroupID   int    `json:"vk_group_id"`
 		AccessToken string `json:"access_token"`
+		Replace     bool   `json:"replace"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -3409,6 +3437,11 @@ func saveGroupTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if group.AccessToken != "" && !req.Replace {
+		utils.RespondError(w, http.StatusConflict, "у сообщества уже есть ключ API. Чтобы заменить его, передайте replace=true. Если бот работает, вставьте ключ с галками «Сообщения» и «Стена», иначе Callback сломается.")
+		return
+	}
+
 	group.AccessToken = req.AccessToken
 	if err := updateGroup(group); err != nil {
 		utils.RespondError(w, http.StatusInternalServerError, "failed to save token")
@@ -3420,6 +3453,116 @@ func saveGroupTokenHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondSuccess(w, map[string]interface{}{
 		"group": groupToSettings(group),
 	})
+}
+
+func savePhotosUserTokenHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !isModerator(ctx.GroupRole) {
+		utils.RespondError(w, http.StatusForbidden, "only community admins can set photos token")
+		return
+	}
+	if ctx.UserID == 0 || ctx.GroupID == 0 {
+		utils.RespondError(w, http.StatusBadRequest, "vk_user_id and vk_group_id required")
+		return
+	}
+
+	var req struct {
+		AccessToken string `json:"access_token"`
+		UserName    string `json:"user_name"`
+		UserPhoto   string `json:"user_photo"`
+		ExpiresIn   int    `json:"expires_in"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	token := strings.TrimSpace(req.AccessToken)
+	if token == "" {
+		utils.RespondError(w, http.StatusBadRequest, "access_token required")
+		return
+	}
+
+	client := vk.NewVKClient(token)
+	if err := client.ProbeWallPhotoUpload(strconv.Itoa(ctx.GroupID)); err != nil {
+		utils.RespondError(w, http.StatusBadRequest, vk.ExplainWallError(err))
+		return
+	}
+
+	expires := req.ExpiresIn
+	if expires <= 0 {
+		expires = 24 * 60 * 60
+	}
+	tokenExpires := time.Now().Add(time.Duration(expires) * time.Second).UnixMilli()
+	name := strings.TrimSpace(req.UserName)
+	if name == "" {
+		name = fmt.Sprintf("VK %d", ctx.UserID)
+	}
+	if err := upsertPhotosUserToken(ctx.UserID, token, name, strings.TrimSpace(req.UserPhoto), tokenExpires); err != nil {
+		log.Printf("[savePhotosUserToken] %v", err)
+		utils.RespondError(w, http.StatusInternalServerError, "failed to save photos token")
+		return
+	}
+
+	models.LogInfo("VK_PHOTOS_TOKEN", "Админ сохранил user-токен Mini App для загрузки фото на стену", nil, fmt.Sprintf("vk_user_id=%d group=%d", ctx.UserID, ctx.GroupID))
+
+	utils.RespondSuccess(w, map[string]interface{}{
+		"ok":               true,
+		"has_photos_token": true,
+	})
+}
+
+func hasActivePhotosUserToken() bool {
+	var n int
+	err := database.QueryRow(`
+		SELECT COUNT(*) FROM vk_accounts
+		WHERE is_active = ? AND COALESCE(access_token, '') <> ''
+	`, true).Scan(&n)
+	return err == nil && n > 0
+}
+
+func upsertPhotosUserToken(vkUserID int, accessToken, userName, userPhoto string, tokenExpires int64) error {
+	tx, err := database.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(database.Rebind(`UPDATE vk_accounts SET is_active = ?`), false); err != nil {
+		return err
+	}
+
+	result, err := tx.Exec(database.Rebind(`
+		UPDATE vk_accounts
+		SET access_token = ?,
+		    user_name = ?,
+		    user_photo = ?,
+		    token_expires = ?,
+		    is_active = ?,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE vk_user_id = ?
+	`), accessToken, userName, userPhoto, tokenExpires, true, vkUserID)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		if _, err := tx.Exec(database.Rebind(`
+			INSERT INTO vk_accounts (vk_user_id, user_name, user_photo, access_token, token_expires, is_active, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		`), vkUserID, userName, userPhoto, accessToken, tokenExpires, true); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func deletePostHandler(w http.ResponseWriter, r *http.Request, postID int) {

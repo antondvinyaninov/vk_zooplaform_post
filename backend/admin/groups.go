@@ -480,8 +480,8 @@ func disconnectGroupHandler(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// testGroupPublishHandler публикует одно тестовое фото токеном сообщества.
-// Только для групп с is_test=true, чтобы не трогать боевые стены.
+// testGroupPublishHandler публикует тестовый пост ключом сообщества.
+// Фото на стену этим ключом VK не принимает (27); пробуем user-токен только на upload.
 func testGroupPublishHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Method not allowed"})
@@ -541,9 +541,9 @@ func testGroupPublishHandler(w http.ResponseWriter, r *http.Request) {
 
 	client := vk.NewVKClient(token)
 	gid := fmt.Sprintf("%d", vkGroupID)
-	att, _, err := client.UploadPhotoToWall(tmpPath, gid)
+	att, _, err := vk.UploadPhotoForGroupWall(client, getActiveAccountTokenOrEmpty(), tmpPath, gid)
 	if err != nil {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "UploadPhotoToWall: " + err.Error()})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "UploadPhotoToWall: " + vk.ExplainWallError(err)})
 		return
 	}
 

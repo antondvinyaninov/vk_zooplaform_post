@@ -45,6 +45,7 @@ export interface PostType {
 export interface AppGroupSettings extends AppGroup {
   is_active: boolean;
   has_token: boolean;
+  has_photos_token?: boolean;
   notify_user_ids: number[];
   post_types: PostType[];
   enable_post_types: boolean;
@@ -342,13 +343,55 @@ export const moderatePost = async (
   });
 };
 
-export const saveGroupToken = async (groupId: number, token: string) => {
+export const saveGroupToken = async (groupId: number, token: string, replace = false) => {
   return fetchJSON<{ group: AppGroup }>(`${API_URL}/groups/token`, {
     method: 'POST',
     body: JSON.stringify({
       vk_group_id: groupId,
       access_token: token,
+      replace,
     }),
+  });
+};
+
+export const savePhotosUserToken = async (accessToken: string, extras?: { user_name?: string; user_photo?: string; expires_in?: number }) => {
+  return fetchJSON<{ ok: boolean; has_photos_token: boolean }>(`${API_URL}/photos-token`, {
+    method: 'POST',
+    body: JSON.stringify({
+      access_token: accessToken,
+      user_name: extras?.user_name || '',
+      user_photo: extras?.user_photo || '',
+      expires_in: extras?.expires_in || 0,
+    }),
+  });
+};
+
+export const grantMiniAppPhotosToken = async () => {
+  const launchParams = (window as any).vkLaunchParams || {};
+  const appId = Number(launchParams.vk_app_id);
+  const groupId = Number(launchParams.vk_group_id);
+  if (!appId || !groupId) {
+    throw new Error('Откройте Mini App из сообщества (кнопка приложения в группе), не с личной страницы и не из настроек VK.');
+  }
+  const result = await vkBridge.send('VKWebAppGetAuthToken', {
+    app_id: appId,
+    scope: 'photos,video',
+  });
+  if (!result?.access_token) {
+    throw new Error('VK не вернул токен');
+  }
+  let userName = '';
+  let userPhoto = '';
+  try {
+    const info = await vkBridge.send('VKWebAppGetUserInfo');
+    userName = [info?.first_name, info?.last_name].filter(Boolean).join(' ');
+    userPhoto = info?.photo_200 || '';
+  } catch {
+    // имя не обязательно
+  }
+  return savePhotosUserToken(result.access_token, {
+    user_name: userName,
+    user_photo: userPhoto,
   });
 };
 
