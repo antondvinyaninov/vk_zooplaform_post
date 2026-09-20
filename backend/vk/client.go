@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const (
+var (
 	VKAPIURL     = "https://api.vk.com/method"
 	VKAPIVersion = "5.131"
 )
@@ -112,16 +112,16 @@ func (c *VKClient) CallMethodContext(ctx context.Context, method string, params 
 		}
 
 		if vkResp.Error != nil {
+			apiErr := *vkResp.Error
 			// Ошибка 6 - Too many requests per second
 			// Ошибка 9 - Flood control
 			// Ошибка 10 - Internal server error
-			if vkResp.Error.ErrorCode == 6 || vkResp.Error.ErrorCode == 9 || vkResp.Error.ErrorCode == 10 {
-				lastErr = fmt.Errorf("VK API Error [%d]: %s", vkResp.Error.ErrorCode, vkResp.Error.ErrorMsg)
+			if apiErr.ErrorCode == 6 || apiErr.ErrorCode == 9 || apiErr.ErrorCode == 10 {
+				lastErr = &apiErr
 				time.Sleep(time.Duration(i+1) * time.Second)
 				continue
 			}
-			// Другие ошибки не повторяем (например, неверный токен)
-			return nil, fmt.Errorf("VK API Error [%d]: %s", vkResp.Error.ErrorCode, vkResp.Error.ErrorMsg)
+			return nil, &apiErr
 		}
 
 		return vkResp.Response, nil
@@ -160,9 +160,11 @@ type SavedPhoto struct {
 	} `json:"sizes"`
 }
 
-// UploadPhotoToWall загружает фото на стену
+// UploadPhotoToWall загружает фото для стены группы.
+// User-токен: photos.getWallUploadServer + photos.saveWallPhoto.
+// Ключ сообщества: эти методы дают VK 27, поэтому грузим через
+// photos.getMessagesUploadServer + photos.saveMessagesPhoto (owner = группа) и крепим к wall.post.
 func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, string, error) {
-	// 1. Получаем URL для загрузки
 	params := map[string]string{}
 	if groupID != "" {
 		params["group_id"] = groupID
@@ -170,6 +172,10 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 
 	uploadServerResp, err := c.CallMethod("photos.getWallUploadServer", params)
 	if err != nil {
+		if IsUnavailableWithGroupAuth(err) {
+			log.Printf("[UploadPhotoToWall] photos.getWallUploadServer unavailable for group token, using messages upload")
+			return c.uploadPhotoViaMessages(filePath)
+		}
 		return "", "", fmt.Errorf("failed to get upload server: %w", err)
 	}
 
@@ -178,50 +184,11 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 		return "", "", fmt.Errorf("failed to parse upload server: %w", err)
 	}
 
-	// 2. Загружаем файл
-	file, err := os.Open(filePath)
+	photoUpload, err := c.uploadPhotoFile(filePath, uploadServer.UploadURL)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("photo", filepath.Base(filePath))
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create form file: %w", err)
+		return "", "", err
 	}
 
-	if _, err := io.Copy(part, file); err != nil {
-		return "", "", fmt.Errorf("failed to copy file: %w", err)
-	}
-	writer.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "POST", uploadServer.UploadURL, body)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to create upload request: %w", err)
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to upload file: %w", err)
-	}
-	defer resp.Body.Close()
-
-	uploadRespBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to read upload response: %w", err)
-	}
-
-	var photoUpload PhotoUploadResponse
-	if err := json.Unmarshal(uploadRespBody, &photoUpload); err != nil {
-		return "", "", fmt.Errorf("failed to parse upload response: %w", err)
-	}
-
-	// 3. Сохраняем фото
 	saveParams := map[string]string{
 		"photo":  photoUpload.Photo,
 		"server": strconv.Itoa(photoUpload.Server),
@@ -233,9 +200,90 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 
 	savedResp, err := c.CallMethod("photos.saveWallPhoto", saveParams)
 	if err != nil {
+		if IsUnavailableWithGroupAuth(err) {
+			log.Printf("[UploadPhotoToWall] photos.saveWallPhoto unavailable for group token, using messages upload")
+			return c.uploadPhotoViaMessages(filePath)
+		}
 		return "", "", fmt.Errorf("failed to save photo: %w", err)
 	}
 
+	return attachmentFromSavedPhotos(savedResp)
+}
+
+func (c *VKClient) uploadPhotoViaMessages(filePath string) (string, string, error) {
+	uploadServerResp, err := c.CallMethod("photos.getMessagesUploadServer", map[string]string{})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get messages upload server: %w", err)
+	}
+
+	var uploadServer UploadServer
+	if err := json.Unmarshal(uploadServerResp, &uploadServer); err != nil {
+		return "", "", fmt.Errorf("failed to parse messages upload server: %w", err)
+	}
+
+	photoUpload, err := c.uploadPhotoFile(filePath, uploadServer.UploadURL)
+	if err != nil {
+		return "", "", err
+	}
+
+	savedResp, err := c.CallMethod("photos.saveMessagesPhoto", map[string]string{
+		"photo":  photoUpload.Photo,
+		"server": strconv.Itoa(photoUpload.Server),
+		"hash":   photoUpload.Hash,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to save messages photo: %w", err)
+	}
+
+	return attachmentFromSavedPhotos(savedResp)
+}
+
+func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResponse, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("photo", filepath.Base(filePath))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create form file: %w", err)
+	}
+
+	if _, err := io.Copy(part, file); err != nil {
+		return nil, fmt.Errorf("failed to copy file: %w", err)
+	}
+	writer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "POST", uploadURL, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create upload request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	uploadRespBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read upload response: %w", err)
+	}
+
+	var photoUpload PhotoUploadResponse
+	if err := json.Unmarshal(uploadRespBody, &photoUpload); err != nil {
+		return nil, fmt.Errorf("failed to parse upload response: %w", err)
+	}
+	return &photoUpload, nil
+}
+
+func attachmentFromSavedPhotos(savedResp json.RawMessage) (string, string, error) {
 	var savedPhotos []SavedPhoto
 	if err := json.Unmarshal(savedResp, &savedPhotos); err != nil {
 		return "", "", fmt.Errorf("failed to parse saved photo: %w", err)
@@ -249,24 +297,20 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 	photoURL := ""
 	if len(photo.Sizes) > 0 {
 		photoURL = photo.Sizes[len(photo.Sizes)-1].URL
-	} else {
-		// Fallback for legacy VK API formats
-		if photo.Photo2560 != "" {
-			photoURL = photo.Photo2560
-		} else if photo.Photo1280 != "" {
-			photoURL = photo.Photo1280
-		} else if photo.Photo807 != "" {
-			photoURL = photo.Photo807
-		} else if photo.Photo604 != "" {
-			photoURL = photo.Photo604
-		} else if photo.Photo130 != "" {
-			photoURL = photo.Photo130
-		} else if photo.Photo75 != "" {
-			photoURL = photo.Photo75
-		}
+	} else if photo.Photo2560 != "" {
+		photoURL = photo.Photo2560
+	} else if photo.Photo1280 != "" {
+		photoURL = photo.Photo1280
+	} else if photo.Photo807 != "" {
+		photoURL = photo.Photo807
+	} else if photo.Photo604 != "" {
+		photoURL = photo.Photo604
+	} else if photo.Photo130 != "" {
+		photoURL = photo.Photo130
+	} else if photo.Photo75 != "" {
+		photoURL = photo.Photo75
 	}
-	log.Printf("[UploadPhotoToWall] RAW savedResp: %s", string(savedResp))
-	log.Printf("[UploadPhotoToWall] Extracted photoURL: %s", photoURL)
+	log.Printf("[UploadPhotoToWall] Extracted photoURL: %s owner=%d id=%d", photoURL, photo.OwnerID, photo.ID)
 	return fmt.Sprintf("photo%d_%d", photo.OwnerID, photo.ID), photoURL, nil
 }
 

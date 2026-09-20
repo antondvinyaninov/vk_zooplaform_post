@@ -83,14 +83,20 @@ func setupMockUser(t *testing.T, vkUserID int) *models.User {
 	`, user.VKUserID, user.FirstName, user.LastName, user.Photo200).Scan(&user.ID)
 	require.NoError(t, err)
 
-	// Insert mock vk account so getActiveVKToken() works
+	// Insert mock vk account so parser/video fallback still has a user token
 	_, err = database.DB.Exec(`
 		INSERT INTO vk_accounts (vk_user_id, user_name, access_token, is_active, created_at, updated_at)
-		VALUES ($1, 'Admin', 'mock_token_123', true, NOW(), NOW())
+		VALUES ($1, 'Admin', 'mock_user_token', true, NOW(), NOW())
 	`, vkUserID)
 	require.NoError(t, err)
 
 	return user
+}
+
+func setGroupWallToken(t *testing.T, vkGroupID int, token string) {
+	t.Helper()
+	_, err := database.DB.Exec(`UPDATE groups SET access_token = $1 WHERE vk_group_id = $2`, token, vkGroupID)
+	require.NoError(t, err)
 }
 
 func TestCreatePostAndSuggest(t *testing.T) {
@@ -163,6 +169,8 @@ func TestCreatePostAndSuggest(t *testing.T) {
 	require.Equal(t, 1, suggestCount, "Publication should exist in group 2")
 	require.Contains(t, customFields, "color")
 	require.Equal(t, "pending", status)
+
+	setGroupWallToken(t, vkGroupID2, "mock_group_wall_token")
 
 	// ==========================================
 	// 3. Moderate Post in Group 2 (Approve)
@@ -276,4 +284,78 @@ func TestCreatePostWithMedia(t *testing.T) {
 	require.Contains(t, customFields, "field1")
 }
 
+func TestModerateRequiresGroupWallTokenNotVKConnect(t *testing.T) {
+	clearDB(t)
+
+	vkUserID := 555
+	vkGroupID := 777
+	setupMockUser(t, vkUserID)
+
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	writer.WriteField("message", "Need a group key to publish")
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/api/app/posts", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=member", vkUserID, vkGroupID))
+	w := httptest.NewRecorder()
+	createPostHandler(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode, w.Body.String())
+
+	var createResp map[string]interface{}
+	require.NoError(t, json.NewDecoder(w.Result().Body).Decode(&createResp))
+	postID := int(createResp["id"].(float64))
+
+	modBody := bytes.NewBufferString(`{"status":"published"}`)
+	reqMod := httptest.NewRequest("POST", fmt.Sprintf("/api/app/posts/%d/moderate", postID), modBody)
+	reqMod.Header.Set("Content-Type", "application/json")
+	reqMod.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=admin", vkUserID, vkGroupID))
+	wMod := httptest.NewRecorder()
+	moderatePostHandler(wMod, reqMod, postID)
+
+	require.Equal(t, http.StatusBadRequest, wMod.Result().StatusCode, wMod.Body.String())
+	require.NotContains(t, wMod.Body.String(), "please login at /vk-connect")
+	require.Contains(t, wMod.Body.String(), "Стеной")
+}
+
+func TestModerateUsesGroupTokenWhenVKAccountExists(t *testing.T) {
+	clearDB(t)
+
+	vkUserID := 556
+	vkGroupID := 778
+	setupMockUser(t, vkUserID)
+
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	writer.WriteField("message", "Publish with group wall token")
+	writer.Close()
+
+	req := httptest.NewRequest("POST", "/api/app/posts", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=member", vkUserID, vkGroupID))
+	w := httptest.NewRecorder()
+	createPostHandler(w, req)
+	require.Equal(t, http.StatusOK, w.Result().StatusCode, w.Body.String())
+
+	var createResp map[string]interface{}
+	require.NoError(t, json.NewDecoder(w.Result().Body).Decode(&createResp))
+	postID := int(createResp["id"].(float64))
+
+	setGroupWallToken(t, vkGroupID, "mock_group_wall_token")
+
+	modBody := bytes.NewBufferString(`{"status":"published"}`)
+	reqMod := httptest.NewRequest("POST", fmt.Sprintf("/api/app/posts/%d/moderate", postID), modBody)
+	reqMod.Header.Set("Content-Type", "application/json")
+	reqMod.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=admin", vkUserID, vkGroupID))
+	wMod := httptest.NewRecorder()
+	moderatePostHandler(wMod, reqMod, postID)
+	require.Equal(t, http.StatusOK, wMod.Result().StatusCode, wMod.Body.String())
+
+	time.Sleep(100 * time.Millisecond)
+	var status string
+	err := database.DB.QueryRow("SELECT status FROM post_publications WHERE post_id = $1", postID).Scan(&status)
+	require.NoError(t, err)
+	require.Equal(t, "published", status)
+}
 

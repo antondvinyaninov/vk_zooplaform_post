@@ -480,7 +480,8 @@ func disconnectGroupHandler(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"status": "success"})
 }
 
-// testGroupPublishHandler публикует одно тестовое фото токеном сообщества.
+// testGroupPublishHandler публикует одно тестовое фото ключом сообщества
+// (getWallUploadServer недоступен этому ключу — UploadPhotoToWall уходит в messages upload).
 // Только для групп с is_test=true, чтобы не трогать боевые стены.
 func testGroupPublishHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

@@ -342,12 +342,13 @@ export const moderatePost = async (
   });
 };
 
-export const saveGroupToken = async (groupId: number, token: string) => {
+export const saveGroupToken = async (groupId: number, token: string, replace = false) => {
   return fetchJSON<{ group: AppGroup }>(`${API_URL}/groups/token`, {
     method: 'POST',
     body: JSON.stringify({
       vk_group_id: groupId,
       access_token: token,
+      replace,
     }),
   });
 };

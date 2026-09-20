@@ -73,9 +73,9 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 		publishDate = req.PublishDate
 	}
 
-	token := resolveToken(accessToken)
-	if token == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK account not connected — please login at /vk-connect"})
+	token, err := resolveWallToken(accessToken, ownerID)
+	if err != nil || token == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": vk.ExplainWallError(err)})
 		return
 	}
 
@@ -110,7 +110,7 @@ func vkPostHandler(w http.ResponseWriter, r *http.Request) {
 	postID, err := client.WallPost(ownerID, message, attachments, fromGroup == 1, publishDate)
 	if err != nil {
 		log.Printf("[vkPost] VK wall.post error: %v", err)
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": vk.ExplainWallError(err)})
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{"post_id": postID})
@@ -202,9 +202,9 @@ func vkCopyPostHandler(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
 		return
 	}
-	token := resolveToken(req.AccessToken)
-	if token == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "VK account not connected"})
+	token, err := resolveWallToken(req.AccessToken, req.OwnerID)
+	if err != nil || token == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": vk.ExplainWallError(err)})
 		return
 	}
 	client := vk.NewVKClient(token)
@@ -215,23 +215,42 @@ func vkCopyPostHandler(w http.ResponseWriter, r *http.Request) {
 	postID, err := client.WallPost(req.OwnerID, req.Message, attachments, req.FromGroup == 1, 0)
 	if err != nil {
 		log.Printf("[vkCopyPost] error: %v", err)
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": vk.ExplainWallError(err)})
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{"post_id": postID})
 }
 
-// resolveToken возвращает токен из запроса или активный из vk_accounts
+// resolveToken возвращает токен из запроса или активный из vk_accounts (чтение/парсер, не стена).
 func resolveToken(fromRequest string) string {
 	if t := strings.TrimSpace(fromRequest); t != "" {
 		return t
 	}
-	// fallback: активный аккаунт из БД
 	token, err := getActiveAccountToken()
 	if err != nil {
 		log.Printf("[resolveToken] db error: %v", err)
 	}
 	return token
+}
+
+func resolveWallToken(fromRequest, ownerID string) (string, error) {
+	if t := strings.TrimSpace(fromRequest); t != "" {
+		return t, nil
+	}
+	vkGroupID := strings.TrimPrefix(strings.TrimSpace(ownerID), "-")
+	if vkGroupID == "" {
+		return "", fmt.Errorf("%s", vk.GroupWallTokenMissing)
+	}
+	var token string
+	err := database.QueryRow(`SELECT COALESCE(access_token, '') FROM groups WHERE vk_group_id = ?`, vkGroupID).Scan(&token)
+	if err != nil {
+		return "", fmt.Errorf("%s", vk.GroupWallTokenMissing)
+	}
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return "", fmt.Errorf("%s", vk.GroupWallTokenMissing)
+	}
+	return token, nil
 }
 
 func vkGetGroupsHandler(w http.ResponseWriter, r *http.Request) {

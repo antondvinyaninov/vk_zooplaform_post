@@ -17,6 +17,7 @@ import {
   CustomSelect,
   Switch,
   SimpleCell,
+  Textarea,
 } from '@vkontakte/vkui';
 import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline, Icon24ArticleOutline, Icon16CopyOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
@@ -90,6 +91,7 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<React.ReactNode | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -220,6 +222,9 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
           )}
 
           <Group>
+            <FormStatus mode="default">
+              Постинг на стену идёт ключом сообщества из VK: Управление → Дополнительно → Работа с API, галки «Стена» и «Фотографии» (и «Сообщения», если нужен бот). Кнопка ниже — только Callback/бот; токен Mini App Bridge без Стены wall.post не вызывает. Не логин на /vk-connect.
+            </FormStatus>
             {!settings?.has_token && (
               <FormItem top="Подключение Callback API (обязательно для работы бота)">
                 <Button 
@@ -271,6 +276,49 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                 </Button>
               </FormItem>
             )}
+
+            <FormItem top="Ключ API группы (Стена)">
+              <Textarea
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="vk1.a...."
+              />
+              <Button
+                size="l"
+                stretched
+                mode="primary"
+                disabled={saving || !apiKeyInput.trim()}
+                style={{ marginTop: 8 }}
+                onClick={async () => {
+                  try {
+                    const launchParams = (window as any).vkLaunchParams || {};
+                    const groupId = Number(launchParams.vk_group_id);
+                    if (!groupId) {
+                      throw new Error("Не удалось определить ID группы");
+                    }
+                    setSaving(true);
+                    await saveGroupToken(groupId, apiKeyInput.trim(), Boolean(settings?.has_token));
+                    setApiKeyInput('');
+                    setSettings(prev => prev ? { ...prev, has_token: true } : null);
+                    setSnackbar(
+                      <Snackbar
+                        onClose={() => setSnackbar(null)}
+                        onClosed={() => setSnackbar(null)}
+                        before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+                      >
+                        Ключ API сохранён для постинга
+                      </Snackbar>
+                    );
+                  } catch (e: any) {
+                    setError(e?.message || "Не удалось сохранить ключ");
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+              >
+                {settings?.has_token ? 'Заменить ключ API' : 'Сохранить ключ API'}
+              </Button>
+            </FormItem>
             
             <FormItem top="Город (где работает группа)">
               <CustomSelect
