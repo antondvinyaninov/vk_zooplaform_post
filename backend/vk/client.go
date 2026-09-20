@@ -293,14 +293,11 @@ func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID
 	if err == nil {
 		return att, photoURL, nil
 	}
-	if !IsUnavailableWithGroupAuth(err) {
-		return "", "", err
-	}
 	userToken = strings.TrimSpace(userToken)
 	if userToken == "" {
 		return "", "", fmt.Errorf("%s (%v)", GroupCannotUploadWallPhoto, err)
 	}
-	log.Printf("[UploadPhotoToWall] community token cannot photos.getWallUploadServer (VK 27); uploading with user photos token")
+	log.Printf("[UploadPhotoToWall] community upload failed (%v); uploading with user photos token", err)
 	return NewVKClient(userToken).UploadPhotoToWall(filePath, groupID)
 }
 

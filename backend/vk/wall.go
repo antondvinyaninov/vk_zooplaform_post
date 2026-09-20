@@ -75,9 +75,6 @@ func WallPostWithPhoto(groupClient *VKClient, userToken, ownerID, message, fileP
 	if err == nil {
 		return postID, att, nil
 	}
-	if !IsAccessDenied(err) {
-		return 0, att, err
-	}
 	userToken = strings.TrimSpace(userToken)
 	if userToken == "" {
 		return 0, att, err
