@@ -1391,6 +1391,9 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			attachments = append(attachments, att)
 			appendAttachmentToPost(post, att, "")
 		}
+		if len(miniAppWallPhotos) > 0 {
+			log.Printf("[Moderate] Mini App wall photos=%d; wall.post ключом сообщества", len(miniAppWallPhotos))
+		}
 
 		// Считаем сколько медиа ожидается из S3 и сохраняем список ключей,
 		// чтобы при частичной загрузке точно знать, какие файлы нужно догрузить.
