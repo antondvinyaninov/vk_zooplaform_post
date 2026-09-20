@@ -366,6 +366,35 @@ export const savePhotosUserToken = async (accessToken: string, extras?: { user_n
   });
 };
 
+export const grantMiniAppPhotosToken = async () => {
+  const launchParams = (window as any).vkLaunchParams || {};
+  const appId = Number(launchParams.vk_app_id);
+  const groupId = Number(launchParams.vk_group_id);
+  if (!appId || !groupId) {
+    throw new Error('Откройте Mini App из сообщества (кнопка приложения в группе), не с личной страницы и не из настроек VK.');
+  }
+  const result = await vkBridge.send('VKWebAppGetAuthToken', {
+    app_id: appId,
+    scope: 'photos,video',
+  });
+  if (!result?.access_token) {
+    throw new Error('VK не вернул токен');
+  }
+  let userName = '';
+  let userPhoto = '';
+  try {
+    const info = await vkBridge.send('VKWebAppGetUserInfo');
+    userName = [info?.first_name, info?.last_name].filter(Boolean).join(' ');
+    userPhoto = info?.photo_200 || '';
+  } catch {
+    // имя не обязательно
+  }
+  return savePhotosUserToken(result.access_token, {
+    user_name: userName,
+    user_photo: userPhoto,
+  });
+};
+
 export const getCommunitySettings = async () => {
   return fetchJSON<AppGroupSettings>(`${API_URL}/groups/me`, { method: 'GET' });
 };

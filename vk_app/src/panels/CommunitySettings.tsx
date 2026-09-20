@@ -21,7 +21,7 @@ import {
 } from '@vkontakte/vkui';
 import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline, Icon24ArticleOutline, Icon16CopyOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, savePhotosUserToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
+import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, grantMiniAppPhotosToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
 
 const POST_TYPE_COLORS = [
   '#86efac', // Green (distinct)
@@ -233,33 +233,9 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                 disabled={saving}
                 onClick={async () => {
                   try {
-                    const launchParams = (window as any).vkLaunchParams || {};
-                    const appId = Number(launchParams.vk_app_id);
-                    if (!appId) {
-                      throw new Error("Откройте настройки из Mini App внутри группы VK");
-                    }
                     setSaving(true);
                     setError(null);
-                    const result = await vkBridge.send('VKWebAppGetAuthToken', {
-                      app_id: appId,
-                      scope: 'photos,video',
-                    });
-                    if (!result?.access_token) {
-                      throw new Error("VK не вернул токен");
-                    }
-                    let userName = '';
-                    let userPhoto = '';
-                    try {
-                      const info = await vkBridge.send('VKWebAppGetUserInfo');
-                      userName = [info?.first_name, info?.last_name].filter(Boolean).join(' ');
-                      userPhoto = info?.photo_200 || '';
-                    } catch {
-                      // имя не обязательно
-                    }
-                    await savePhotosUserToken(result.access_token, {
-                      user_name: userName,
-                      user_photo: userPhoto,
-                    });
+                    await grantMiniAppPhotosToken();
                     setSettings(prev => prev ? { ...prev, has_photos_token: true } : null);
                     setSnackbar(
                       <Snackbar

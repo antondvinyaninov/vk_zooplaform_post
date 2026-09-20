@@ -11,6 +11,9 @@ import {
   CustomSelect,
   FormItem,
   Snackbar,
+  Button,
+  Div,
+  FormStatus,
 } from '@vkontakte/vkui';
 import {
   Icon28SettingsOutline,
@@ -18,11 +21,12 @@ import {
   Icon28ErrorCircleOutline,
   Icon28CheckCircleOutline,
   Icon28LinkOutline,
+  Icon28CameraOutline,
 } from '@vkontakte/icons';
 import { UserInfo } from '@vkontakte/vk-bridge';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
 import { DEFAULT_VIEW_PANELS } from '../routes';
-import { AppUser, searchCities, updateUserProfile } from '../shared/api';
+import { AppUser, searchCities, updateUserProfile, grantMiniAppPhotosToken } from '../shared/api';
 import { useState, useRef } from 'react';
 
 export interface ProfileProps extends NavIdProps {
@@ -42,11 +46,41 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, appUser, role, onAp
       : []
   );
   const [isCityLoading, setIsCityLoading] = useState(false);
+  const [photosGranting, setPhotosGranting] = useState(false);
   const [snackbar, setSnackbar] = useState<React.ReactNode | null>(null);
   
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const isAdmin = ['admin', 'editor', 'moder'].includes(role || '');
+  const launchRole = String((window as any).vkLaunchParams?.vk_viewer_group_role || '');
+  const isAdmin = ['admin', 'editor', 'moder'].includes(role || launchRole);
+
+  const handleGrantPhotos = async () => {
+    setPhotosGranting(true);
+    try {
+      await grantMiniAppPhotosToken();
+      setSnackbar(
+        <Snackbar
+          onClose={() => setSnackbar(null)}
+          onClosed={() => setSnackbar(null)}
+          before={<Icon28CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+        >
+          Загрузка фото на стену разрешена
+        </Snackbar>
+      );
+    } catch (e: any) {
+      setSnackbar(
+        <Snackbar
+          onClose={() => setSnackbar(null)}
+          onClosed={() => setSnackbar(null)}
+          before={<Icon28ErrorCircleOutline fill="var(--vkui--color_icon_negative)" />}
+        >
+          {e?.error_data?.error_reason || e?.message || 'Не удалось получить токен фото'}
+        </Snackbar>
+      );
+    } finally {
+      setPhotosGranting(false);
+    }
+  };
 
   return (
     <Panel id={id}>
@@ -64,8 +98,24 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, appUser, role, onAp
 
       {isAdmin && (
         <Group header={<Header>Меню администратора</Header>}>
+          <Div>
+            <Button
+              size="l"
+              stretched
+              mode="primary"
+              before={<Icon28CameraOutline />}
+              loading={photosGranting}
+              onClick={handleGrantPhotos}
+            >
+              Разрешить загрузку фото на стену
+            </Button>
+          </Div>
           <List>
-            <SimpleCell before={<Icon28SettingsOutline />} onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS}`)}>
+            <SimpleCell
+              before={<Icon28SettingsOutline />}
+              subtitle="Ключ API группы, город, типы постов"
+              onClick={() => routeNavigator.push(`/${DEFAULT_VIEW_PANELS.COMMUNITY_SETTINGS}`)}
+            >
               Настройки сообщества
             </SimpleCell>
 
@@ -83,6 +133,14 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, appUser, role, onAp
               Пост по ссылке
             </SimpleCell>
           </List>
+        </Group>
+      )}
+
+      {!isAdmin && (
+        <Group>
+          <FormStatus mode="default">
+            Кнопка «Разрешить загрузку фото» и «Настройки сообщества» видны только администратору, и только если Mini App открыт из сообщества (не с личной страницы и не из управления VK).
+          </FormStatus>
         </Group>
       )}
 
