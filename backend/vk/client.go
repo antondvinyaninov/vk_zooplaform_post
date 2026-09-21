@@ -146,7 +146,7 @@ func (c *VKClient) CallMethodContext(ctx context.Context, method string, params 
 			// Ошибка 6 - Too many requests per second
 			// Ошибка 9 - Flood control
 			// Ошибка 10 - Internal server error
-			if apiErr.ErrorCode == 6 || apiErr.ErrorCode == 9 || apiErr.ErrorCode == 10 {
+			if apiErr.ErrorCode == 6 || apiErr.ErrorCode == 9 {
 				lastErr = &apiErr
 				time.Sleep(time.Duration(i+1) * time.Second)
 				continue
