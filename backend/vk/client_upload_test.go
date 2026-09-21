@@ -233,7 +233,7 @@ func TestUploadPhotoForGroupWallUsesGroupAlbumAfter27(t *testing.T) {
 	}
 	client := NewVKClient("group-community-key")
 	client.HTTPClient = srv.Client()
-	att, gotURL, err := UploadPhotoForGroupWall(client, "", tmp, "168099183")
+	att, gotURL, err := client.UploadPhotoToGroupAlbum(tmp, "168099183")
 	if err != nil {
 		t.Fatalf("album upload: %v", err)
 	}
