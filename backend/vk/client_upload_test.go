@@ -208,3 +208,32 @@ func TestUploadPhotoForGroupWallSkipsMessagesAlbum(t *testing.T) {
 		t.Fatalf("messages album must not be used, hits=%d", messagesHits)
 	}
 }
+
+func TestGetPhotoURLs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.Path, "photos.getById") {
+			http.NotFound(w, r)
+			return
+		}
+		_ = r.ParseForm()
+		if !strings.Contains(r.FormValue("photos"), "81306887_1") {
+			t.Errorf("photos=%s", r.FormValue("photos"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"response":[{"id":1,"owner_id":81306887,"sizes":[{"url":"https://example.com/p.jpg","type":"x"}]}]}`)
+	}))
+	t.Cleanup(srv.Close)
+	prev := VKAPIURL
+	VKAPIURL = srv.URL
+	t.Cleanup(func() { VKAPIURL = prev })
+
+	client := NewVKClient("user")
+	client.HTTPClient = srv.Client()
+	got, err := client.GetPhotoURLs([]string{"photo81306887_1_ak", "photo81306887_1_ak"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["photo81306887_1"] != "https://example.com/p.jpg" {
+		t.Fatalf("%v", got)
+	}
+}
