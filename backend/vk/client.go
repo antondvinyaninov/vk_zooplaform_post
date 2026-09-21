@@ -390,28 +390,25 @@ func attachmentFromSavedPhotos(savedResp json.RawMessage) (string, string, error
 	}
 
 	photo := savedPhotos[0]
-	photoURL := ""
-	if len(photo.Sizes) > 0 {
-		photoURL = photo.Sizes[len(photo.Sizes)-1].URL
-	} else if photo.Photo2560 != "" {
-		photoURL = photo.Photo2560
-	} else if photo.Photo1280 != "" {
-		photoURL = photo.Photo1280
-	} else if photo.Photo807 != "" {
-		photoURL = photo.Photo807
-	} else if photo.Photo604 != "" {
-		photoURL = photo.Photo604
-	} else if photo.Photo130 != "" {
-		photoURL = photo.Photo130
-	} else if photo.Photo75 != "" {
-		photoURL = photo.Photo75
-	}
+	photoURL := savedPhotoURL(photo)
 	log.Printf("[UploadPhotoToWall] Extracted photoURL: %s owner=%d id=%d", photoURL, photo.OwnerID, photo.ID)
 	att := fmt.Sprintf("photo%d_%d", photo.OwnerID, photo.ID)
 	if photo.AccessKey != "" {
 		att += "_" + photo.AccessKey
 	}
 	return att, photoURL, nil
+}
+
+func savedPhotoURL(photo SavedPhoto) string {
+	if len(photo.Sizes) > 0 {
+		return photo.Sizes[len(photo.Sizes)-1].URL
+	}
+	for _, u := range []string{photo.Photo2560, photo.Photo1280, photo.Photo807, photo.Photo604, photo.Photo130, photo.Photo75} {
+		if u != "" {
+			return u
+		}
+	}
+	return ""
 }
 
 // SendDirectMessage отправляет личное сообщение пользователю от имени группы
@@ -721,6 +718,45 @@ func (c *VKClient) GetVideoThumbnails(attachmentIDs []string) (map[string]string
 	}
 
 	return thumbnails, nil
+}
+
+// GetPhotoURLs получает URL картинок для вложений вида photo{owner}_{id}[_access_key].
+func (c *VKClient) GetPhotoURLs(attachmentIDs []string) (map[string]string, error) {
+	urls := make(map[string]string)
+	if c == nil || len(attachmentIDs) == 0 {
+		return urls, nil
+	}
+	var photos []string
+	seen := make(map[string]bool)
+	for _, attachmentID := range attachmentIDs {
+		raw := strings.TrimPrefix(strings.TrimSpace(attachmentID), "photo")
+		if raw == "" || seen[raw] {
+			continue
+		}
+		seen[raw] = true
+		photos = append(photos, raw)
+	}
+	if len(photos) == 0 {
+		return urls, nil
+	}
+	resp, err := c.CallMethod("photos.getById", map[string]string{
+		"photos":      strings.Join(photos, ","),
+		"photo_sizes": "1",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("photos.getById failed: %w", err)
+	}
+	var items []SavedPhoto
+	if err := json.Unmarshal(resp, &items); err != nil {
+		return nil, fmt.Errorf("failed to parse photos.getById: %w", err)
+	}
+	for _, photo := range items {
+		id := fmt.Sprintf("photo%d_%d", photo.OwnerID, photo.ID)
+		if u := savedPhotoURL(photo); u != "" {
+			urls[id] = u
+		}
+	}
+	return urls, nil
 }
 
 // GetVideoThumbnail получает URL превью для одного видео-вложения.

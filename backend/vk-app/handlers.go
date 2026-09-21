@@ -1324,7 +1324,8 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 			kept := make([]string, 0)
 			for _, key := range parseMediaKeys(post.S3VideoKey) {
 				if classifyMediaByExt(key) == "photo" {
-					go s3DeleteVideoKey(key)
+					// Превью в Mini App берётся из S3. Файл не удаляем.
+					kept = append(kept, key)
 					continue
 				}
 				kept = append(kept, key)
@@ -1398,18 +1399,19 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 		// Считаем сколько медиа ожидается из S3 и сохраняем список ключей,
 		// чтобы при частичной загрузке точно знать, какие файлы нужно догрузить.
 		s3Keys := parseMediaKeys(post.S3VideoKey)
+		var keptPhotoKeys []string
 		if len(miniAppWallPhotos) > 0 {
 			kept := make([]string, 0, len(s3Keys))
 			for _, key := range s3Keys {
 				if classifyMediaByExt(key) == "photo" {
-					go s3DeleteVideoKey(key)
+					keptPhotoKeys = append(keptPhotoKeys, key)
 					continue
 				}
 				kept = append(kept, key)
 			}
 			s3Keys = kept
 		}
-		remainingS3Keys := append([]string(nil), s3Keys...)
+		remainingS3Keys := append(append([]string(nil), s3Keys...), keptPhotoKeys...)
 		expectedS3Count := len(s3Keys)
 		uploadedFromS3Count := 0
 		var mediaFailures []mediaUploadFailure
@@ -1493,8 +1495,10 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 						attachments = append(attachments, att)
 						appendAttachmentToPost(post, att, attURL)
 
-						go s3DeleteVideoKey(key)
-						remainingS3Keys = removeMediaKey(remainingS3Keys, key)
+						if classifyMediaByExt(key) != "photo" {
+							go s3DeleteVideoKey(key)
+							remainingS3Keys = removeMediaKey(remainingS3Keys, key)
+						}
 						uploadedOK = true
 						uploadedFromS3Count++
 						break // выход из retry loop
@@ -1836,8 +1840,10 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 						newAttachments = append(newAttachments, att)
 						recoveredMediaFiles = append(recoveredMediaFiles, recoveredMedia{Key: key, Attachment: att, AttachmentURL: attURL})
-						go s3DeleteVideoKey(key)
-						remainingPatchKeys = removeMediaKey(remainingPatchKeys, key)
+						if classifyMediaByExt(key) != "photo" {
+							go s3DeleteVideoKey(key)
+							remainingPatchKeys = removeMediaKey(remainingPatchKeys, key)
+						}
 						uploadedOK = true
 						log.Printf("[PatchMedia] ✅ Successfully uploaded missed media %s", key)
 						break
@@ -2223,6 +2229,7 @@ func userFacingGroup(group *models.Group) *groupSummary {
 
 func populateAttachmentURLs(posts []postResponse) []postResponse {
 	var videoIDs []string
+	var photoIDs []string
 
 	// First pass: collect all VK video IDs that need thumbnails
 	for _, p := range posts {
@@ -2249,18 +2256,21 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 				if strings.HasPrefix(id, "video") && mediaURL == "" {
 					videoIDs = append(videoIDs, id)
 				}
+				if strings.HasPrefix(id, "photo") && mediaURL == "" {
+					photoIDs = append(photoIDs, id)
+				}
 			}
 		}
 	}
 
 	// Batch fetch video thumbnails
 	videoThumbnails := make(map[string]string)
-	if len(videoIDs) > 0 {
-		adminToken, tokenErr := getActiveVKToken()
-		if tokenErr == nil && adminToken != "" {
-			vkClient := vk.NewVKClient(adminToken)
+	photoURLs := make(map[string]string)
+	adminToken, tokenErr := getActiveVKToken()
+	if tokenErr == nil && adminToken != "" {
+		vkClient := vk.NewVKClient(adminToken)
 
-			// Deduplicate IDs
+		if len(videoIDs) > 0 {
 			uniqueIDs := make(map[string]bool)
 			var batch []string
 			for _, id := range videoIDs {
@@ -2276,6 +2286,15 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 				log.Printf("[populateAttachmentURLs] GetVideoThumbnails failed for %d videos: %v", len(batch), err)
 			}
 		}
+		if len(photoIDs) > 0 {
+			if urls, err := vkClient.GetPhotoURLs(photoIDs); err == nil {
+				photoURLs = urls
+			} else {
+				log.Printf("[populateAttachmentURLs] GetPhotoURLs failed for %d photos: %v", len(photoIDs), err)
+			}
+		}
+	} else if len(photoIDs) > 0 || len(videoIDs) > 0 {
+		log.Printf("[populateAttachmentURLs] no user token to resolve VK media URLs")
 	}
 
 	// Create S3 client exactly once
@@ -2310,6 +2329,19 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 				}
 
 				if strings.HasPrefix(id, "photo") {
+					if mediaURL == "" {
+						raw := strings.TrimPrefix(id, "photo")
+						partsRaw := strings.SplitN(raw, "_", 3)
+						if len(partsRaw) >= 2 {
+							baseID := fmt.Sprintf("photo%s_%s", partsRaw[0], partsRaw[1])
+							if u, ok := photoURLs[baseID]; ok {
+								mediaURL = u
+							}
+						}
+					}
+					if mediaURL == "" {
+						continue
+					}
 					urls = append(urls, AttachmentURL{ID: id, Type: "photo", URL: mediaURL})
 				} else if strings.HasPrefix(id, "video") {
 					if mediaURL == "" {
