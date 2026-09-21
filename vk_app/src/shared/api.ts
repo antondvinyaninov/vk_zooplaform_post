@@ -350,7 +350,10 @@ export const moderatePost = async (
     try {
       wall_attachments = await attachWallPhotosViaMiniApp(post);
     } catch (e: any) {
-      throw new Error(e?.message || 'Не удалось загрузить фото на стену из Mini App');
+      throw new Error(
+        (e?.message || 'Не удалось загрузить фото на стену из Mini App') +
+          ' Нужно право photos. Сам пост публикует сервер ключом сообщества.'
+      );
     }
     if (!wall_attachments.length) {
       throw new Error('VK не сохранил фото на стену из Mini App.');
@@ -445,85 +448,6 @@ const photoS3Keys = (post: AppPost): string[] =>
     .map((key) => key.trim())
     .filter((key) => key && /\.(jpe?g|png|gif|webp)$/i.test(key));
 
-type WallUploadResult = {
-  photo?: string;
-  photos?: string;
-  photos_list?: string;
-  server?: number;
-  hash?: string;
-};
-
-const wallUploadPayload = (data?: WallUploadResult): string => {
-  for (const value of [data?.photo, data?.photos_list, data?.photos]) {
-    const text = String(value || '').trim();
-    if (text && text !== '[]') {
-      return text;
-    }
-  }
-  return '';
-};
-
-const fetchWallPhotoBlob = async (postId: number, s3Key: string, filename: string): Promise<File> => {
-  const vkSignature = getVKLaunchSignature();
-  const url = `${API_URL}/wall-photo/file?post_id=${postId}&s3_key=${encodeURIComponent(s3Key)}&x-vk-sign=${encodeURIComponent(vkSignature)}`;
-  const response = await fetch(url, {
-    headers: {
-      'x-vk-sign': vkSignature,
-      Authorization: `Bearer ${vkSignature}`,
-    },
-  });
-  if (!response.ok) {
-    let message = `Не удалось скачать фото поста (${response.status})`;
-    try {
-      const data = await response.json();
-      message = data.error || data.message || message;
-    } catch {
-      // keep default
-    }
-    throw new Error(message);
-  }
-  const blob = await response.blob();
-  const type = blob.type || 'image/jpeg';
-  return new File([blob], filename, { type });
-};
-
-const postMultipartToVk = async (file: File, uploadUrl: string, field: string): Promise<WallUploadResult> => {
-  const form = new FormData();
-  form.append(field, file, file.name || 'photo.jpg');
-  const response = await fetch(uploadUrl, { method: 'POST', body: form });
-  const text = await response.text();
-  let data: WallUploadResult = {};
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error('VK upload_url вернул не JSON');
-  }
-  return data;
-};
-
-const postPhotoToVkUploadUrl = async (file: File, uploadUrl: string): Promise<WallUploadResult> => {
-  const first = await postMultipartToVk(file, uploadUrl, 'photo');
-  if (wallUploadPayload(first)) {
-    return first;
-  }
-  const retry = await postMultipartToVk(file, uploadUrl, 'file');
-  if (wallUploadPayload(retry)) {
-    return retry;
-  }
-  throw new Error('VK не принял файл на upload_url (пустой photo)');
-};
-
-const pushWallPhotoViaServer = async (uploadUrl: string, key: string, postId: number) => {
-  return fetchJSON<WallUploadResult>(`${API_URL}/wall-photo/push`, {
-    method: 'POST',
-    body: JSON.stringify({
-      upload_url: uploadUrl,
-      s3_key: key,
-      post_id: postId,
-    }),
-  });
-};
-
 const attachWallPhotosViaMiniApp = async (post: AppPost): Promise<string[]> => {
   const keys = photoS3Keys(post);
   if (!keys.length) {
@@ -546,25 +470,24 @@ const attachWallPhotosViaMiniApp = async (post: AppPost): Promise<string[]> => {
     if (!uploadUrl) {
       throw new Error('VK не выдал upload_url для фото на стену. ' + bridgeVkError(probe));
     }
-    const filename = key.split('/').pop() || 'photo.jpg';
-    let pushed: WallUploadResult | undefined;
-    try {
-      const file = await fetchWallPhotoBlob(post.id, key, filename);
-      pushed = await postPhotoToVkUploadUrl(file, uploadUrl);
-    } catch {
-      pushed = await pushWallPhotoViaServer(uploadUrl, key, post.id);
-    }
-    const payload = wallUploadPayload(pushed);
-    if (!payload) {
-      throw new Error('VK не принял файл на upload_url (пустой photo).');
-    }
+    const pushed = await fetchJSON<{ photo: string; server: number; hash: string }>(
+      `${API_URL}/wall-photo/push`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          upload_url: uploadUrl,
+          s3_key: key,
+          post_id: post.id,
+        }),
+      }
+    );
     let saved: any;
     try {
       saved = await bridgeCallVk('photos.saveWallPhoto', {
         group_id: groupId,
-        photo: payload,
-        server: Number(pushed?.server || 0),
-        hash: String(pushed?.hash || ''),
+        photo: pushed.photo,
+        server: pushed.server,
+        hash: pushed.hash,
         access_token: accessToken,
       });
     } catch (e: any) {

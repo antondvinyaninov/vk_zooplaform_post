@@ -515,16 +515,3 @@ func TestPushWallPhotoRejectsBadUploadURL(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
 	require.Contains(t, w.Body.String(), "upload_url")
 }
-
-func TestWallPhotoFileRejectsMissingParams(t *testing.T) {
-	clearDB(t)
-	vkUserID := 44
-	vkGroupID := 227624792
-	setupMockUser(t, vkUserID)
-	req := httptest.NewRequest("GET", "/api/app/wall-photo/file", nil)
-	req.Header.Set("x-vk-sign", fmt.Sprintf("vk_user_id=%d&vk_group_id=%d&vk_viewer_group_role=admin", vkUserID, vkGroupID))
-	w := httptest.NewRecorder()
-	wallPhotoFileHandler(w, req)
-	require.Equal(t, http.StatusBadRequest, w.Result().StatusCode)
-	require.Contains(t, w.Body.String(), "s3_key")
-}
