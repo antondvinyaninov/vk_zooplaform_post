@@ -353,13 +353,15 @@ export const moderatePost = async (
     } catch (e: any) {
       throw new Error(
         (e?.message || 'Не удалось загрузить фото на стену из Mini App') +
-          ' Нужно право photos. Сам пост публикует сервер ключом сообщества.'
+          ' Нужно право photos.'
       );
     }
     if (!wall_attachments.length) {
       throw new Error('VK не сохранил фото на стену из Mini App.');
     }
   }
+
+  const vk_post_id = await publishWallFromMiniApp(post, wall_attachments, publishDate);
 
   return fetchJSON<AppPost>(`${API_URL}/posts/${id}/moderate`, {
     method: 'PATCH',
@@ -368,6 +370,7 @@ export const moderatePost = async (
       publish_date: publishDate?.toISOString(),
       reject_reason: rejectReason,
       wall_attachments,
+      vk_post_id,
     }),
   });
 };
@@ -472,6 +475,67 @@ const photoS3Keys = (post: AppPost): string[] =>
     .split(',')
     .map((key) => key.trim())
     .filter((key) => key && /\.(jpe?g|png|gif|webp)$/i.test(key));
+
+const publishWallFromMiniApp = async (
+  post: AppPost,
+  attachments: string[],
+  publishDate?: Date
+): Promise<number> => {
+  const { appId, groupId } = miniAppLaunchIds();
+  const tryPost = async (accessToken: string) => {
+    const params: Record<string, string | number> = {
+      owner_id: -groupId,
+      from_group: 1,
+      message: post.message || '',
+      access_token: accessToken,
+    };
+    if (attachments.length) {
+      params.attachments = attachments.join(',');
+    }
+    if (publishDate) {
+      params.publish_date = Math.floor(publishDate.getTime() / 1000);
+    }
+    const res = await bridgeCallVk('wall.post', params);
+    return Number(res?.response?.post_id || 0);
+  };
+
+  let lastError = '';
+  try {
+    const community = await vkBridge.send('VKWebAppGetCommunityToken', {
+      app_id: appId,
+      group_id: groupId,
+      scope: 'messages,manage,photos,docs,wall',
+    });
+    if (community?.access_token) {
+      const id = await tryPost(community.access_token);
+      if (id) {
+        return id;
+      }
+    }
+  } catch (e: any) {
+    lastError = bridgeVkError(e);
+  }
+
+  try {
+    const user = await vkBridge.send('VKWebAppGetAuthToken', {
+      app_id: appId,
+      scope: 'wall,photos,groups',
+    });
+    if (user?.access_token) {
+      const id = await tryPost(user.access_token);
+      if (id) {
+        return id;
+      }
+    }
+  } catch (e: any) {
+    lastError = bridgeVkError(e);
+  }
+
+  throw new Error(
+    lastError ||
+      'VK не опубликовал пост на стену из Mini App. Для этой группы нужен ключ из Настройки → Работа с API с галкой Стена.'
+  );
+};
 
 const attachWallPhotosViaMiniApp = async (post: AppPost): Promise<string[]> => {
   const keys = photoS3Keys(post);
