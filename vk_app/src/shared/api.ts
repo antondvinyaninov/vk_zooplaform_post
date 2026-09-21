@@ -335,36 +335,12 @@ export const moderatePost = async (
   publishDate?: Date,
   rejectReason?: string,
 ) => {
-  if (status === 'rejected') {
-    return fetchJSON<AppPost>(`${API_URL}/posts/${id}/moderate`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        status,
-        reject_reason: rejectReason,
-      }),
-    });
-  }
-
-  const post = await getPostById(id);
-  let wall_attachments: string[] = [];
-  if (photoS3Keys(post).length) {
-    try {
-      wall_attachments = await attachWallPhotosViaMiniApp(post);
-    } catch (e: any) {
-      throw new Error(e?.message || 'Не удалось загрузить фото на стену из Mini App');
-    }
-    if (!wall_attachments.length) {
-      throw new Error('VK не сохранил фото на стену из Mini App.');
-    }
-  }
-
   return fetchJSON<AppPost>(`${API_URL}/posts/${id}/moderate`, {
     method: 'PATCH',
     body: JSON.stringify({
       status,
       publish_date: publishDate?.toISOString(),
       reject_reason: rejectReason,
-      wall_attachments,
     }),
   });
 };
@@ -462,104 +438,6 @@ const bridgeCallVk = async (method: string, params: Record<string, string | numb
       v: '5.199',
     },
   });
-};
-
-const photoS3Keys = (post: AppPost): string[] =>
-  (post.s3_video_key || '')
-    .split(',')
-    .map((key) => key.trim())
-    .filter((key) => key && /\.(jpe?g|png|gif|webp)$/i.test(key));
-
-const fetchWallPhotoBlob = async (postId: number, s3Key: string, filename: string): Promise<File> => {
-  const vkSignature = getVKLaunchSignature();
-  const url = `${API_URL}/wall-photo/file?post_id=${postId}&s3_key=${encodeURIComponent(s3Key)}&x-vk-sign=${encodeURIComponent(vkSignature)}`;
-  const response = await fetch(url, {
-    headers: {
-      'x-vk-sign': vkSignature,
-      Authorization: `Bearer ${vkSignature}`,
-    },
-  });
-  if (!response.ok) {
-    let message = `Не удалось скачать фото поста (${response.status})`;
-    try {
-      const data = await response.json();
-      message = data.error || data.message || message;
-    } catch {
-      // keep default
-    }
-    throw new Error(message);
-  }
-  const blob = await response.blob();
-  const type = blob.type || 'image/jpeg';
-  return new File([blob], filename, { type });
-};
-
-const postPhotoToVkUploadUrl = async (file: File, uploadUrl: string) => {
-  const jpeg = await compressImage(file);
-  const form = new FormData();
-  form.append('photo', jpeg, jpeg.name || 'photo.jpg');
-  const response = await fetch(uploadUrl, { method: 'POST', body: form });
-  const text = await response.text();
-  let data: { photo?: string; server?: number; hash?: string } = {};
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error('VK upload_url вернул не JSON');
-  }
-  if (!data.photo) {
-    throw new Error('VK не принял файл на upload_url (пустой photo). Загрузите JPEG/PNG.');
-  }
-  return data;
-};
-
-const attachWallPhotosViaMiniApp = async (post: AppPost): Promise<string[]> => {
-  const keys = photoS3Keys(post);
-  if (!keys.length) {
-    return [];
-  }
-  const { groupId } = miniAppLaunchIds();
-  const accessToken = await getMiniAppPhotosAccessToken();
-  const attached: string[] = [];
-  for (const key of keys) {
-    let probe: any;
-    try {
-      probe = await bridgeCallVk('photos.getWallUploadServer', {
-        group_id: groupId,
-        access_token: accessToken,
-      });
-    } catch (e: any) {
-      throw new Error('Не удалось получить сервер загрузки фото из Mini App. ' + bridgeVkError(e));
-    }
-    const uploadUrl = probe?.response?.upload_url;
-    if (!uploadUrl) {
-      throw new Error('VK не выдал upload_url для фото на стену. ' + bridgeVkError(probe));
-    }
-    const filename = key.split('/').pop() || 'photo.jpg';
-    const file = await fetchWallPhotoBlob(post.id, key, filename);
-    const pushed = await postPhotoToVkUploadUrl(file, uploadUrl);
-    let saved: any;
-    try {
-      saved = await bridgeCallVk('photos.saveWallPhoto', {
-        group_id: groupId,
-        photo: String(pushed.photo),
-        server: Number(pushed.server || 0),
-        hash: String(pushed.hash || ''),
-        access_token: accessToken,
-      });
-    } catch (e: any) {
-      throw new Error('photos.saveWallPhoto из Mini App не прошёл. ' + bridgeVkError(e));
-    }
-    const photo = saved?.response?.[0];
-    if (!photo?.id) {
-      throw new Error('VK не сохранил фото на стену. ' + bridgeVkError(saved));
-    }
-    let att = `photo${photo.owner_id}_${photo.id}`;
-    if (photo.access_key) {
-      att += `_${photo.access_key}`;
-    }
-    attached.push(att);
-  }
-  return attached;
 };
 
 export const grantMiniAppPhotosToken = async () => {
