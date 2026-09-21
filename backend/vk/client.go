@@ -177,7 +177,7 @@ type PhotoUploadResponse struct {
 	AID        int    `json:"aid"`
 }
 
-func (p *PhotoUploadResponse) uploadPayload() string {
+func (p *PhotoUploadResponse) UploadPayload() string {
 	if p == nil {
 		return ""
 	}
@@ -232,7 +232,7 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 	}
 
 	saveParams := map[string]string{
-		"photo":  photoUpload.uploadPayload(),
+		"photo":  photoUpload.UploadPayload(),
 		"server": strconv.Itoa(photoUpload.Server),
 		"hash":   photoUpload.Hash,
 	}
@@ -307,25 +307,16 @@ func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID
 	if groupClient == nil {
 		return "", "", fmt.Errorf("%s", GroupWallTokenMissing)
 	}
-	att, photoURL, wallErr := groupClient.UploadPhotoToWall(filePath, groupID)
-	if wallErr == nil {
-		return att, photoURL, nil
-	}
-	att, photoURL, albumErr := groupClient.UploadPhotoToGroupAlbum(filePath, groupID)
-	if albumErr == nil {
-		log.Printf("[UploadPhotoToWall] community getWallUploadServer failed (%v); saved via group album", wallErr)
+	att, photoURL, err := groupClient.UploadPhotoToWall(filePath, groupID)
+	if err == nil {
 		return att, photoURL, nil
 	}
 	userToken = strings.TrimSpace(userToken)
-	if userToken != "" {
-		log.Printf("[UploadPhotoToWall] community wall+album failed (wall=%v album=%v); trying user photos token", wallErr, albumErr)
-		att, photoURL, userErr := NewVKClient(userToken).UploadPhotoToWall(filePath, groupID)
-		if userErr == nil {
-			return att, photoURL, nil
-		}
-		return "", "", fmt.Errorf("%s (wall: %v; album: %v; user: %v)", GroupCannotUploadWallPhoto, wallErr, albumErr, userErr)
+	if userToken == "" {
+		return "", "", fmt.Errorf("%s (%v)", GroupCannotUploadWallPhoto, err)
 	}
-	return "", "", fmt.Errorf("%s (wall: %v; album: %v)", GroupCannotUploadWallPhoto, wallErr, albumErr)
+	log.Printf("[UploadPhotoToWall] community upload failed (%v); uploading with user photos token", err)
+	return NewVKClient(userToken).UploadPhotoToWall(filePath, groupID)
 }
 
 const groupWallAlbumTitle = "ЗооПлатформа"
@@ -363,7 +354,7 @@ func (c *VKClient) UploadPhotoToGroupAlbum(filePath, groupID string) (string, st
 	if err != nil {
 		return "", "", err
 	}
-	payload := photoUpload.uploadPayload()
+	payload := photoUpload.UploadPayload()
 	savedResp, err := c.CallMethod("photos.save", map[string]string{
 		"album_id":    strconv.Itoa(albumID),
 		"group_id":    groupID,
@@ -454,7 +445,7 @@ func (c *VKClient) UploadPhotoViaGroupMessages(filePath string) (string, string,
 		return "", "", err
 	}
 	savedResp, err := c.CallMethod("photos.saveMessagesPhoto", map[string]string{
-		"photo":  photoUpload.uploadPayload(),
+		"photo":  photoUpload.UploadPayload(),
 		"server": strconv.Itoa(photoUpload.Server),
 		"hash":   photoUpload.Hash,
 	})
@@ -527,7 +518,7 @@ func postMultipartPhoto(filePath, uploadURL, field string) (*PhotoUploadResponse
 		}
 		return nil, fmt.Errorf("failed to parse upload response: %w (%s)", err, snippet)
 	}
-	if photoUpload.uploadPayload() == "" {
+	if photoUpload.UploadPayload() == "" {
 		snippet := string(uploadRespBody)
 		if len(snippet) > 240 {
 			snippet = snippet[:240]

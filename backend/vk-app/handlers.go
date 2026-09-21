@@ -3721,13 +3721,14 @@ func pushWallPhotoUploadHandler(w http.ResponseWriter, r *http.Request) {
 		utils.RespondError(w, http.StatusBadRequest, "failed to push photo to VK upload_url")
 		return
 	}
-	if uploaded == nil || strings.TrimSpace(uploaded.Photo) == "" {
+	payload := uploaded.UploadPayload()
+	if payload == "" {
 		utils.RespondError(w, http.StatusBadRequest, "VK upload_url returned empty photo")
 		return
 	}
 
 	utils.RespondSuccess(w, map[string]interface{}{
-		"photo":  uploaded.Photo,
+		"photo":  payload,
 		"server": uploaded.Server,
 		"hash":   uploaded.Hash,
 	})
