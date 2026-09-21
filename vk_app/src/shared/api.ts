@@ -45,7 +45,6 @@ export interface PostType {
 export interface AppGroupSettings extends AppGroup {
   is_active: boolean;
   has_token: boolean;
-  has_wall?: boolean;
   has_photos_token?: boolean;
   notify_user_ids: number[];
   post_types: PostType[];
@@ -353,7 +352,7 @@ export const moderatePost = async (
     } catch (e: any) {
       throw new Error(
         (e?.message || 'Не удалось загрузить фото на стену из Mini App') +
-          ' Нужно право photos.'
+          ' Нужно право photos. Сам пост публикует сервер ключом сообщества.'
       );
     }
     if (!wall_attachments.length) {
@@ -373,7 +372,7 @@ export const moderatePost = async (
 };
 
 export const saveGroupToken = async (groupId: number, token: string, replace = false) => {
-  return fetchJSON<{ group: AppGroupSettings }>(`${API_URL}/groups/token`, {
+  return fetchJSON<{ group: AppGroup }>(`${API_URL}/groups/token`, {
     method: 'POST',
     body: JSON.stringify({
       vk_group_id: groupId,
@@ -381,30 +380,6 @@ export const saveGroupToken = async (groupId: number, token: string, replace = f
       replace,
     }),
   });
-};
-
-export const connectCurrentCommunity = async (replace = false) => {
-  const { appId, groupId } = miniAppLaunchIds();
-  const community = await vkBridge.send('VKWebAppGetCommunityToken', {
-    app_id: appId,
-    group_id: groupId,
-    scope: 'messages,manage,photos,docs,wall',
-  });
-  if (!community?.access_token) {
-    throw new Error(
-      'VK не выдал ключ сообщества. В кабинете Mini App включите права сообщества: Стена, Сообщения, Фото, Документы, Управление.'
-    );
-  }
-  const saved = await saveGroupToken(groupId, community.access_token, replace);
-  try {
-    const photos = await grantMiniAppPhotosToken();
-    return { group: saved.group, photos };
-  } catch (e: any) {
-    throw new Error(
-      'Ключ сообщества сохранён. Осталось разрешить photos во втором окне: ' +
-        (e?.message || 'ошибка Mini App')
-    );
-  }
 };
 
 export const savePhotosUserToken = async (
@@ -506,16 +481,13 @@ const attachWallPhotosViaMiniApp = async (post: AppPost): Promise<string[]> => {
         }),
       }
     );
-    if (!pushed?.photo) {
-      throw new Error('Сервер не получил photo от VK. Попробуйте JPEG.');
-    }
     let saved: any;
     try {
       saved = await bridgeCallVk('photos.saveWallPhoto', {
         group_id: groupId,
-        photo: String(pushed.photo),
-        server: Number(pushed.server || 0),
-        hash: String(pushed.hash || ''),
+        photo: pushed.photo,
+        server: pushed.server,
+        hash: pushed.hash,
         access_token: accessToken,
       });
     } catch (e: any) {

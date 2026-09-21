@@ -21,7 +21,7 @@ import {
 } from '@vkontakte/vkui';
 import { Icon24CheckCircleOutline, Icon24ErrorCircleOutline, Icon28AddCircleOutline, Icon24Cancel, Icon24ListAddOutline, Icon24ArticleOutline, Icon16CopyOutline } from '@vkontakte/icons';
 import { useRouteNavigator } from '@vkontakte/vk-mini-apps-router';
-import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, grantMiniAppPhotosToken, connectCurrentCommunity, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
+import { getCommunitySettings, updateCommunitySettings, getCommunityManagers, searchCities, saveGroupToken, grantMiniAppPhotosToken, sendTestNotification, type AppGroupSettings, type AppManager, type PostType } from '../shared/api';
 
 const POST_TYPE_COLORS = [
   '#86efac', // Green (distinct)
@@ -222,54 +222,14 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
           )}
 
           <Group>
-            <FormStatus mode={settings?.has_wall && settings?.has_photos_token ? 'default' : 'error'}>
-              {settings?.has_wall && settings?.has_photos_token
-                ? 'Группа подключена. На стену идёт ключ этой группы из «Работа с API», не ключ Mini App и не ключ Антона.'
-                : 'У каждой группы свой ключ. Антон работает с ключом из Настройки → Работа с API (Стена + Сообщения). Mini App выдаёт другой ключ — им VK запрещает wall.post (ошибка 15/10). Вставьте ключ Сарапула в поле ниже.'}
+            <FormStatus mode="default">
+              Пост на стену публикует сервер ключом группы (поле ниже, право «Стена»). Картинка при модерации грузится из Mini App (кнопка ниже, право photos). Mini App больше не вызывает wall.post.
             </FormStatus>
-            <FormItem top="Автоподключение">
+            <FormItem top="Фото на стену (токен вашего приложения)">
               <Button
                 size="l"
                 stretched
                 mode="primary"
-                disabled={saving}
-                onClick={async () => {
-                  try {
-                    setSaving(true);
-                    setError(null);
-                    const replace = Boolean(settings?.has_token);
-                    const result = await connectCurrentCommunity(replace);
-                    setSettings(prev => prev ? {
-                      ...prev,
-                      ...(result.group || {}),
-                      has_token: true,
-                      has_wall: true,
-                      has_photos_token: true,
-                    } : prev);
-                    setSnackbar(
-                      <Snackbar
-                        onClose={() => setSnackbar(null)}
-                        onClosed={() => setSnackbar(null)}
-                        before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
-                      >
-                        Группа подключена: стена, фото и Callback
-                      </Snackbar>
-                    );
-                  } catch (e: any) {
-                    setError(e?.error_data?.error_reason || e?.message || 'Не удалось подключить группу');
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                {settings?.has_wall && settings?.has_photos_token ? 'Обновить подключение группы' : 'Подключить группу'}
-              </Button>
-            </FormItem>
-            <FormItem top="Только фото (если ключ группы уже есть)">
-              <Button
-                size="l"
-                stretched
-                mode="secondary"
                 disabled={saving}
                 onClick={async () => {
                   try {
@@ -296,6 +256,57 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
                 {settings?.has_photos_token ? 'Обновить разрешение на фото' : 'Разрешить загрузку фото на стену'}
               </Button>
             </FormItem>
+            {!settings?.has_token && (
+              <FormItem top="Подключение Callback API (обязательно для работы бота)">
+                <Button 
+                  size="l" 
+                  stretched 
+                  mode="secondary"
+                  before={<Icon24CheckCircleOutline />}
+                  onClick={async () => {
+                    try {
+                      // @ts-ignore
+                      const launchParams = window.vkLaunchParams || {};
+                      const appId = Number(launchParams.vk_app_id);
+                      const groupId = Number(launchParams.vk_group_id);
+                      
+                      if (!appId || !groupId) {
+                        throw new Error("Не удалось определить ID приложения или группы");
+                      }
+                      
+                      // @ts-ignore
+                      const result = await vkBridge.send('VKWebAppGetCommunityToken', {
+                        app_id: appId,
+                        group_id: groupId,
+                        scope: 'messages,manage,photos,docs,wall'
+                      });
+                      
+                      if (result.access_token) {
+                        setSaving(true);
+                        // @ts-ignore
+                        await saveGroupToken(groupId, result.access_token);
+                        setSettings(prev => prev ? { ...prev, has_token: true } : null);
+                        setSnackbar(
+                          <Snackbar
+                            onClose={() => setSnackbar(null)}
+                            onClosed={() => setSnackbar(null)}
+                            before={<Icon24CheckCircleOutline fill="var(--vkui--color_icon_positive)" />}
+                          >
+                            Сообщество успешно подключено к API
+                          </Snackbar>
+                        );
+                      }
+                    } catch (e: any) {
+                      setError(e?.error_data?.error_reason || e?.message || "Ошибка подключения");
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  Предоставить доступ
+                </Button>
+              </FormItem>
+            )}
 
             <FormItem top="Ключ API группы (Стена)">
               <Textarea
