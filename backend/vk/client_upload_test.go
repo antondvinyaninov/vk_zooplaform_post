@@ -173,6 +173,84 @@ func TestUploadPhotoForGroupWallFallsBackToUserToken(t *testing.T) {
 	}
 }
 
+func TestUploadPhotoForGroupWallUsesGroupAlbumAfter27(t *testing.T) {
+	var messagesHits, saveHits int
+	mux := http.NewServeMux()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mux.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	mux.HandleFunc("/photos.getWallUploadServer", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"error":{"error_code":27,"error_msg":"Group authorization failed: method is unavailable with group auth."}}`)
+	})
+	mux.HandleFunc("/photos.getMessagesUploadServer", func(w http.ResponseWriter, r *http.Request) {
+		messagesHits++
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"response": map[string]any{"upload_url": srv.URL + "/mupload"}})
+	})
+	mux.HandleFunc("/photos.getAlbums", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"response": map[string]any{
+				"count": 1,
+				"items": []map[string]any{{"id": 555, "title": "ЗооПлатформа"}},
+			},
+		})
+	})
+	mux.HandleFunc("/photos.getUploadServer", func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		if r.FormValue("album_id") != "555" || r.FormValue("group_id") != "168099183" {
+			t.Errorf("getUploadServer album=%s group=%s", r.FormValue("album_id"), r.FormValue("group_id"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"response": map[string]any{"upload_url": srv.URL + "/aupload", "album_id": 555},
+		})
+	})
+	mux.HandleFunc("/aupload", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"server":7,"photos_list":"[album-photo]","hash":"ah"}`)
+	})
+	mux.HandleFunc("/photos.save", func(w http.ResponseWriter, r *http.Request) {
+		saveHits++
+		_ = r.ParseForm()
+		if r.FormValue("photos_list") != "[album-photo]" && r.FormValue("photos") != "[album-photo]" {
+			t.Errorf("photos.save payload missing, form=%v", r.PostForm)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"response":[{"id":88,"owner_id":-168099183,"access_key":"gk","sizes":[{"url":"https://example.com/g.jpg","type":"x"}]}]}`)
+	})
+
+	prev := VKAPIURL
+	VKAPIURL = srv.URL
+	t.Cleanup(func() { VKAPIURL = prev })
+
+	tmp := filepath.Join(t.TempDir(), "t.jpg")
+	if err := os.WriteFile(tmp, []byte("jpeg-bytes"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	client := NewVKClient("group-community-key")
+	client.HTTPClient = srv.Client()
+	att, gotURL, err := UploadPhotoForGroupWall(client, "", tmp, "168099183")
+	if err != nil {
+		t.Fatalf("album upload: %v", err)
+	}
+	if att != "photo-168099183_88_gk" {
+		t.Fatalf("attachment %q", att)
+	}
+	if gotURL != "https://example.com/g.jpg" {
+		t.Fatalf("url %q", gotURL)
+	}
+	if messagesHits != 0 {
+		t.Fatalf("messages album must not be used, hits=%d", messagesHits)
+	}
+	if saveHits == 0 {
+		t.Fatal("photos.save was not called")
+	}
+}
+
 func TestUploadPhotoForGroupWallSkipsMessagesAlbum(t *testing.T) {
 	messagesHits := 0
 	mux := http.NewServeMux()

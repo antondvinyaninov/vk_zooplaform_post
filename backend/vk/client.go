@@ -169,9 +169,25 @@ type UploadServer struct {
 
 // PhotoUploadResponse ответ после загрузки фото
 type PhotoUploadResponse struct {
-	Server int    `json:"server"`
-	Photo  string `json:"photo"`
-	Hash   string `json:"hash"`
+	Server     int    `json:"server"`
+	Photo      string `json:"photo"`
+	Photos     string `json:"photos"`
+	PhotosList string `json:"photos_list"`
+	Hash       string `json:"hash"`
+	AID        int    `json:"aid"`
+}
+
+func (p *PhotoUploadResponse) uploadPayload() string {
+	if p == nil {
+		return ""
+	}
+	for _, s := range []string{p.Photo, p.PhotosList, p.Photos} {
+		s = strings.TrimSpace(s)
+		if s != "" && s != "[]" {
+			return s
+		}
+	}
+	return ""
 }
 
 // SavedPhoto сохраненное фото
@@ -216,7 +232,7 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 	}
 
 	saveParams := map[string]string{
-		"photo":  photoUpload.Photo,
+		"photo":  photoUpload.uploadPayload(),
 		"server": strconv.Itoa(photoUpload.Server),
 		"hash":   photoUpload.Hash,
 	}
@@ -282,23 +298,137 @@ func PostPhotoToUploadURL(filePath, uploadURL string) (*PhotoUploadResponse, err
 	return NewVKClient("").uploadPhotoFile(filePath, uploadURL)
 }
 
-// UploadPhotoForGroupWall сначала пробует photos.getWallUploadServer ключом сообщества.
-// Это VK 27 — тогда грузим user-токеном photos.saveWallPhoto (альбом стены).
-// photos.saveMessagesPhoto на стене не рисуется: только текст, без превью.
+// UploadPhotoForGroupWall грузит JPEG так, чтобы wall.post ключом сообщества
+// получил photo-{group}_id. getWallUploadServer у ключа сообщества = VK 27,
+// user-токен Mini App с сервера = VK 5. Рабочий путь с EasyPanel: альбом
+// сообщества (getUploadServer + photos.save с того же IP). Альбом сообщений
+// не используем — на стене такое фото не видно.
 func UploadPhotoForGroupWall(groupClient *VKClient, userToken, filePath, groupID string) (string, string, error) {
 	if groupClient == nil {
 		return "", "", fmt.Errorf("%s", GroupWallTokenMissing)
 	}
-	att, photoURL, err := groupClient.UploadPhotoToWall(filePath, groupID)
-	if err == nil {
+	att, photoURL, wallErr := groupClient.UploadPhotoToWall(filePath, groupID)
+	if wallErr == nil {
+		return att, photoURL, nil
+	}
+	att, photoURL, albumErr := groupClient.UploadPhotoToGroupAlbum(filePath, groupID)
+	if albumErr == nil {
+		log.Printf("[UploadPhotoToWall] community getWallUploadServer failed (%v); saved via group album", wallErr)
 		return att, photoURL, nil
 	}
 	userToken = strings.TrimSpace(userToken)
-	if userToken == "" {
-		return "", "", fmt.Errorf("%s (%v)", GroupCannotUploadWallPhoto, err)
+	if userToken != "" {
+		log.Printf("[UploadPhotoToWall] community wall+album failed (wall=%v album=%v); trying user photos token", wallErr, albumErr)
+		att, photoURL, userErr := NewVKClient(userToken).UploadPhotoToWall(filePath, groupID)
+		if userErr == nil {
+			return att, photoURL, nil
+		}
+		return "", "", fmt.Errorf("%s (wall: %v; album: %v; user: %v)", GroupCannotUploadWallPhoto, wallErr, albumErr, userErr)
 	}
-	log.Printf("[UploadPhotoToWall] community upload failed (%v); uploading with user photos token", err)
-	return NewVKClient(userToken).UploadPhotoToWall(filePath, groupID)
+	return "", "", fmt.Errorf("%s (wall: %v; album: %v)", GroupCannotUploadWallPhoto, wallErr, albumErr)
+}
+
+const groupWallAlbumTitle = "ЗооПлатформа"
+
+// UploadPhotoToGroupAlbum грузит фото в альбом сообщества ключом группы.
+// getUploadServer и POST файла идут с одного IP, вложение photo-{group}_id
+// принимается wall.post и рисуется в ленте (в отличие от альбома сообщений).
+func (c *VKClient) UploadPhotoToGroupAlbum(filePath, groupID string) (string, string, error) {
+	if c == nil {
+		return "", "", fmt.Errorf("%s", GroupWallTokenMissing)
+	}
+	groupID = strings.TrimSpace(groupID)
+	if groupID == "" {
+		return "", "", fmt.Errorf("group_id required")
+	}
+	albumID, err := c.ensureGroupPhotoAlbum(groupID)
+	if err != nil {
+		return "", "", err
+	}
+	uploadServerResp, err := c.CallMethod("photos.getUploadServer", map[string]string{
+		"album_id": strconv.Itoa(albumID),
+		"group_id": groupID,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("photos.getUploadServer: %w", err)
+	}
+	var uploadServer UploadServer
+	if err := json.Unmarshal(uploadServerResp, &uploadServer); err != nil {
+		return "", "", fmt.Errorf("failed to parse album upload server: %w", err)
+	}
+	if strings.TrimSpace(uploadServer.UploadURL) == "" {
+		return "", "", fmt.Errorf("photos.getUploadServer: empty upload_url")
+	}
+	photoUpload, err := c.uploadPhotoFile(filePath, uploadServer.UploadURL)
+	if err != nil {
+		return "", "", err
+	}
+	payload := photoUpload.uploadPayload()
+	savedResp, err := c.CallMethod("photos.save", map[string]string{
+		"album_id":    strconv.Itoa(albumID),
+		"group_id":    groupID,
+		"server":      strconv.Itoa(photoUpload.Server),
+		"photos_list": payload,
+		"hash":        photoUpload.Hash,
+	})
+	if err != nil {
+		savedResp, err = c.CallMethod("photos.save", map[string]string{
+			"album_id": strconv.Itoa(albumID),
+			"group_id": groupID,
+			"server":   strconv.Itoa(photoUpload.Server),
+			"photos":   payload,
+			"hash":     photoUpload.Hash,
+		})
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("photos.save: %w", err)
+	}
+	return attachmentFromSavedPhotos(savedResp)
+}
+
+func (c *VKClient) ensureGroupPhotoAlbum(groupID string) (int, error) {
+	raw, err := c.CallMethod("photos.getAlbums", map[string]string{
+		"owner_id": "-" + groupID,
+		"count":    "50",
+	})
+	if err == nil {
+		var albums struct {
+			Items []struct {
+				ID    int    `json:"id"`
+				Title string `json:"title"`
+			} `json:"items"`
+		}
+		if json.Unmarshal(raw, &albums) == nil {
+			for _, album := range albums.Items {
+				if album.ID > 0 && strings.EqualFold(strings.TrimSpace(album.Title), groupWallAlbumTitle) {
+					return album.ID, nil
+				}
+			}
+			for _, album := range albums.Items {
+				if album.ID > 0 {
+					return album.ID, nil
+				}
+			}
+		}
+	}
+	created, createErr := c.CallMethod("photos.createAlbum", map[string]string{
+		"title":                 groupWallAlbumTitle,
+		"group_id":              groupID,
+		"upload_by_admins_only": "1",
+	})
+	if createErr != nil {
+		if err != nil {
+			return 0, fmt.Errorf("photos.getAlbums: %v; photos.createAlbum: %w", err, createErr)
+		}
+		return 0, fmt.Errorf("photos.createAlbum: %w", createErr)
+	}
+	var album struct {
+		ID int `json:"id"`
+	}
+	if err := json.Unmarshal(created, &album); err != nil || album.ID <= 0 {
+		return 0, fmt.Errorf("photos.createAlbum: invalid album id")
+	}
+	return album.ID, nil
 }
 
 // UploadPhotoViaGroupMessages грузит JPEG ключом сообщества в альбом сообщений (-64).
@@ -324,7 +454,7 @@ func (c *VKClient) UploadPhotoViaGroupMessages(filePath string) (string, string,
 		return "", "", err
 	}
 	savedResp, err := c.CallMethod("photos.saveMessagesPhoto", map[string]string{
-		"photo":  photoUpload.Photo,
+		"photo":  photoUpload.uploadPayload(),
 		"server": strconv.Itoa(photoUpload.Server),
 		"hash":   photoUpload.Hash,
 	})
@@ -335,6 +465,18 @@ func (c *VKClient) UploadPhotoViaGroupMessages(filePath string) (string, string,
 }
 
 func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResponse, error) {
+	result, err := postMultipartPhoto(filePath, uploadURL, "photo")
+	if err == nil {
+		return result, nil
+	}
+	retry, retryErr := postMultipartPhoto(filePath, uploadURL, "file")
+	if retryErr == nil {
+		return retry, nil
+	}
+	return nil, err
+}
+
+func postMultipartPhoto(filePath, uploadURL, field string) (*PhotoUploadResponse, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
@@ -343,15 +485,16 @@ func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResp
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("photo", filepath.Base(filePath))
+	part, err := writer.CreateFormFile(field, filepath.Base(filePath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create form file: %w", err)
 	}
-
 	if _, err := io.Copy(part, file); err != nil {
 		return nil, fmt.Errorf("failed to copy file: %w", err)
 	}
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -360,8 +503,12 @@ func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResp
 		return nil, fmt.Errorf("failed to create upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148")
+	req.Header.Set("Origin", "https://vk.com")
+	req.Header.Set("Referer", "https://vk.com/")
 
-	resp, err := c.HTTPClient.Do(req)
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}
@@ -380,7 +527,7 @@ func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResp
 		}
 		return nil, fmt.Errorf("failed to parse upload response: %w (%s)", err, snippet)
 	}
-	if strings.TrimSpace(photoUpload.Photo) == "" {
+	if photoUpload.uploadPayload() == "" {
 		snippet := string(uploadRespBody)
 		if len(snippet) > 240 {
 			snippet = snippet[:240]
