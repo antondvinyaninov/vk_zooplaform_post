@@ -374,7 +374,18 @@ func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResp
 
 	var photoUpload PhotoUploadResponse
 	if err := json.Unmarshal(uploadRespBody, &photoUpload); err != nil {
-		return nil, fmt.Errorf("failed to parse upload response: %w", err)
+		snippet := string(uploadRespBody)
+		if len(snippet) > 240 {
+			snippet = snippet[:240]
+		}
+		return nil, fmt.Errorf("failed to parse upload response: %w (%s)", err, snippet)
+	}
+	if strings.TrimSpace(photoUpload.Photo) == "" {
+		snippet := string(uploadRespBody)
+		if len(snippet) > 240 {
+			snippet = snippet[:240]
+		}
+		return nil, fmt.Errorf("VK upload returned empty photo: %s", snippet)
 	}
 	return &photoUpload, nil
 }
