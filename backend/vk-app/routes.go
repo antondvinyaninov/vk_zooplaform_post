@@ -25,6 +25,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/app/groups/token", middleware.CORSFunc(saveGroupTokenHandler))
 	mux.HandleFunc("/api/app/photos-token", middleware.CORSFunc(savePhotosUserTokenHandler))
 	mux.HandleFunc("/api/app/wall-photo/push", middleware.CORSFunc(pushWallPhotoUploadHandler))
+	mux.HandleFunc("/api/app/wall-photo/file", middleware.CORSFunc(wallPhotoFileHandler))
 	mux.HandleFunc("/api/app/cities", middleware.CORSFunc(citiesHandler))
 	mux.HandleFunc("/api/app/upload/presign", middleware.CORSFunc(s3PresignHandler))
 	mux.HandleFunc("/api/app/notifications/test", middleware.CORSFunc(testNotificationHandler))

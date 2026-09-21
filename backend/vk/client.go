@@ -169,9 +169,24 @@ type UploadServer struct {
 
 // PhotoUploadResponse ответ после загрузки фото
 type PhotoUploadResponse struct {
-	Server int    `json:"server"`
-	Photo  string `json:"photo"`
-	Hash   string `json:"hash"`
+	Server     int    `json:"server"`
+	Photo      string `json:"photo"`
+	Photos     string `json:"photos"`
+	PhotosList string `json:"photos_list"`
+	Hash       string `json:"hash"`
+}
+
+func (p *PhotoUploadResponse) UploadPayload() string {
+	if p == nil {
+		return ""
+	}
+	for _, s := range []string{p.Photo, p.PhotosList, p.Photos} {
+		s = strings.TrimSpace(s)
+		if s != "" && s != "[]" {
+			return s
+		}
+	}
+	return ""
 }
 
 // SavedPhoto сохраненное фото
@@ -216,7 +231,7 @@ func (c *VKClient) UploadPhotoToWall(filePath string, groupID string) (string, s
 	}
 
 	saveParams := map[string]string{
-		"photo":  photoUpload.Photo,
+		"photo":  photoUpload.UploadPayload(),
 		"server": strconv.Itoa(photoUpload.Server),
 		"hash":   photoUpload.Hash,
 	}
@@ -324,7 +339,7 @@ func (c *VKClient) UploadPhotoViaGroupMessages(filePath string) (string, string,
 		return "", "", err
 	}
 	savedResp, err := c.CallMethod("photos.saveMessagesPhoto", map[string]string{
-		"photo":  photoUpload.Photo,
+		"photo":  photoUpload.UploadPayload(),
 		"server": strconv.Itoa(photoUpload.Server),
 		"hash":   photoUpload.Hash,
 	})
@@ -335,6 +350,21 @@ func (c *VKClient) UploadPhotoViaGroupMessages(filePath string) (string, string,
 }
 
 func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResponse, error) {
+	result, err := postMultipartPhoto(filePath, uploadURL, "photo")
+	if err == nil && result.UploadPayload() != "" {
+		return result, nil
+	}
+	retry, retryErr := postMultipartPhoto(filePath, uploadURL, "file")
+	if retryErr == nil && retry.UploadPayload() != "" {
+		return retry, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return nil, fmt.Errorf("VK upload returned empty photo")
+}
+
+func postMultipartPhoto(filePath, uploadURL, field string) (*PhotoUploadResponse, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
@@ -343,15 +373,16 @@ func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResp
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	part, err := writer.CreateFormFile("photo", filepath.Base(filePath))
+	part, err := writer.CreateFormFile(field, filepath.Base(filePath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create form file: %w", err)
 	}
-
 	if _, err := io.Copy(part, file); err != nil {
 		return nil, fmt.Errorf("failed to copy file: %w", err)
 	}
-	writer.Close()
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -360,8 +391,12 @@ func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResp
 		return nil, fmt.Errorf("failed to create upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148")
+	req.Header.Set("Origin", "https://vk.com")
+	req.Header.Set("Referer", "https://vk.com/")
 
-	resp, err := c.HTTPClient.Do(req)
+	client := &http.Client{Timeout: 2 * time.Minute}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload file: %w", err)
 	}
@@ -374,7 +409,11 @@ func (c *VKClient) uploadPhotoFile(filePath, uploadURL string) (*PhotoUploadResp
 
 	var photoUpload PhotoUploadResponse
 	if err := json.Unmarshal(uploadRespBody, &photoUpload); err != nil {
-		return nil, fmt.Errorf("failed to parse upload response: %w", err)
+		snippet := string(uploadRespBody)
+		if len(snippet) > 240 {
+			snippet = snippet[:240]
+		}
+		return nil, fmt.Errorf("failed to parse upload response: %w (%s)", err, snippet)
 	}
 	return &photoUpload, nil
 }

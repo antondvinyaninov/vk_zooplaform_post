@@ -3716,16 +3716,108 @@ func pushWallPhotoUploadHandler(w http.ResponseWriter, r *http.Request) {
 		utils.RespondError(w, http.StatusBadRequest, "failed to push photo to VK upload_url")
 		return
 	}
-	if uploaded == nil || strings.TrimSpace(uploaded.Photo) == "" {
+	payload := ""
+	if uploaded != nil {
+		payload = uploaded.UploadPayload()
+	}
+	if payload == "" {
+		server, hash := 0, ""
+		if uploaded != nil {
+			server = uploaded.Server
+			hash = uploaded.Hash
+		}
+		log.Printf("[pushWallPhoto] empty photo payload server=%d hash_len=%d", server, len(hash))
 		utils.RespondError(w, http.StatusBadRequest, "VK upload_url returned empty photo")
 		return
 	}
 
 	utils.RespondSuccess(w, map[string]interface{}{
-		"photo":  uploaded.Photo,
-		"server": uploaded.Server,
-		"hash":   uploaded.Hash,
+		"photo":       payload,
+		"photos_list": uploaded.PhotosList,
+		"server":      uploaded.Server,
+		"hash":        uploaded.Hash,
 	})
+}
+
+func wallPhotoFileHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		utils.RespondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	ctx, err := parseLaunchContext(r)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if !isModerator(ctx.GroupRole) {
+		utils.RespondError(w, http.StatusForbidden, "only community admins can download wall photos")
+		return
+	}
+	postID, _ := strconv.Atoi(r.URL.Query().Get("post_id"))
+	key := strings.TrimSpace(r.URL.Query().Get("s3_key"))
+	if key == "" || postID <= 0 {
+		utils.RespondError(w, http.StatusBadRequest, "s3_key and post_id required")
+		return
+	}
+	post, err := getPostByID(postID)
+	if err != nil || post == nil {
+		utils.RespondError(w, http.StatusNotFound, "post not found")
+		return
+	}
+	group, err := ensureGroup(ctx.GroupID)
+	if err != nil || group == nil {
+		utils.RespondError(w, http.StatusInternalServerError, "failed to get group")
+		return
+	}
+	belongs := false
+	for _, pub := range post.Publications {
+		if pub.GroupID == group.ID {
+			belongs = true
+			break
+		}
+	}
+	if !belongs {
+		utils.RespondError(w, http.StatusForbidden, "post belongs to a different community")
+		return
+	}
+	foundKey := false
+	for _, existing := range parseMediaKeys(post.S3VideoKey) {
+		if existing == key {
+			foundKey = true
+			break
+		}
+	}
+	if !foundKey {
+		utils.RespondError(w, http.StatusBadRequest, "s3_key is not on this post")
+		return
+	}
+	s3, err := s3client.New()
+	if err != nil {
+		utils.RespondError(w, http.StatusInternalServerError, "s3 unavailable")
+		return
+	}
+	rc, _, err := s3.GetObject(r.Context(), key)
+	if err != nil {
+		utils.RespondError(w, http.StatusBadRequest, "failed to download media from storage")
+		return
+	}
+	defer rc.Close()
+	ctype := "application/octet-stream"
+	switch strings.ToLower(filepath.Ext(key)) {
+	case ".jpg", ".jpeg":
+		ctype = "image/jpeg"
+	case ".png":
+		ctype = "image/png"
+	case ".gif":
+		ctype = "image/gif"
+	case ".webp":
+		ctype = "image/webp"
+	}
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("Cache-Control", "private, max-age=60")
+	if _, err := io.Copy(w, rc); err != nil {
+		log.Printf("[wallPhotoFile] copy: %v", err)
+	}
 }
 
 func hasActivePhotosUserToken() bool {
