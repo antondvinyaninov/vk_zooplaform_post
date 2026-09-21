@@ -224,8 +224,8 @@ export const CommunitySettings: FC<NavIdProps> = ({ id }) => {
           <Group>
             <FormStatus mode={settings?.has_wall && settings?.has_photos_token ? 'default' : 'error'}>
               {settings?.has_wall && settings?.has_photos_token
-                ? 'Группа подключена: стена — ключом сообщества, фото — из Mini App. Callback ставится сам.'
-                : 'Нажмите «Подключить группу». VK покажет два окна: ключ сообщества (Стена + Сообщения) и photos. Ручной vk1.a… только если VK не выдал Стену.'}
+                ? 'Группа подключена. На стену идёт ключ этой группы из «Работа с API», не ключ Mini App и не ключ Антона.'
+                : 'У каждой группы свой ключ. Антон работает с ключом из Настройки → Работа с API (Стена + Сообщения). Mini App выдаёт другой ключ — им VK запрещает wall.post (ошибка 15/10). Вставьте ключ Сарапула в поле ниже.'}
             </FormStatus>
             <FormItem top="Автоподключение">
               <Button
