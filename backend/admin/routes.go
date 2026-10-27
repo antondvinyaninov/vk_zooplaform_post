@@ -44,6 +44,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/vk/service-key", middleware.CORSFunc(vkServiceKeyHandler))
 	mux.HandleFunc("/api/vk/oauth/start", middleware.CORSFunc(vkOAuthStartHandler))
 	mux.HandleFunc("/api/vk/oauth/callback", middleware.CORSFunc(vkOAuthCallbackHandler))
+	mux.HandleFunc("/auth", middleware.CORSFunc(vkOAuthCallbackHandler))
 	mux.HandleFunc("/api/vk/oauth/token", middleware.CORSFunc(vkOAuthTokenHandler))
 
 	log.Printf("[Admin] Registering redirect routes...")

@@ -236,7 +236,7 @@ func oauthRedirectURI(r *http.Request, cfg *config.Config) string {
 		}
 		base = scheme + "://" + r.Host
 	}
-	return base + "/api/vk/oauth/callback"
+	return base + "/auth"
 }
 
 func isSecureRequest(r *http.Request) bool {
