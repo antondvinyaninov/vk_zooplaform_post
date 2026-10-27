@@ -781,9 +781,7 @@ func createPostHandler(w http.ResponseWriter, r *http.Request) {
 
 				// Если фронтенд по ошибке прислал видео в поле media
 				if strings.HasPrefix(contentType, "video/") ||
-					strings.HasSuffix(filenameLower, ".mp4") ||
-					strings.HasSuffix(filenameLower, ".mov") ||
-					strings.HasSuffix(filenameLower, ".qt") {
+					classifyMediaByExt(filenameLower) == "video" {
 					os.Remove(tmpPath)
 					continue
 				}
@@ -1465,7 +1463,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 						tmpFile.Close()
 						rc.Close()
 
-						if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
+						if classifyMediaByExt(key) == "video" {
 							att, attURL, uploadErr = client.UploadVideo(tmpPath, strconv.Itoa(group.VKGroupID), filepath.Base(key))
 							if uploadErr != nil && (vk.IsUserAuthorizationFailed(uploadErr) || vk.IsUnavailableWithGroupAuth(uploadErr)) {
 								if userToken, tokenErr := getActiveVKToken(); tokenErr == nil && userToken != "" {
@@ -1810,7 +1808,7 @@ func moderatePostHandler(w http.ResponseWriter, r *http.Request, postID int) {
 
 						var att, attURL string
 						var uploadErr error
-						if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
+						if classifyMediaByExt(key) == "video" {
 							att, attURL, uploadErr = patchClient.UploadVideo(tmpPath, strconv.Itoa(capturedGroupID), filepath.Base(key))
 							if uploadErr != nil && (vk.IsUserAuthorizationFailed(uploadErr) || vk.IsUnavailableWithGroupAuth(uploadErr)) {
 								if userToken, tokenErr := getActiveVKToken(); tokenErr == nil && userToken != "" {
@@ -2338,9 +2336,8 @@ func populateAttachmentURLs(posts []postResponse) []postResponse {
 				if err != nil {
 					log.Printf("[populateAttachmentURLs] failed to presign S3 URL for %s: %v", key, err)
 				} else {
-					ext := strings.ToLower(filepath.Ext(key))
 					attType := "s3_image"
-					if ext == ".mp4" || ext == ".mov" || ext == ".qt" {
+					if classifyMediaByExt(key) == "video" {
 						attType = "s3_video"
 					}
 					urls = append(urls, AttachmentURL{ID: "s3:" + key, Type: attType, URL: presignedURL})
@@ -3119,9 +3116,10 @@ func getActiveVKToken() (string, error) {
 		SELECT access_token
 		FROM vk_accounts
 		WHERE is_active = ?
+		  AND (token_expires IS NULL OR token_expires = 0 OR token_expires > ?)
 		ORDER BY updated_at DESC
 		LIMIT 1
-	`, true).Scan(&token)
+	`, true, time.Now().UnixMilli()).Scan(&token)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -3733,7 +3731,8 @@ func hasActivePhotosUserToken() bool {
 	err := database.QueryRow(`
 		SELECT COUNT(*) FROM vk_accounts
 		WHERE is_active = ? AND COALESCE(access_token, '') <> ''
-	`, true).Scan(&n)
+		  AND (token_expires IS NULL OR token_expires = 0 OR token_expires > ?)
+	`, true, time.Now().UnixMilli()).Scan(&n)
 	return err == nil && n > 0
 }
 

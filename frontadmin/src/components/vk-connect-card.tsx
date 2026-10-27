@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { IconTrash } from "@tabler/icons-react"
-import { fetcher, api } from "@/lib/api"
+import { fetcher, api, API_BASE_URL } from "@/lib/api"
 
 interface VkAccount {
   id: number
@@ -57,15 +57,35 @@ export function VkConnectCard() {
     }
   }
 
+  const handleConnect = () => {
+    window.location.href = `${API_BASE_URL}/vk/oauth/start`
+  }
+
+  const formatTokenExpiry = (value?: number) => {
+    if (!value) return "бессрочный"
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return "срок неизвестен"
+    const expired = date.getTime() < Date.now()
+    const formatted = date.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+    return expired ? `истёк ${formatted}` : `до ${formatted}`
+  }
+
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0 pb-6">
         <div>
-          <CardTitle>Токен для загрузки фото</CardTitle>
+          <CardTitle>VK-аккаунт для медиа</CardTitle>
           <CardDescription className="mt-1">
-            Выдаётся в Mini App: Настройки сообщества → «Разрешить загрузку фото на стену». Не Kate и не /vk-connect. Публикация на стену идёт ключом группы.
+            Нужен аккаунт администратора групп с правами photos и video. Токен хранится на сервере и используется для загрузки фото и видео; публикация идёт ключом сообщества.
           </CardDescription>
         </div>
+        <Button onClick={handleConnect}>Подключить VK-аккаунт</Button>
       </CardHeader>
       
       <CardContent>
@@ -86,7 +106,7 @@ export function VkConnectCard() {
             </div>
           ) : accounts.length === 0 ? (
             <div className="text-center p-6 border border-dashed rounded-lg text-muted-foreground">
-              Пока нет токена фото. Откройте Mini App группы и нажмите «Разрешить загрузку фото на стену».
+              Пока нет VK-аккаунта для медиа. Нажмите «Подключить VK-аккаунт» и разрешите доступ к фото и видео.
             </div>
           ) : (
             accounts.map((account) => (
@@ -108,7 +128,14 @@ export function VkConnectCard() {
                         <Badge variant="default" className="text-[10px] uppercase tracking-wider">Основной</Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground mt-0.5">VK ID: {account.vk_user_id}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      VK ID: {account.vk_user_id} · токен {formatTokenExpiry(account.token_expires)}
+                    </p>
+                    {account.token_expires ? (
+                      new Date(account.token_expires).getTime() < Date.now() ? (
+                        <p className="text-xs text-destructive mt-1">Токен истёк — фото и видео не загрузятся. Подключите аккаунт заново.</p>
+                      ) : null
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

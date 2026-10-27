@@ -78,9 +78,10 @@ func getActiveVKToken() (string, error) {
 		SELECT access_token
 		FROM vk_accounts
 		WHERE is_active = true
+		  AND (token_expires IS NULL OR token_expires = 0 OR token_expires > ?)
 		ORDER BY updated_at DESC
 		LIMIT 1
-	`).Scan(&token)
+	`, time.Now().UnixMilli()).Scan(&token)
 	if err != nil {
 		return "", err
 	}
@@ -204,7 +205,7 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 							task_id = EXCLUDED.task_id,
 							updated_at = CURRENT_TIMESTAMP
 					`, taskID, detail.ID, detail.Name, detail.ScreenName, cityTitle, detail.MembersCount, detail.Description, string(contactsStr), string(linksStr))
-					
+
 					if err == nil {
 						if !processedGroups[detail.ID] {
 							processedGroups[detail.ID] = true
@@ -214,7 +215,7 @@ func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities
 						log.Printf("UPSERT error for group %d: %v", detail.ID, err)
 					}
 				}
-				
+
 				database.Exec(`UPDATE parser_tasks SET total_found = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, totalFound, taskID)
 				time.Sleep(1 * time.Second) // rate limit
 			}
@@ -302,7 +303,7 @@ func isRelevantGroup(g vk.Group, currentCityID int, currentCityTitle string) boo
 
 	animalPrefixes := []string{
 		"собак", "собач", "кошк", "кошач", "щено", "щенк", "животн", "питомц", "хвостик",
-		"четвероног", "дворняж", "котят", "котик", "зверюшк", 
+		"четвероног", "дворняж", "котят", "котик", "зверюшк",
 		"зоо", "ветклиник", "ветеринар", "груминг", "грумер", "любимц", "любимец", "корм",
 		"кинолог", "дрессиров", "зоонян", "догситер", "догситтер", "передержк", "сббж", "ветцентр", "лапк", "выгул",
 	}
@@ -324,8 +325,8 @@ func isRelevantGroup(g vk.Group, currentCityID int, currentCityTitle string) boo
 	salesPhrases := []string{"продаются щенки", "продаются котята", "в продаже", "наша цена"}
 	if hasPrefixInWords(salesPrefixes) || containsPhrase(salesPhrases) || hasExactInWords([]string{"доставка", "цена", "цены", "услуги"}) {
 		allowedSalesPrefixes := []string{
-			"приют", "спасен", "благотворительн", "волонтер", "пожертв", 
-			"зоо", "питомник", "вет", "грум", "кинолог", "дрессиров", 
+			"приют", "спасен", "благотворительн", "волонтер", "пожертв",
+			"зоо", "питомник", "вет", "грум", "кинолог", "дрессиров",
 			"догситер", "догситтер", "зоонян", "передержк", "сббж", "стрижк", "выгул", "аптек", "постри",
 		}
 		if !hasPrefixInWords(allowedSalesPrefixes) && !containsPhrase([]string{"помощь бездомным"}) && !hasExactInWords([]string{"сбор", "фонд", "магазин", "магазины", "специалист", "мастер"}) {

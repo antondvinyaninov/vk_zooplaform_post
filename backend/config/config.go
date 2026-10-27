@@ -21,7 +21,9 @@ type Config struct {
 	VKOfficialGroupToken string
 	VKOfficialGroupID    int
 
-	DatabaseURL  string
+	PublicBaseURL string
+
+	DatabaseURL string
 }
 
 // Load загружает конфигурацию из переменных окружения
@@ -42,7 +44,9 @@ func Load() *Config {
 		VKOfficialGroupToken: getEnv("VK_OFFICIAL_GROUP_TOKEN", ""),
 		VKOfficialGroupID:    getEnvInt("VK_OFFICIAL_GROUP_ID", 165434330),
 
-		DatabaseURL:  getEnv("DB_URL", getEnv("DATABASE_URL", "postgres://dvinyaninov_pet:ps8uGNxn0uVf0VK23@155.212.168.69:5596/vkpet?sslmode=disable")),
+		PublicBaseURL: getEnv("PUBLIC_BASE_URL", "https://vk.zooplatforma.ru"),
+
+		DatabaseURL: getEnv("DB_URL", getEnv("DATABASE_URL", "postgres://dvinyaninov_pet:ps8uGNxn0uVf0VK23@155.212.168.69:5596/vkpet?sslmode=disable")),
 	}
 }
 

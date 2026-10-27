@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type vkAccount struct {
@@ -376,9 +377,10 @@ func getActiveAccountToken() (string, error) {
 		SELECT access_token
 		FROM vk_accounts
 		WHERE is_active = ?
+		  AND (token_expires IS NULL OR token_expires = 0 OR token_expires > ?)
 		ORDER BY updated_at DESC
 		LIMIT 1
-	`, true).Scan(&token)
+	`, true, time.Now().UnixMilli()).Scan(&token)
 	if err != nil {
 		return "", err
 	}
@@ -398,8 +400,9 @@ func listUserPhotoTokens() []string {
 		SELECT access_token
 		FROM vk_accounts
 		WHERE COALESCE(access_token, '') <> ''
+		  AND (token_expires IS NULL OR token_expires = 0 OR token_expires > ?)
 		ORDER BY is_active ASC, updated_at DESC
-	`)
+	`, time.Now().UnixMilli())
 	if err != nil {
 		log.Printf("[vk_accounts] list tokens: %v", err)
 		return nil
