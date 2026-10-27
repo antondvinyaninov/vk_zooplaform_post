@@ -170,7 +170,7 @@ func vkOAuthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("VK ID: %d, scope: %s, permissions mask: %d", token.UserID, token.Scope, mask),
 	)
 
-	successURL := "/vk-connect/?connected=1"
+	successURL := "/settings/?connected=1"
 	if videoMissing {
 		successURL += "&warning=missing_video"
 	}
@@ -282,7 +282,7 @@ func missingScopes(scope string, mask int) []string {
 }
 
 func redirectOAuthError(w http.ResponseWriter, r *http.Request, code string) {
-	http.Redirect(w, r, "/vk-connect/?error="+url.QueryEscape(code), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/settings/?error="+url.QueryEscape(code), http.StatusTemporaryRedirect)
 }
 
 func redirectOAuthMissingScope(w http.ResponseWriter, r *http.Request, missing []string, mask int) {
@@ -290,7 +290,7 @@ func redirectOAuthMissingScope(w http.ResponseWriter, r *http.Request, missing [
 	params.Set("error", "missing_scope")
 	params.Set("need", strings.Join(missing, ","))
 	params.Set("mask", fmt.Sprintf("%d", mask))
-	http.Redirect(w, r, "/vk-connect/?"+params.Encode(), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/settings/?"+params.Encode(), http.StatusTemporaryRedirect)
 }
 
 // vkOAuthTokenHandler оставлен для обратной совместимости старого маршрута.
