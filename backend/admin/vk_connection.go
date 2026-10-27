@@ -1,8 +1,12 @@
 package admin
 
 import (
+	"context"
+
+	"backend/config"
 	"backend/database"
 	"backend/models"
+	"backend/vkaccounts"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -170,6 +174,10 @@ func (e stringError) Error() string { return string(e) }
 func errString(v string) error { return stringError(v) }
 
 func upsertVKAccount(accessToken string, vkUserID int, userName, userPhoto string, tokenExpires int64) error {
+	return upsertVKAccountFull(accessToken, "", "", "", vkUserID, userName, userPhoto, tokenExpires)
+}
+
+func upsertVKAccountFull(accessToken, refreshToken, deviceID, scope string, vkUserID int, userName, userPhoto string, tokenExpires int64) error {
 	tx, err := database.Begin()
 	if err != nil {
 		return err
@@ -185,13 +193,16 @@ func upsertVKAccount(accessToken string, vkUserID int, userName, userPhoto strin
 		result, err := tx.Exec(database.Rebind(`
 			UPDATE vk_accounts
 			SET access_token = ?,
+			    refresh_token = ?,
+			    device_id = ?,
+			    scope = ?,
 			    user_name = ?,
 			    user_photo = ?,
 			    token_expires = ?,
 			    is_active = ?,
 			    updated_at = CURRENT_TIMESTAMP
 			WHERE vk_user_id = ?
-		`), accessToken, userName, userPhoto, nullInt64(tokenExpires), true, vkUserID)
+		`), accessToken, refreshToken, deviceID, scope, userName, userPhoto, nullInt64(tokenExpires), true, vkUserID)
 		if err != nil {
 			return err
 		}
@@ -201,9 +212,9 @@ func upsertVKAccount(accessToken string, vkUserID int, userName, userPhoto strin
 
 	if !updated {
 		if _, err := tx.Exec(database.Rebind(`
-			INSERT INTO vk_accounts (vk_user_id, user_name, user_photo, access_token, token_expires, is_active, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-		`), nullInt(vkUserID), userName, userPhoto, accessToken, nullInt64(tokenExpires), true); err != nil {
+			INSERT INTO vk_accounts (vk_user_id, user_name, user_photo, access_token, refresh_token, device_id, scope, token_expires, is_active, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		`), nullInt(vkUserID), userName, userPhoto, accessToken, refreshToken, deviceID, scope, nullInt64(tokenExpires), true); err != nil {
 			return err
 		}
 	}
@@ -372,19 +383,7 @@ func nullInt64(v int64) interface{} {
 
 // getActiveAccountToken возвращает access_token активного аккаунта из vk_accounts
 func getActiveAccountToken() (string, error) {
-	var token string
-	err := database.QueryRow(`
-		SELECT access_token
-		FROM vk_accounts
-		WHERE is_active = ?
-		  AND (token_expires IS NULL OR token_expires = 0 OR token_expires > ?)
-		ORDER BY updated_at DESC
-		LIMIT 1
-	`, true, time.Now().UnixMilli()).Scan(&token)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(token), nil
+	return vkaccounts.ActiveToken(context.Background(), config.Load())
 }
 
 func getActiveAccountTokenOrEmpty() string {

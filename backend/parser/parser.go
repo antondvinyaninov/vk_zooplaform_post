@@ -1,8 +1,10 @@
 package parser
 
 import (
+	"backend/config"
 	"backend/database"
 	"backend/vk"
+	"backend/vkaccounts"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -73,19 +75,7 @@ func StopParsing() error {
 }
 
 func getActiveVKToken() (string, error) {
-	var token string
-	err := database.QueryRow(`
-		SELECT access_token
-		FROM vk_accounts
-		WHERE is_active = true
-		  AND (token_expires IS NULL OR token_expires = 0 OR token_expires > ?)
-		ORDER BY updated_at DESC
-		LIMIT 1
-	`, time.Now().UnixMilli()).Scan(&token)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(token), nil
+	return vkaccounts.ActiveToken(context.Background(), config.Load())
 }
 
 func runParsingTask(ctx context.Context, taskID int64, keywords []string, cities []string) {

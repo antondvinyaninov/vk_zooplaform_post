@@ -7,9 +7,11 @@ import (
 	s3client "backend/s3"
 	"backend/utils"
 	"backend/vk"
+	"backend/vkaccounts"
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -3111,22 +3113,14 @@ func userWallPhotoToken() string {
 }
 
 func getActiveVKToken() (string, error) {
-	var token string
-	err := database.QueryRow(`
-		SELECT access_token
-		FROM vk_accounts
-		WHERE is_active = ?
-		  AND (token_expires IS NULL OR token_expires = 0 OR token_expires > ?)
-		ORDER BY updated_at DESC
-		LIMIT 1
-	`, true, time.Now().UnixMilli()).Scan(&token)
-	if err == sql.ErrNoRows {
+	token, err := vkaccounts.ActiveToken(context.Background(), config.Load())
+	if errors.Is(err, vkaccounts.ErrNoToken) || errors.Is(err, vkaccounts.ErrTokenExpired) {
 		return "", nil
 	}
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(token), nil
+	return token, nil
 }
 
 type notificationDeliveryReport struct {
@@ -3727,13 +3721,8 @@ func pushWallPhotoUploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func hasActivePhotosUserToken() bool {
-	var n int
-	err := database.QueryRow(`
-		SELECT COUNT(*) FROM vk_accounts
-		WHERE is_active = ? AND COALESCE(access_token, '') <> ''
-		  AND (token_expires IS NULL OR token_expires = 0 OR token_expires > ?)
-	`, true, time.Now().UnixMilli()).Scan(&n)
-	return err == nil && n > 0
+	token, err := vkaccounts.ActiveToken(context.Background(), config.Load())
+	return err == nil && strings.TrimSpace(token) != ""
 }
 
 func upsertPhotosUserToken(vkUserID int, accessToken, userName, userPhoto string, tokenExpires int64) error {

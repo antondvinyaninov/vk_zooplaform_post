@@ -87,6 +87,10 @@ func createTables() error {
 		return err
 	}
 
+	if err := migrateVKAccountsTable(); err != nil {
+		return err
+	}
+
 	if err := migrateParsedGroupsTable(); err != nil {
 		return err
 	}
@@ -314,11 +318,11 @@ func migrateParsedGroupsTable() error {
 	if err := addColumnIfMissing("parsed_groups", "updated_at", "TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP"); err != nil {
 		return err
 	}
-	
+
 	// Add unique constraint for vk_group_id to allow ON CONFLICT to work
 	DB.Exec(`ALTER TABLE parsed_groups DROP CONSTRAINT IF EXISTS parsed_groups_task_id_vk_group_id_key`)
 	DB.Exec(`ALTER TABLE parsed_groups ADD CONSTRAINT parsed_groups_vk_group_id_key UNIQUE (vk_group_id)`)
-	
+
 	return nil
 }
 
@@ -475,6 +479,22 @@ func seedVKConnectionRow() error {
 		ON CONFLICT (id) DO NOTHING`
 	_, err := DB.Exec(query)
 	return err
+}
+
+func migrateVKAccountsTable() error {
+	for _, column := range []struct {
+		name       string
+		definition string
+	}{
+		{"refresh_token", "TEXT"},
+		{"device_id", "TEXT"},
+		{"scope", "TEXT"},
+	} {
+		if err := addColumnIfMissing("vk_accounts", column.name, column.definition); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func migrateVKAccountsFromLegacy() error {
