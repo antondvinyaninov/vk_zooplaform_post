@@ -118,9 +118,21 @@ func vkOAuthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	missing := missingScopes(token.Scope, mask)
-	if len(missing) > 0 {
+	photosMissing, videoMissing := false, false
+	for _, name := range missing {
+		switch name {
+		case "photos":
+			photosMissing = true
+		case "video":
+			videoMissing = true
+		}
+	}
+	if photosMissing {
 		redirectOAuthMissingScope(w, r, missing, mask)
 		return
+	}
+	if videoMissing {
+		log.Printf("[VK OAuth] video scope missing for VK ID %d (mask %d)", token.UserID, mask)
 	}
 
 	userName, userPhoto := "", ""
@@ -158,7 +170,11 @@ func vkOAuthCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("VK ID: %d, scope: %s, permissions mask: %d", token.UserID, token.Scope, mask),
 	)
 
-	http.Redirect(w, r, "/vk-connect?connected=1", http.StatusTemporaryRedirect)
+	successURL := "/vk-connect/?connected=1"
+	if videoMissing {
+		successURL += "&warning=missing_video"
+	}
+	http.Redirect(w, r, successURL, http.StatusTemporaryRedirect)
 }
 
 func exchangeVKIDToken(ctx context.Context, form url.Values) (*vkIDTokenResponse, error) {
@@ -266,7 +282,7 @@ func missingScopes(scope string, mask int) []string {
 }
 
 func redirectOAuthError(w http.ResponseWriter, r *http.Request, code string) {
-	http.Redirect(w, r, "/vk-connect?error="+url.QueryEscape(code), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/vk-connect/?error="+url.QueryEscape(code), http.StatusTemporaryRedirect)
 }
 
 func redirectOAuthMissingScope(w http.ResponseWriter, r *http.Request, missing []string, mask int) {
@@ -274,7 +290,7 @@ func redirectOAuthMissingScope(w http.ResponseWriter, r *http.Request, missing [
 	params.Set("error", "missing_scope")
 	params.Set("need", strings.Join(missing, ","))
 	params.Set("mask", fmt.Sprintf("%d", mask))
-	http.Redirect(w, r, "/vk-connect?"+params.Encode(), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, "/vk-connect/?"+params.Encode(), http.StatusTemporaryRedirect)
 }
 
 // vkOAuthTokenHandler оставлен для обратной совместимости старого маршрута.
