@@ -49,7 +49,7 @@ export const Profile: FC<ProfileProps> = ({ id, fetchedUser, appUser, role, onAp
   const [photosGranting, setPhotosGranting] = useState(false);
   const [snackbar, setSnackbar] = useState<React.ReactNode | null>(null);
   
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const launchRole = String((window as any).vkLaunchParams?.vk_viewer_group_role || '');
   const isAdmin = ['admin', 'editor', 'moder'].includes(role || launchRole);

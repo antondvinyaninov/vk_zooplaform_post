@@ -1,5 +1,5 @@
 # Сборка VK Mini App
-FROM node:20-alpine AS vk-app-builder
+FROM node:22-alpine AS vk-app-builder
 
 WORKDIR /app/vk_app
 COPY vk_app/package*.json ./
@@ -9,7 +9,7 @@ COPY vk_app/ ./
 RUN npm run build
 
 # Сборка Go бэкенда
-FROM golang:1.25-alpine AS backend-builder
+FROM golang:1.26-alpine AS backend-builder
 
 # Устанавливаем необходимые пакеты
 RUN apk add --no-cache gcc musl-dev
